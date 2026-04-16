@@ -21,6 +21,14 @@ def set_gt_in_data(data_list, idx, gt):
 
 
 def calculate_ground_truth(data_list, evaluate_window_len):
+    if not data_list:
+        return
+
+    if len(data_list) <= evaluate_window_len:
+        for idx in range(len(data_list) - 1, -1, -1):
+            set_gt_in_data(data_list, idx, TREND.UNKNOWN)
+        return
+
     last_idx = len(data_list) - 1
     first_colourful_idx = last_idx - evaluate_window_len
 

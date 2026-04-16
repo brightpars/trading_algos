@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center">
+  <h1>Experiment {{ experiment.experiment_id }}</h1>
+  <a class="btn btn-outline-primary" href="{{ url_for('experiments.compare', experiment_id=experiment.experiment_id) }}">Compare view</a>
+</div>
+<p><strong>Symbol:</strong> {{ experiment.symbol }} | <strong>Candles:</strong> {{ experiment.candle_count }}</p>
+{% for result in results %}
+  <div class="card mb-4">
+    <div class="card-body">
+      <h3 class="h5">{{ result.alg_name }}</h3>
+      <p><strong>Params:</strong> <code>{{ result.alg_param }}</code></p>
+      <p><strong>Latest decision:</strong> {{ result.latest_decision.trend }} (confidence={{ result.latest_decision.confidence }})</p>
+      <p><strong>Signal summary:</strong> {{ result.signal_summary }}</p>
+      <pre class="small bg-light p-3 rounded">{{ result.eval_dict }}</pre>
+      <div class="chart-container" data-chart='{{ result.chart_payload|tojson if result.chart_payload else "null" }}'></div>
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

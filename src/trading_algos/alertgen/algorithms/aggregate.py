@@ -200,3 +200,6 @@ class agreegate_algs(BaseAlertAlgorithm):
         if payload:
             result.append((payload, title))
         return result
+
+
+AggregateAlertAlgorithm = agreegate_algs

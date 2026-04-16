@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Report bundle for {{ experiment.experiment_id }}</h1>
+{% for result in results %}
+  <div class="card mb-3">
+    <div class="card-body">
+      <h2 class="h5">{{ result.alg_name }}</h2>
+      <p><strong>Report path:</strong> <code>{{ result.report_refs.report_data_path }}</code></p>
+      <p><strong>Figure path:</strong> <code>{{ result.report_refs.figure_path }}</code></p>
+      <pre class="small bg-light p-3 rounded">{{ result.eval_dict }}</pre>
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

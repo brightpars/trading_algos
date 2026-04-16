@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ algorithm.name }}</h1>
+<dl class="row">
+  <dt class="col-sm-3">Key</dt><dd class="col-sm-9"><code>{{ algorithm.key }}</code></dd>
+  <dt class="col-sm-3">Description</dt><dd class="col-sm-9">{{ algorithm.description }}</dd>
+  <dt class="col-sm-3">Category</dt><dd class="col-sm-9">{{ algorithm.category }}</dd>
+  <dt class="col-sm-3">Tags</dt><dd class="col-sm-9">{{ algorithm.tags|join(', ') }}</dd>
+  <dt class="col-sm-3">Default params</dt><dd class="col-sm-9"><code>{{ algorithm.default_param }}</code></dd>
+</dl>
+<a class="btn btn-primary" href="{{ url_for('experiments.new_experiment') }}">Run this algorithm</a>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Experiment history</h1>
+<table class="table table-striped">
+  <thead><tr><th>ID</th><th>Symbol</th><th>Status</th><th>Candles</th><th>Created</th><th></th></tr></thead>
+  <tbody>
+    {% for item in experiments %}
+    <tr>
+      <td><code>{{ item.experiment_id }}</code></td>
+      <td>{{ item.symbol }}</td>
+      <td>{{ item.status }}</td>
+      <td>{{ item.candle_count }}</td>
+      <td>{{ item.created_at }}</td>
+      <td><a href="{{ url_for('experiments.detail', experiment_id=item.experiment_id) }}">Open</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

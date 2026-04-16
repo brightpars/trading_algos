@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Alert generation and decision-making algorithms for smarttrade"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["flask>=3.0", "pymongo>=4.6"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -25,6 +25,10 @@ exclude = ["^build/"]
 
 [[tool.mypy.overrides]]
 module = ["scipy", "scipy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["utils_shared", "utils_shared.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

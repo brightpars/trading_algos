@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Comparison for {{ experiment.experiment_id }}</h1>
+<table class="table table-bordered">
+  <thead><tr><th>Algorithm</th><th>Params</th><th>Trend</th><th>Confidence</th><th>Signals</th></tr></thead>
+  <tbody>
+  {% for result in results %}
+    <tr>
+      <td>{{ result.alg_name }}</td>
+      <td><code>{{ result.alg_param }}</code></td>
+      <td>{{ result.latest_decision.trend }}</td>
+      <td>{{ result.latest_decision.confidence }}</td>
+      <td>{{ result.signal_summary }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

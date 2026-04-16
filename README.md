@@ -2,6 +2,43 @@ Trading Algos
 
 This repository contains reusable trading-oriented algorithm libraries, with `alertgen` focused on generating buy/sell/neutral alerts from market candles.
 
+## Dashboard MVP
+
+This repository now also contains a lightweight Flask dashboard package at `src/trading_algos_dashboard` for:
+
+- browsing registered alert algorithms,
+- launching experiment runs against smarttrade-backed market data,
+- comparing algorithm outputs,
+- reviewing saved reports and experiment history persisted in MongoDB.
+
+### Run the dashboard
+
+1. Ensure MongoDB is available.
+2. Ensure the smarttrade repository is available at `/home/mohammad/development/smarttrade` or set `SMARTTRADE_PATH`.
+3. Install dashboard dependencies into the project venv.
+4. Run with:
+
+```bash
+./.venv/bin/python -m flask --app trading_algos_dashboard.app:create_app run
+```
+
+Or use the helper launcher:
+
+```bash
+bash /home/mohammad/development/trading_algos/scripts/run_dashboard.sh
+```
+
+The helper script sets `PYTHONPATH` to the repo `src/` directory automatically so the dashboard package can be imported without installing the project first.
+By default, it starts the dashboard on port `2000`.
+
+Useful environment variables:
+
+- `TRADING_ALGOS_DASHBOARD_MONGO_URI`
+- `TRADING_ALGOS_DASHBOARD_MONGO_DB`
+- `TRADING_ALGOS_DASHBOARD_REPORT_PATH`
+- `SMARTTRADE_PATH`
+- `TRADING_ALGOS_DASHBOARD_SMARTTRADE_USER_ID`
+
 ## Alertgen direction
 
 `alertgen` is structured around `BaseAlertAlgorithm`, which acts as the base contract for concrete alert algorithms. The goal is to grow this into a large library of trading algorithms that can be mixed, validated, evaluated, and composed consistently.
