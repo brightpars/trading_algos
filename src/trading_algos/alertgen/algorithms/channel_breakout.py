@@ -171,7 +171,3 @@ class CloseHighChannelBreakoutAlertAlgorithm(RollingChannelBreakoutAlertAlgorith
                 self.latest_predicted_trend = TREND.UNKNOWN
         else:
             self.latest_predicted_trend = TREND.UNKNOWN
-
-
-alg200 = RollingChannelBreakoutAlertAlgorithm
-alg201 = CloseHighChannelBreakoutAlertAlgorithm

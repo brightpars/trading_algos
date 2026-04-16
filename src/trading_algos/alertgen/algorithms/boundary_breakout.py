@@ -264,8 +264,3 @@ class LowAnchoredBoundaryBreakoutAlertAlgorithm(BoundaryBreakoutAlertAlgorithm):
 
     def is_high_boundry_broken_higher(self):
         return self.high_boundry < self.latest_data_modifiable["Low"]
-
-
-alg100 = BoundaryBreakoutAlertAlgorithm
-alg101 = DoubleRedConfirmationAlertAlgorithm
-alg102 = LowAnchoredBoundaryBreakoutAlertAlgorithm

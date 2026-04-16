@@ -1,7 +1,4 @@
-from trading_algos.alertgen.algorithms.aggregate import (
-    AggregateAlertAlgorithm,
-    agreegate_algs,
-)
+from trading_algos.alertgen.algorithms.aggregate import agreegate_algs
 from trading_algos.alertgen.algorithms.boundary_breakout import (
     BoundaryBreakoutAlertAlgorithm,
     DoubleRedConfirmationAlertAlgorithm,
@@ -13,7 +10,6 @@ from trading_algos.alertgen.algorithms.channel_breakout import (
 )
 
 __all__ = [
-    "AggregateAlertAlgorithm",
     "BoundaryBreakoutAlertAlgorithm",
     "CloseHighChannelBreakoutAlertAlgorithm",
     "DoubleRedConfirmationAlertAlgorithm",
