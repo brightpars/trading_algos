@@ -1,6 +1,8 @@
 import json
 
-from trading_algos.alertgen.algorithm_registry import get_alert_algorithm_spec_by_key
+from trading_algos.alertgen.core.algorithm_registry import (
+    get_alert_algorithm_spec_by_key,
+)
 
 
 def _validate_required_keys(payload, required_keys, label):
@@ -85,7 +87,7 @@ def _normalize_alertgen_engine_type(engine_type, label):
 
 
 def _normalize_alertgen_alg_param(*, alg_key, raw_alg_param, label):
-    from trading_algos.alertgen.catalog import register_builtin_alert_algorithms
+    from trading_algos.alertgen.core.catalog import register_builtin_alert_algorithms
 
     register_builtin_alert_algorithms()
     spec = get_alert_algorithm_spec_by_key(alg_key)

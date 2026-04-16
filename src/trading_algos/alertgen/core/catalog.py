@@ -1,18 +1,18 @@
-from trading_algos.alertgen.alg_aggregate import agreegate_algs
-from trading_algos.alertgen.breakout_boundary_variants import (
+from trading_algos.alertgen.algorithms.aggregate import agreegate_algs
+from trading_algos.alertgen.algorithms.boundary_breakout import (
     BoundaryBreakoutAlertAlgorithm,
     DoubleRedConfirmationAlertAlgorithm,
     LowAnchoredBoundaryBreakoutAlertAlgorithm,
 )
-from trading_algos.alertgen.channel_breakout_variants import (
+from trading_algos.alertgen.algorithms.channel_breakout import (
     CloseHighChannelBreakoutAlertAlgorithm,
     RollingChannelBreakoutAlertAlgorithm,
 )
-from trading_algos.alertgen.algorithm_registry import (
+from trading_algos.alertgen.core.algorithm_registry import (
     AlertAlgorithmSpec,
     register_alert_algorithm,
 )
-from trading_algos.alertgen.validation import (
+from trading_algos.alertgen.core.validation import (
     require_buy_sell_window_param,
     require_period_param,
     require_window_param,

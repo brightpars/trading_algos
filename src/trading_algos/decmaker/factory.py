@@ -1,4 +1,4 @@
-from trading_algos.decmaker.alg1 import alg1
+from trading_algos.decmaker.algorithms.alg1 import alg1
 
 
 def create_decmaker_algorithm(container_obj, engine_config):

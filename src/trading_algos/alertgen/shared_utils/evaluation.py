@@ -4,8 +4,8 @@ from typing import Any
 
 from scipy import stats
 
-from trading_algos.alertgen.common import TREND
-from trading_algos.alertgen.models import EvaluationSummary
+from trading_algos.alertgen.shared_utils.common import TREND
+from trading_algos.alertgen.shared_utils.models import EvaluationSummary
 
 
 def _linregress_slope_and_rvalue(x: list[float], y: list[float]) -> tuple[float, float]:

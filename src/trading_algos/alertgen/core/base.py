@@ -3,14 +3,22 @@ import logging
 import os
 from abc import ABC, abstractmethod
 
-from trading_algos.alertgen.common import CANDLE_COLOUR, TREND
-from trading_algos.alertgen.evaluation import (
+from trading_algos.alertgen.shared_utils.common import CANDLE_COLOUR, TREND
+from trading_algos.alertgen.shared_utils.evaluation import (
     calculate_ground_truth,
     evaluate_predictions,
 )
-from trading_algos.alertgen.models import AlgorithmDecision, AlgorithmMetadata, Candle
-from trading_algos.alertgen.plotting import PLOT, add_normal_graph, save_figure
-from trading_algos.alertgen.reporting import write_analysis_report_bundle
+from trading_algos.alertgen.shared_utils.models import (
+    AlgorithmDecision,
+    AlgorithmMetadata,
+    Candle,
+)
+from trading_algos.alertgen.shared_utils.plotting import (
+    PLOT,
+    add_normal_graph,
+    save_figure,
+)
+from trading_algos.alertgen.shared_utils.reporting import write_analysis_report_bundle
 
 
 LOGGER = logging.getLogger(__name__)

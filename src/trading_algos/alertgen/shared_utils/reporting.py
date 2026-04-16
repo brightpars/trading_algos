@@ -6,8 +6,8 @@ import os
 
 import matplotlib.pyplot as plt
 
-from trading_algos.alertgen.models import AnalysisReportData
-from trading_algos.alertgen.plotting import save_figure
+from trading_algos.alertgen.shared_utils.models import AnalysisReportData
+from trading_algos.alertgen.shared_utils.plotting import save_figure
 
 
 def serialize_analysis_report(path, filename, data_list, eval_dict):

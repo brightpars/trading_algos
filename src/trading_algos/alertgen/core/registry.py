@@ -1,5 +1,5 @@
-from trading_algos.alertgen.algorithm_registry import list_alert_algorithm_specs
-from trading_algos.alertgen.catalog import register_builtin_alert_algorithms
+from trading_algos.alertgen.core.algorithm_registry import list_alert_algorithm_specs
+from trading_algos.alertgen.core.catalog import register_builtin_alert_algorithms
 
 
 def get_default_alertgen_sensor_config(name="sensor_0"):

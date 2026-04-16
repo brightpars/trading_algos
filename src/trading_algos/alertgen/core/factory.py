@@ -1,5 +1,7 @@
-from trading_algos.alertgen.algorithm_registry import get_alert_algorithm_spec_by_key
-from trading_algos.alertgen.catalog import register_builtin_alert_algorithms
+from trading_algos.alertgen.core.algorithm_registry import (
+    get_alert_algorithm_spec_by_key,
+)
+from trading_algos.alertgen.core.catalog import register_builtin_alert_algorithms
 
 
 def create_alertgen_algorithm(sensor_config, report_base_path):

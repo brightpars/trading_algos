@@ -3,21 +3,24 @@ import json
 import pytest
 
 from trading_algos.alertgen import list_alert_algorithm_specs
-from trading_algos.alertgen.algorithm_registry import (
-    get_alert_algorithm_spec_by_key,
+from trading_algos.alertgen.algorithms.aggregate import (
+    AggregateAlertAlgorithm,
+    agreegate_algs,
 )
-from trading_algos.alertgen.alg_aggregate import AggregateAlertAlgorithm, agreegate_algs
-from trading_algos.alertgen.breakout_boundary_variants import (
+from trading_algos.alertgen.algorithms.boundary_breakout import (
     LowAnchoredBoundaryBreakoutAlertAlgorithm,
 )
-from trading_algos.alertgen.channel_breakout_variants import (
+from trading_algos.alertgen.algorithms.channel_breakout import (
     CloseHighChannelBreakoutAlertAlgorithm,
     RollingChannelBreakoutAlertAlgorithm,
 )
-from trading_algos.alertgen.factory import create_alertgen_algorithm
-from trading_algos.alertgen.models import Candle
-from trading_algos.alertgen.reporting import serialize_analysis_report
-from trading_algos.alertgen.validation import normalize_alertgen_sensor_config
+from trading_algos.alertgen.core.algorithm_registry import (
+    get_alert_algorithm_spec_by_key,
+)
+from trading_algos.alertgen.core.factory import create_alertgen_algorithm
+from trading_algos.alertgen.core.validation import normalize_alertgen_sensor_config
+from trading_algos.alertgen.shared_utils.models import Candle
+from trading_algos.alertgen.shared_utils.reporting import serialize_analysis_report
 
 
 def _sample_rows(count=5, *, flat=False):
@@ -362,7 +365,7 @@ def test_validation_accepts_alg_key_without_alg_code():
 
 
 def test_default_alertgen_sensor_config_prefers_alg_key_only():
-    from trading_algos.alertgen.registry import get_default_alertgen_sensor_config
+    from trading_algos.alertgen.core.registry import get_default_alertgen_sensor_config
 
     sensor = get_default_alertgen_sensor_config()
     sensor_config = sensor["sensor_config"]

@@ -1,6 +1,10 @@
-from trading_algos.alertgen.base import BaseAlertAlgorithm
-from trading_algos.alertgen.common import TREND
-from trading_algos.alertgen.plotting import PLOT, add_normal_graph, save_figure
+from trading_algos.alertgen.core.base import BaseAlertAlgorithm
+from trading_algos.alertgen.shared_utils.common import TREND
+from trading_algos.alertgen.shared_utils.plotting import (
+    PLOT,
+    add_normal_graph,
+    save_figure,
+)
 
 
 class RollingChannelBreakoutAlertAlgorithm(BaseAlertAlgorithm):

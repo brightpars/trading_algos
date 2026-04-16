@@ -21,7 +21,7 @@ This repository contains reusable trading-oriented algorithm libraries, with `al
 
 1. Implement a new subclass of `BaseAlertAlgorithm`.
 2. Define its prediction logic in `trend_prediction_logic()`.
-3. Register it in `src/trading_algos/alertgen/catalog.py` with:
+3. Register it in `src/trading_algos/alertgen/core/catalog.py` with:
    - stable key/name
    - parameter normalizer
    - default parameter

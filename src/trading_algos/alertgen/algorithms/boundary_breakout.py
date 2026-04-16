@@ -1,6 +1,6 @@
-from trading_algos.alertgen.base import BaseAlertAlgorithm
-from trading_algos.alertgen.common import CANDLE_COLOUR, TREND
-from trading_algos.alertgen.plotting import (
+from trading_algos.alertgen.core.base import BaseAlertAlgorithm
+from trading_algos.alertgen.shared_utils.common import CANDLE_COLOUR, TREND
+from trading_algos.alertgen.shared_utils.plotting import (
     PLOT,
     add_normal_graph,
     add_special_graph,
