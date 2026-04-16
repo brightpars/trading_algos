@@ -1,5 +1,7 @@
 import json
 
+from trading_algos.alertgen.algorithm_registry import get_alert_algorithm_spec_by_key
+
 
 def _validate_required_keys(payload, required_keys, label):
     missing_keys = [key for key in required_keys if key not in payload]
@@ -82,16 +84,49 @@ def _normalize_alertgen_engine_type(engine_type, label):
     return normalized
 
 
-def _normalize_alertgen_alg_param(alg_code, raw_alg_param, label):
-    if alg_code in [100, 101, 102]:
-        return _require_int_like(raw_alg_param, label)
-    if alg_code in [200, 201, 901]:
-        return _require_positive_int_like(raw_alg_param, label)
-    if alg_code == 902:
-        if not isinstance(raw_alg_param, list) or len(raw_alg_param) != 2:
-            raise ValueError(f"{label} must be a list of length 2")
-        return [_require_positive_int_like(item, label) for item in raw_alg_param]
-    raise ValueError(f"sensor_config alg_code={alg_code} is unsupported")
+def _normalize_alertgen_alg_param(*, alg_key, raw_alg_param, label):
+    from trading_algos.alertgen.catalog import register_builtin_alert_algorithms
+
+    register_builtin_alert_algorithms()
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+    return spec.param_normalizer(raw_alg_param, label)
+
+
+def _require_param_dict(raw_alg_param, label):
+    if not isinstance(raw_alg_param, dict):
+        raise ValueError(f"{label} must be a dict/JSON object")
+    return dict(raw_alg_param)
+
+
+def _require_single_positive_int_param(raw_alg_param, label, *, field_name):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(normalized, [field_name], label)
+    return {
+        field_name: _require_positive_int_like(
+            normalized[field_name], f"{label} {field_name}"
+        )
+    }
+
+
+def require_period_param(raw_alg_param, label):
+    return _require_single_positive_int_param(raw_alg_param, label, field_name="period")
+
+
+def require_window_param(raw_alg_param, label):
+    return _require_single_positive_int_param(raw_alg_param, label, field_name="window")
+
+
+def require_buy_sell_window_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(normalized, ["buy_window", "sell_window"], label)
+    return {
+        "buy_window": _require_positive_int_like(
+            normalized["buy_window"], f"{label} buy_window"
+        ),
+        "sell_window": _require_positive_int_like(
+            normalized["sell_window"], f"{label} sell_window"
+        ),
+    }
 
 
 def normalize_alertgen_sensor_config(
@@ -101,7 +136,7 @@ def normalize_alertgen_sensor_config(
         raise ValueError(f"{label} must be a dict/JSON object")
     normalized = dict(sensor_config)
     _validate_required_keys(
-        normalized, ["buy", "sell", "alg_code", "symbol", "alg_param"], label
+        normalized, ["buy", "sell", "symbol", "alg_param", "alg_key"], label
     )
     normalized["buy"] = _normalize_bool_like(normalized["buy"], f"{label} buy")
     normalized["sell"] = _normalize_bool_like(normalized["sell"], f"{label} sell")
@@ -110,11 +145,13 @@ def normalize_alertgen_sensor_config(
     normalized["symbol"] = _require_non_empty_string(
         normalized["symbol"], f"{label} symbol", reject_random_name=True
     )
-    normalized["alg_code"] = _require_int_like(
-        normalized["alg_code"], f"{label} alg_code"
+    normalized["alg_key"] = _require_non_empty_string(
+        normalized["alg_key"], f"{label} alg_key"
     )
     normalized["alg_param"] = _normalize_alertgen_alg_param(
-        normalized["alg_code"], normalized["alg_param"], f"{label} alg_param"
+        alg_key=normalized["alg_key"],
+        raw_alg_param=normalized["alg_param"],
+        label=f"{label} alg_param",
     )
     return normalized
 

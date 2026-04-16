@@ -11,9 +11,9 @@ POSITIVE_INFITIY_FLOAT = float("inf")
 NEGATIVE_INFITIY_FLOAT = float("-inf")
 
 
-class alg100(BaseAlertAlgorithm):
+class BoundaryBreakoutAlertAlgorithm(BaseAlertAlgorithm):
     def __init__(self, symbol, report_base_path, date_str="", evaluate_window_len=5):
-        self.alg_name = "alg100"
+        self.alg_name = "boundary_breakout"
         super().__init__(
             self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )
@@ -24,6 +24,31 @@ class alg100(BaseAlertAlgorithm):
         self.no_colourful_candle_seen_yet = True
         self.latest_predicted_trend = TREND.UNKNOWN
         self.breaks_dict = {}
+
+    @property
+    def low_boundary(self):
+        return self.low_boundry
+
+    @low_boundary.setter
+    def low_boundary(self, value):
+        self.low_boundry = value
+
+    @property
+    def high_boundary(self):
+        return self.high_boundry
+
+    @high_boundary.setter
+    def high_boundary(self, value):
+        self.high_boundry = value
+
+    def update_boundaries(self):
+        self.update_boundries()
+
+    def is_low_boundary_broken_lower(self):
+        return self.is_low_boundry_broken_lower()
+
+    def is_high_boundary_broken_higher(self):
+        return self.is_high_boundry_broken_higher()
 
     def update_boundries(self):
         if (
@@ -149,9 +174,9 @@ class alg100(BaseAlertAlgorithm):
         return [(payload, title)] if payload else []
 
 
-class alg101(alg100):
+class DoubleRedConfirmationAlertAlgorithm(BoundaryBreakoutAlertAlgorithm):
     def __init__(self, symbol, report_base_path, date_str="", evaluate_window_len=5):
-        self.alg_name = "alg101"
+        self.alg_name = "double_red_confirmation"
         BaseAlertAlgorithm.__init__(
             self, self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )
@@ -164,6 +189,15 @@ class alg101(alg100):
         self.breaks_dict = {}
         self.first_red_seen = False
         self.second_red_seen = False
+
+    def update_boundaries(self):
+        self.update_boundries()
+
+    def is_low_boundary_broken_lower(self):
+        return self.is_low_boundry_broken_lower()
+
+    def is_high_boundary_broken_higher(self):
+        return self.is_high_boundry_broken_higher()
 
     def update_boundries(self):
         if self.is_high_boundry_broken_higher():
@@ -178,7 +212,7 @@ class alg101(alg100):
         return self.latest_data_modifiable["Low"] > self.high_boundry
 
     def trend_prediction_logic(self):
-        alg100.trend_prediction_logic(self)
+        BoundaryBreakoutAlertAlgorithm.trend_prediction_logic(self)
         if self.is_high_boundry_broken_higher():
             self.first_red_seen = False
             self.second_red_seen = False
@@ -194,9 +228,9 @@ class alg101(alg100):
                 self.first_red_seen = True
 
 
-class alg102(alg100):
+class LowAnchoredBoundaryBreakoutAlertAlgorithm(BoundaryBreakoutAlertAlgorithm):
     def __init__(self, symbol, report_base_path, date_str="", evaluate_window_len=5):
-        self.alg_name = "alg102"
+        self.alg_name = "low_anchored_boundary_breakout"
         BaseAlertAlgorithm.__init__(
             self, self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )
@@ -210,6 +244,15 @@ class alg102(alg100):
         self.first_red_seen = False
         self.second_red_seen = False
 
+    def update_boundaries(self):
+        self.update_boundries()
+
+    def is_low_boundary_broken_lower(self):
+        return self.is_low_boundry_broken_lower()
+
+    def is_high_boundary_broken_higher(self):
+        return self.is_high_boundry_broken_higher()
+
     def update_boundries(self):
         if self.is_high_boundry_broken_higher():
             self.high_boundry = self.latest_data_modifiable["High"]
@@ -221,3 +264,8 @@ class alg102(alg100):
 
     def is_high_boundry_broken_higher(self):
         return self.high_boundry < self.latest_data_modifiable["Low"]
+
+
+alg100 = BoundaryBreakoutAlertAlgorithm
+alg101 = DoubleRedConfirmationAlertAlgorithm
+alg102 = LowAnchoredBoundaryBreakoutAlertAlgorithm

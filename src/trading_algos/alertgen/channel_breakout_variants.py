@@ -3,7 +3,7 @@ from trading_algos.alertgen.common import TREND
 from trading_algos.alertgen.plotting import PLOT, add_normal_graph, save_figure
 
 
-class alg200(BaseAlertAlgorithm):
+class RollingChannelBreakoutAlertAlgorithm(BaseAlertAlgorithm):
     class State:
         INIT = "init"
         BREAK_LOW = "break_low"
@@ -15,13 +15,16 @@ class alg200(BaseAlertAlgorithm):
     def __init__(
         self, symbol, report_base_path, date_str="", evaluate_window_len=5, wlen=20
     ):
-        self.alg_name = f"alg200_wlen={wlen}"
+        self.alg_name = f"rolling_channel_breakout_wlen={wlen}"
         super().__init__(
             self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )
         self.wlen = wlen
         self.latest_predicted_trend = TREND.UNKNOWN
         self.state = self.State.INIT
+
+    def minimum_history(self) -> int:
+        return self.wlen
 
     def trend_prediction_logic(self):
         if len(self.data_list) < 2:
@@ -106,25 +109,20 @@ class alg200(BaseAlertAlgorithm):
         return [(payload, title)] if payload else []
 
 
-class alg201(alg200):
-    class State:
-        INIT = "init"
-        BREAK_LOW = "break_low"
-        BREAK_LOW_SEEN = "break_low_seen"
-        BREAK_HIGH = "break_high"
-        BREAK_HIGH_SEEN = "break_high_seen"
-        BETWEEN_BREAK_LINES = "between_break_lines"
-
+class CloseHighChannelBreakoutAlertAlgorithm(RollingChannelBreakoutAlertAlgorithm):
     def __init__(
         self, symbol, report_base_path, date_str="", evaluate_window_len=5, wlen=20
     ):
-        self.alg_name = f"alg201_wlen={wlen}"
+        self.alg_name = f"close_high_channel_breakout_wlen={wlen}"
         BaseAlertAlgorithm.__init__(
             self, self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )
         self.wlen = wlen
         self.latest_predicted_trend = TREND.UNKNOWN
         self.state = self.State.INIT
+
+    def minimum_history(self) -> int:
+        return self.wlen
 
     def trend_prediction_logic(self):
         if len(self.data_list) < 2:
@@ -169,3 +167,7 @@ class alg201(alg200):
                 self.latest_predicted_trend = TREND.UNKNOWN
         else:
             self.latest_predicted_trend = TREND.UNKNOWN
+
+
+alg200 = RollingChannelBreakoutAlertAlgorithm
+alg201 = CloseHighChannelBreakoutAlertAlgorithm

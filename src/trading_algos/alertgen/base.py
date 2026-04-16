@@ -1,13 +1,16 @@
 import copy
-import json
 import logging
 import os
-
-import matplotlib.pyplot as plt
-from scipy import stats
+from abc import ABC, abstractmethod
 
 from trading_algos.alertgen.common import CANDLE_COLOUR, TREND
+from trading_algos.alertgen.evaluation import (
+    calculate_ground_truth,
+    evaluate_predictions,
+)
+from trading_algos.alertgen.models import AlgorithmDecision, AlgorithmMetadata, Candle
 from trading_algos.alertgen.plotting import PLOT, add_normal_graph, save_figure
+from trading_algos.alertgen.reporting import write_analysis_report_bundle
 
 
 LOGGER = logging.getLogger(__name__)
@@ -15,7 +18,7 @@ DEFAULT_FIGURE_W = 12
 DEFAULT_FIGURE_L = 4
 
 
-class BaseAlertAlgorithm:
+class BaseAlertAlgorithm(ABC):
     def __init__(
         self, alg_name, symbol, date_str, evaluate_window_len, report_base_path
     ):
@@ -37,6 +40,15 @@ class BaseAlertAlgorithm:
         self.evaluate_window_len = evaluate_window_len
         self.previous_predicted_trend = TREND.UNKNOWN
         self.latest_predicted_trend = TREND.UNKNOWN
+        self.latest_predicted_trend_confidence = 0.0
+
+    @property
+    def buy_signals(self):
+        return self.buy_SIGNALS
+
+    @property
+    def sell_signals(self):
+        return self.sell_SIGNALS
 
     def set_latest_candle_colour(self):
         data = self.latest_data
@@ -76,11 +88,9 @@ class BaseAlertAlgorithm:
             return
         self.latest_predicted_trend_confidence = 4.0
 
+    @abstractmethod
     def trend_prediction_logic(self):
-        LOGGER.error(
-            "trend_prediction_logic must be implemented in subclass and sets values for self.latest_predicted_trend and self.latest_predicted_trend_confidence"
-        )
-        self.latest_predicted_trend = TREND.UNKNOWN
+        """Set latest trend-related fields for the most recent candle."""
 
     def do_trend_prediction(self):
         self.trend_prediction_logic()
@@ -111,6 +121,7 @@ class BaseAlertAlgorithm:
         self.latest_data_modifiable["buy_RANGE_SIGNAL"] = (
             self.latest_predicted_trend == TREND.RANGE_UP
         )
+        self.latest_decision = self.current_decision()
 
     def process(self, data):
         self.previous_predicted_trend = self.latest_predicted_trend
@@ -119,7 +130,8 @@ class BaseAlertAlgorithm:
         except Exception:
             pass
 
-        self.latest_data = data
+        self.latest_candle = Candle.from_mapping(data)
+        self.latest_data = self.latest_candle.to_mapping()
         self.latest_data_modifiable = copy.deepcopy(self.latest_data)
         self.data_list.append(self.latest_data_modifiable)
         self.do_trend_prediction()
@@ -135,101 +147,13 @@ class BaseAlertAlgorithm:
         self.data_list[idx]["gt_trend"] = gt
 
     def calculate_ground_truth(self):
-        last_idx = len(self.data_list) - 1
-        self.evaluate_window_len = 5
-        first_colourful_idx = last_idx - self.evaluate_window_len
-
-        for idx in range(last_idx, first_colourful_idx - 1, -1):
-            self.set_gt_in_data(idx, TREND.UNKNOWN)
-
-        for idx in range(first_colourful_idx - 1, -1, -1):
-            y = [
-                self.data_list[idx]["Close"],
-                self.data_list[idx + self.evaluate_window_len - 1]["Close"],
-            ]
-            x = [1, self.evaluate_window_len]
-            slope, _, r, _, _ = stats.linregress(x, y)
-            if abs(r) < 0.7:
-                gt = self.data_list[idx + 1]["gt_trend"]
-            else:
-                threshold = 0.001
-                if slope > threshold:
-                    gt = TREND.UP
-                elif slope < -threshold:
-                    gt = TREND.DOWN
-                else:
-                    gt = self.data_list[idx + 1]["gt_trend"]
-            self.set_gt_in_data(idx, gt)
-
-        while True:
-            do_changed = False
-            for idx in range(first_colourful_idx - 3, -1, -1):
-                begin_idx = idx
-                mid_idx = idx + 1
-                end_idx = idx + 2
-                if (
-                    self.data_list[begin_idx]["gt_trend"]
-                    == self.data_list[end_idx]["gt_trend"]
-                ):
-                    if (
-                        self.data_list[begin_idx]["gt_trend"]
-                        != self.data_list[mid_idx]["gt_trend"]
-                    ):
-                        gt = self.data_list[begin_idx]["gt_trend"]
-                        self.set_gt_in_data(mid_idx, gt)
-                        do_changed = True
-            if do_changed is False:
-                break
-
-        while True:
-            do_changed = False
-            for idx in range(first_colourful_idx - 4, -1, -1):
-                begin_idx = idx
-                mid_idx = idx + 1
-                end_idx = idx + 3
-                if (
-                    self.data_list[begin_idx]["gt_trend"]
-                    == self.data_list[end_idx]["gt_trend"]
-                ):
-                    if (
-                        self.data_list[begin_idx]["gt_trend"]
-                        != self.data_list[mid_idx]["gt_trend"]
-                    ):
-                        gt = self.data_list[begin_idx]["gt_trend"]
-                        self.set_gt_in_data(mid_idx, gt)
-                        self.set_gt_in_data(mid_idx + 1, gt)
-                        do_changed = True
-            if do_changed is False:
-                break
+        calculate_ground_truth(self.data_list, self.evaluate_window_len)
 
     def evaluate(self):
-        correct_prediction_no = 0
-        wrong_prediction_no = 0
-        absolute_wrong_no = 0
-        correct_buy_signal_no = 0
-        correct_sell_signal_no = 0
-
         self.calculate_ground_truth()
-        for idx, predicted_trend in enumerate(self.predicted_trend_list):
-            ground_truth_trend = self.data_list[idx]["gt_trend"]
-            if predicted_trend == ground_truth_trend:
-                correct_prediction_no += 1
-            else:
-                wrong_prediction_no += 1
-            if ground_truth_trend == TREND.UP and predicted_trend == TREND.DOWN:
-                absolute_wrong_no += 1
-            if ground_truth_trend == TREND.DOWN and predicted_trend == TREND.UP:
-                absolute_wrong_no += 1
-            if predicted_trend == TREND.UP and ground_truth_trend == TREND.UP:
-                correct_buy_signal_no += 1
-            if predicted_trend == TREND.DOWN and ground_truth_trend == TREND.DOWN:
-                correct_sell_signal_no += 1
-
-        self.eval_dict["B~"] = len(self.buy_SIGNALS)
-        self.eval_dict["B+"] = correct_buy_signal_no
-        self.eval_dict["S~"] = len(self.sell_SIGNALS)
-        self.eval_dict["S+"] = correct_sell_signal_no
-        self.eval_dict["!!"] = absolute_wrong_no
+        self.eval_dict = evaluate_predictions(
+            self.data_list, self.predicted_trend_list
+        ).metrics
 
     def make_standard_figure(self, save=True):
         title = f"{self.alg_name}_{self.data_name}"
@@ -260,6 +184,29 @@ class BaseAlertAlgorithm:
 
     def interactive_report_payloads(self):
         return []
+
+    def algorithm_metadata(self):
+        return AlgorithmMetadata(
+            alg_name=self.alg_name,
+            symbol=self.symbol,
+            date=self.date,
+            evaluate_window_len=self.evaluate_window_len,
+        ).to_dict()
+
+    def minimum_history(self) -> int:
+        return 1
+
+    def current_decision(self):
+        return AlgorithmDecision(
+            trend=self.latest_predicted_trend,
+            confidence=self.latest_predicted_trend_confidence,
+            buy_signal=self.latest_predicted_trend == TREND.UP,
+            sell_signal=self.latest_predicted_trend == TREND.DOWN,
+            buy_range_signal=self.latest_predicted_trend == TREND.RANGE_UP,
+            sell_range_signal=self.latest_predicted_trend == TREND.RANGE_DOWN,
+            no_signal=self.latest_predicted_trend not in [TREND.UP, TREND.DOWN],
+            annotations={"alg_name": self.alg_name},
+        )
 
     def _ts_values_as_strings(self):
         return [str(item.get("ts"))[2:] for item in self.data_list]
@@ -324,32 +271,14 @@ class BaseAlertAlgorithm:
         return self._build_plotly_chart(title=title, series_list=series_list)
 
     def write_analysis_report(self):
-        fig, axes = plt.subplots(
-            ncols=1, nrows=2, gridspec_kw={"height_ratios": [2, 1]}
+        write_analysis_report_bundle(
+            report_path=self.report_path,
+            data_name=self.data_name,
+            data_list=self.data_list,
+            eval_dict=self.eval_dict,
+            make_standard_figure=self.make_standard_figure,
+            make_ground_truth_figure=self.make_ground_truth_figure,
+            alg_specific_report=self.alg_specific_report,
+            figure_w=DEFAULT_FIGURE_W,
+            figure_l=DEFAULT_FIGURE_L,
         )
-
-        plt.sca(axes[0])
-        self.make_standard_figure(save=False)
-        fig.add_subplot(axes[0])
-
-        plt.sca(axes[1])
-        self.make_ground_truth_figure(save=False)
-        fig.add_subplot(axes[1])
-
-        fig.set_size_inches(
-            DEFAULT_FIGURE_W,
-            3 * DEFAULT_FIGURE_L,
-        )
-        plt.tight_layout()
-
-        save_figure(path=self.report_path, filename=self.data_name)
-        path = os.path.join(self.report_path, self.data_name + ".dict")
-        data_list_copy = copy.deepcopy(self.data_list)
-        for data in data_list_copy:
-            data.pop("_id", None)
-            data["ts"] = str(data["ts"])
-        dicta = {"data": data_list_copy, "eval_dict": self.eval_dict}
-        with open(path, "w") as fp:
-            json.dump(dicta, fp)
-
-        self.alg_specific_report()

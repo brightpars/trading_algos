@@ -13,6 +13,8 @@ class agreegate_algs(BaseAlertAlgorithm):
         Or = "|"
         And = "&"
 
+    AggregateMethod = Method
+
     def __init__(
         self,
         symbol,
@@ -54,6 +56,14 @@ class agreegate_algs(BaseAlertAlgorithm):
         self.buy_algs_obj_list = buy_algs_obj_list
         self.sell_algs_obj_list = sell_algs_obj_list
 
+    def composition_metadata(self):
+        return {
+            "buy_method": self.buy_method,
+            "sell_method": self.sell_method,
+            "buy_algorithms": [alg.alg_name for alg in self.buy_algs_obj_list],
+            "sell_algorithms": [alg.alg_name for alg in self.sell_algs_obj_list],
+        }
+
     def trend_prediction_logic(self):
         for alg_obj in self.buy_algs_obj_list:
             alg_obj.process(self.latest_data)
@@ -68,9 +78,9 @@ class agreegate_algs(BaseAlertAlgorithm):
             (alg_obj.latest_predicted_trend, alg_obj.latest_predicted_trend_confidence)
             for alg_obj in self.sell_algs_obj_list
         ]
-        self.agreegate_trends_and_set_confidence()
+        self.aggregate_trends_and_set_confidence()
 
-    def agreegate_trends_and_set_confidence(self):
+    def aggregate_trends_and_set_confidence(self):
         if self.buy_method == self.Method.And:
             buy_aggreegate_result = True
             buy_trend_confidence = 10.0
@@ -146,6 +156,9 @@ class agreegate_algs(BaseAlertAlgorithm):
         self.latest_predicted_trend = TREND.UNKNOWN
         self.latest_predicted_trend_confidence = 10.0
 
+    def agreegate_trends_and_set_confidence(self):
+        self.aggregate_trends_and_set_confidence()
+
     def alg_specific_report(self):
         result = []
         for alg in self.buy_algs_obj_list:
@@ -183,3 +196,6 @@ class agreegate_algs(BaseAlertAlgorithm):
         if payload:
             result.append((payload, title))
         return result
+
+
+AggregateAlertAlgorithm = agreegate_algs
