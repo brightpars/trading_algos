@@ -26,7 +26,17 @@ def test_create_app_registers_core_routes(monkeypatch):
                     return doc
             return None
 
-        def update_one(self, *_args, **_kwargs):
+        def update_one(self, query, update, upsert=False):
+            for doc in self.docs:
+                if all(doc.get(k) == v for k, v in query.items()):
+                    if "$set" in update:
+                        doc.update(update["$set"])
+                    return None
+            if upsert:
+                payload = dict(query)
+                if "$set" in update:
+                    payload.update(update["$set"])
+                self.docs.append(payload)
             return None
 
     class _Db(dict):
@@ -61,3 +71,7 @@ def test_create_app_registers_core_routes(monkeypatch):
     assert client.get("/").status_code == 200
     assert client.get("/health").status_code == 200
     assert client.get("/algorithms").status_code == 200
+    response = client.get("/")
+    assert b"Market data server" in response.data
+    assert b'value="127.0.0.2"' in response.data
+    assert b'value="6010"' in response.data

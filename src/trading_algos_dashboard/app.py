@@ -15,12 +15,18 @@ from trading_algos_dashboard.extensions import mongo
 from trading_algos_dashboard.repositories.experiment_repository import (
     ExperimentRepository,
 )
+from trading_algos_dashboard.repositories.data_source_settings_repository import (
+    DataSourceSettingsRepository,
+)
 from trading_algos_dashboard.repositories.result_repository import ResultRepository
 from trading_algos_dashboard.services.algorithm_catalog_service import (
     list_algorithm_catalog,
 )
 from trading_algos_dashboard.services.data_source_service import (
     SmarttradeDataSourceService,
+)
+from trading_algos_dashboard.services.data_source_settings_service import (
+    DataSourceSettingsService,
 )
 from trading_algos_dashboard.services.experiment_service import ExperimentService
 
@@ -46,9 +52,17 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
 
     experiment_repository = ExperimentRepository(mongo.db)
     result_repository = ResultRepository(mongo.db)
+    data_source_settings_repository = DataSourceSettingsRepository(mongo.db)
+    data_source_settings_service = DataSourceSettingsService(
+        repository=data_source_settings_repository
+    )
     data_source_service = SmarttradeDataSourceService(
         smarttrade_path=cfg.smarttrade_path,
         user_id=cfg.smarttrade_user_id,
+        endpoint_resolver=lambda: (
+            data_source_settings_service.get_effective_settings()["ip"],
+            data_source_settings_service.get_effective_settings()["port"],
+        ),
     )
     experiment_service = ExperimentService(
         experiment_repository=experiment_repository,
@@ -60,6 +74,8 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["mongo"] = mongo
     app.extensions["experiment_repository"] = experiment_repository
     app.extensions["result_repository"] = result_repository
+    app.extensions["data_source_settings_repository"] = data_source_settings_repository
+    app.extensions["data_source_settings_service"] = data_source_settings_service
     app.extensions["data_source_service"] = data_source_service
     app.extensions["experiment_service"] = experiment_service
     app.extensions["algorithm_catalog_service"] = list_algorithm_catalog

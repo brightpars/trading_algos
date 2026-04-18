@@ -7,6 +7,11 @@ from pathlib import Path
 from typing import Any
 from xmlrpc.client import Fault
 
+from trading_algos_dashboard.services.data_source_settings_service import (
+    DEFAULT_DATA_SERVER_IP,
+    DEFAULT_DATA_SERVER_PORT,
+)
+
 
 class DataSourceUnavailableError(RuntimeError):
     """Raised when the smarttrade data source cannot be accessed."""
@@ -17,9 +22,24 @@ class MarketDataUnavailableError(ValueError):
 
 
 class SmarttradeDataSourceService:
-    def __init__(self, *, smarttrade_path: str, user_id: int):
+    def __init__(
+        self,
+        *,
+        smarttrade_path: str,
+        user_id: int,
+        endpoint_resolver: Any | None = None,
+    ):
         self.smarttrade_path = smarttrade_path
         self.user_id = user_id
+        self.endpoint_resolver = endpoint_resolver
+
+    def _resolved_endpoint_override(self) -> tuple[str, int] | None:
+        if self.endpoint_resolver is None:
+            return None
+        resolved = self.endpoint_resolver()
+        if resolved is None:
+            return None
+        return str(resolved[0]), int(resolved[1])
 
     def _format_unavailable_message(self) -> str:
         endpoint = self._data_server_endpoint_label()
@@ -35,6 +55,10 @@ class SmarttradeDataSourceService:
             sys.path.insert(0, path)
 
     def _data_server_endpoint_label(self) -> str:
+        override = self._resolved_endpoint_override()
+        if override is not None:
+            ip, port = override
+            return f"{ip}:{port}"
         self._prepare_imports()
         try:
             config_service_module = importlib.import_module("config.service")
@@ -44,16 +68,26 @@ class SmarttradeDataSourceService:
             port = config_service.get_effective_value("DATA_SERVER_PORT")
             return f"{ip}:{port}"
         except Exception:
-            return "the configured Smarttrade data server endpoint"
+            return f"{DEFAULT_DATA_SERVER_IP}:{DEFAULT_DATA_SERVER_PORT}"
 
-    def _data_proxy(self) -> Any:
+    def _create_proxy(self, *, ip: str, port: int) -> Any:
         self._prepare_imports()
         try:
-            data_proxy_module = importlib.import_module(
-                "utils_shared.objects_factory.data_proxy"
+            online_services_module = importlib.import_module(
+                "utils_shared.online_services"
             )
-            get_or_create_data_proxy = getattr(
-                data_proxy_module, "get_or_create_data_proxy"
+            users_context_module = importlib.import_module(
+                "utils_shared.context.users_context_manager"
+            )
+            proxy_operations_module = importlib.import_module(
+                "utils_shared.objects_factory.proxy_operations"
+            )
+            data_proxy_class = getattr(online_services_module, "Data_Proxy")
+            users_context_manager = getattr(
+                users_context_module, "Users_Context_Manager"
+            )
+            get_or_create_proxy_obj = getattr(
+                proxy_operations_module, "get_or_create_proxy_obj"
             )
         except ModuleNotFoundError as exc:
             raise DataSourceUnavailableError(
@@ -61,15 +95,50 @@ class SmarttradeDataSourceService:
                 "Run the dashboard in an environment where smarttrade is installed."
             ) from exc
 
+        ctx = users_context_manager().get_ctx(self.user_id)
+        return get_or_create_proxy_obj(
+            ctx,
+            data_proxy_class,
+            f"DataProxyObj:{ip}:{port}",
+            ip,
+            port,
+        )
+
+    def _data_proxy(self) -> Any:
         try:
-            proxy = get_or_create_data_proxy(self.user_id)
+            override = self._resolved_endpoint_override()
+            if override is None:
+                self._prepare_imports()
+                data_proxy_module = importlib.import_module(
+                    "utils_shared.objects_factory.data_proxy"
+                )
+                get_or_create_data_proxy = getattr(
+                    data_proxy_module, "get_or_create_data_proxy"
+                )
+                proxy = get_or_create_data_proxy(self.user_id)
+            else:
+                ip, port = override
+                proxy = self._create_proxy(ip=ip, port=port)
             if not proxy.is_server_up():
                 raise DataSourceUnavailableError(self._format_unavailable_message())
             return proxy
+        except ModuleNotFoundError as exc:
+            raise DataSourceUnavailableError(
+                "Smarttrade data service dependencies are unavailable. "
+                "Run the dashboard in an environment where smarttrade is installed."
+            ) from exc
         except Exception as exc:
             raise DataSourceUnavailableError(
                 self._format_unavailable_message()
             ) from exc
+
+    def check_connection(self) -> dict[str, Any]:
+        proxy = self._data_proxy()
+        return {
+            "status": "ok",
+            "endpoint": self._data_server_endpoint_label(),
+            "server_up": bool(proxy.is_server_up()),
+        }
 
     def fetch_candles(
         self,
