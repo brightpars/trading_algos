@@ -68,6 +68,7 @@ def test_create_app_registers_core_routes(monkeypatch):
     )
 
     client = app.test_client()
+    assert app.config["SESSION_COOKIE_NAME"] == "trading_algos_session"
     assert client.get("/").status_code == 200
     assert client.get("/health").status_code == 200
     assert client.get("/algorithms").status_code == 200

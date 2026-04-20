@@ -2,42 +2,19 @@ Trading Algos
 
 This repository contains reusable trading-oriented algorithm libraries, with `alertgen` focused on generating buy/sell/neutral alerts from market candles.
 
-## Dashboard MVP
+## Repository boundary
 
-This repository now also contains a lightweight Flask dashboard package at `src/trading_algos_dashboard` for:
+`trading_algos` should own reusable algorithm logic, algorithm registration, parameter normalization, and algorithm instantiation.
 
-- browsing registered alert algorithms,
-- launching experiment runs against smarttrade-backed market data,
-- comparing algorithm outputs,
-- reviewing saved reports and experiment history persisted in MongoDB.
+Runtime engine envelopes and application wiring such as:
 
-### Run the dashboard
+- alertgen/decmaker engine payload defaults,
+- smarttrade-specific execution configuration,
+- smarttrade-backed dashboard/runtime integration,
 
-1. Ensure MongoDB is available.
-2. Ensure the smarttrade repository is available at `/home/mohammad/development/smarttrade` or set `SMARTTRADE_PATH`.
-3. Install dashboard dependencies into the project venv.
-4. Run with:
+belong in the consuming application layer, not in this library package.
 
-```bash
-./.venv/bin/python -m flask --app trading_algos_dashboard.app:create_app run
-```
-
-Or use the helper launcher:
-
-```bash
-bash /home/mohammad/development/trading_algos/scripts/run_dashboard.sh
-```
-
-The helper script sets `PYTHONPATH` to the repo `src/` directory automatically so the dashboard package can be imported without installing the project first.
-By default, it starts the dashboard on port `2000`.
-
-Useful environment variables:
-
-- `TRADING_ALGOS_DASHBOARD_MONGO_URI`
-- `TRADING_ALGOS_DASHBOARD_MONGO_DB`
-- `TRADING_ALGOS_DASHBOARD_REPORT_PATH`
-- `SMARTTRADE_PATH`
-- `TRADING_ALGOS_DASHBOARD_SMARTTRADE_USER_ID`
+There is still a `src/trading_algos_dashboard` package in this repository today, but it is intentionally treated as smarttrade-coupled application code and is a candidate to move into the smarttrade project.
 
 ## Alertgen direction
 
@@ -74,6 +51,8 @@ Useful environment variables:
 
 Numeric `alg_code` identifiers have been removed from the config contract and registry lookup flow.
 Scalar/list `alg_param` formats are also removed from the config contract; built-in algorithms now use named dict parameters.
+
+The library-level config contract is intentionally limited to per-algorithm execution inputs such as `alg_key`, `alg_param`, `symbol`, `buy`, and `sell`. Higher-level engine payload wrappers should be defined by the consuming application.
 
 This keeps extension work localized and avoids editing a growing `if/elif` factory by hand.
 

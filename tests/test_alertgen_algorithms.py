@@ -372,3 +372,4 @@ def test_default_alertgen_sensor_config_prefers_alg_key_only():
 
     assert sensor_config["alg_key"] == "aggregate_boundary_and_channel"
     assert "alg_code" not in sensor_config
+    assert sensor_config["symbol"] == "SYMBOL"

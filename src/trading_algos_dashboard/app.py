@@ -40,6 +40,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     cfg = config or DashboardConfig.from_env()
     app.config.update(
         SECRET_KEY=cfg.secret_key,
+        SESSION_COOKIE_NAME="trading_algos_session",
         MONGO_URI=cfg.mongo_uri,
         MONGO_DB_NAME=cfg.mongo_db_name,
         REPORT_BASE_PATH=cfg.report_base_path,

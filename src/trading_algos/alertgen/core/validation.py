@@ -64,28 +64,6 @@ def _require_json_object_dict(raw, label):
     return parsed
 
 
-def _validate_unique_sensor_names(sensors, label_prefix="Alert generator"):
-    seen_names = set()
-    for idx, sensor in enumerate(sensors):
-        sensor_name = sensor["name"]
-        if not isinstance(sensor_name, str) or not sensor_name.strip():
-            raise ValueError(f"{label_prefix} sensor #{idx + 1} name is required.")
-        normalized_name = sensor_name.strip().casefold()
-        if normalized_name in seen_names:
-            raise ValueError(f"{label_prefix} sensor names must be unique.")
-        seen_names.add(normalized_name)
-
-
-def _normalize_alertgen_engine_type(engine_type, label):
-    normalized = _require_non_empty_string(engine_type, label)
-    supported_types = {"gen1"}
-    if normalized not in supported_types:
-        raise ValueError(
-            f"{label} must be one of: {', '.join(sorted(supported_types))}"
-        )
-    return normalized
-
-
 def _normalize_alertgen_alg_param(*, alg_key, raw_alg_param, label):
     from trading_algos.alertgen.core.catalog import register_builtin_alert_algorithms
 
@@ -155,64 +133,4 @@ def normalize_alertgen_sensor_config(
         raw_alg_param=normalized["alg_param"],
         label=f"{label} alg_param",
     )
-    return normalized
-
-
-def validate_alertgen_engine_payload(payload, label="Alert generator"):
-    if not isinstance(payload, dict):
-        raise ValueError(f"{label} config must be a dict/JSON object")
-    normalized = dict(payload)
-    _validate_required_keys(
-        normalized, ["name", "engine_config", "enable", "sensors"], f"{label} config"
-    )
-    normalized["name"] = _require_non_empty_string(normalized["name"], f"{label} name")
-    normalized["enable"] = bool(normalized["enable"])
-
-    engine_config = _require_json_object_dict(
-        normalized["engine_config"], f"{label} engine_config"
-    )
-    _validate_required_keys(
-        engine_config, ["type", "interval_secs"], f"{label} engine_config"
-    )
-    try:
-        engine_config["interval_secs"] = int(engine_config["interval_secs"])
-    except Exception as exc:
-        raise ValueError(
-            f"{label} engine_config interval_secs must be an integer: {exc}"
-        )
-    if engine_config["interval_secs"] <= 0:
-        raise ValueError(f"{label} engine_config interval_secs must be > 0")
-    engine_config["type"] = _normalize_alertgen_engine_type(
-        engine_config["type"], f"{label} engine_config type"
-    )
-    normalized["engine_config"] = engine_config
-
-    sensors = normalized["sensors"]
-    if not isinstance(sensors, list) or len(sensors) == 0:
-        raise ValueError(f"{label} sensors must be a non-empty list")
-    _validate_unique_sensor_names(sensors, label_prefix=label)
-
-    normalized_sensors = []
-    for idx, sensor in enumerate(sensors):
-        if not isinstance(sensor, dict):
-            raise ValueError(f"sensor #{idx + 1} must be a dict/JSON object")
-        _validate_required_keys(
-            sensor, ["name", "sensor_config", "enable"], f"sensor #{idx + 1}"
-        )
-        sensor_config = _require_json_object_dict(
-            sensor["sensor_config"], f"sensor #{idx + 1} sensor_config"
-        )
-        normalized_sensors.append(
-            {
-                "name": _require_non_empty_string(
-                    sensor["name"], f"{label} sensor #{idx + 1} name"
-                ),
-                "sensor_config": normalize_alertgen_sensor_config(
-                    sensor_config, label=f"sensor #{idx + 1} sensor_config"
-                ),
-                "enable": bool(sensor["enable"]),
-            }
-        )
-
-    normalized["sensors"] = normalized_sensors
     return normalized
