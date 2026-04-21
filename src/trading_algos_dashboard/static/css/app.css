@@ -9,3 +9,240 @@ body {
 pre {
   white-space: pre-wrap;
 }
+
+.builder-layout {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+}
+
+.builder-main-column,
+.builder-side-column {
+  min-width: 0;
+}
+
+.builder-card {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 0.75rem;
+  box-shadow: 0 0.125rem 0.25rem rgb(0 0 0 / 0.04);
+  padding: 1rem;
+}
+
+.builder-template-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.builder-template-card {
+  background: #f8f9fa;
+  border: 1px solid #ced4da;
+  border-radius: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+  padding: 0.875rem;
+  text-align: left;
+}
+
+.builder-template-title {
+  color: #212529;
+  display: block;
+}
+
+.builder-template-description {
+  color: #6c757d;
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.builder-callout {
+  background: linear-gradient(180deg, #fff 0%, #f7fbff 100%);
+}
+
+.builder-callout-step {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  height: 100%;
+  padding: 0.85rem;
+}
+
+.builder-template-card:hover {
+  background: #eef6ff;
+  border-color: #86b7fe;
+}
+
+.builder-node {
+  background: #fff;
+  border: 1px solid #dbe3ea;
+  border-radius: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.builder-node--group {
+  border-left: 4px solid #6f42c1;
+}
+
+.builder-node--algorithm {
+  border-left: 4px solid #0d6efd;
+}
+
+.builder-children {
+  border-left: 2px dashed #ced4da;
+  margin-left: 0.5rem;
+  padding-left: 1rem;
+}
+
+.builder-group-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.builder-algorithm-meta {
+  color: #6c757d;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.builder-meta-pill {
+  background: #f1f3f5;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.builder-param-help {
+  color: #6c757d;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.builder-runtime-options {
+  border-top: 1px dashed #dee2e6;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+}
+
+.builder-empty-hint {
+  background: #f8f9fa;
+  border: 1px dashed #ced4da;
+  border-radius: 0.75rem;
+  padding: 0.9rem;
+}
+
+.builder-catalog-search {
+  margin-bottom: 0.75rem;
+}
+
+.builder-catalog-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.builder-catalog-item {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+}
+
+.builder-catalog-item h3 {
+  font-size: 0.98rem;
+  margin-bottom: 0.25rem;
+}
+
+.builder-summary-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.builder-summary-item {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+}
+
+.builder-summary-label {
+  color: #6c757d;
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+}
+
+.builder-history-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.builder-history-card ul {
+  padding-left: 1.25rem;
+}
+
+.builder-badge {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.6rem;
+}
+
+.builder-badge--algorithm {
+  background: #e7f1ff;
+  color: #0d6efd;
+}
+
+.builder-badge--group {
+  background: #f3e8ff;
+  color: #6f42c1;
+}
+
+.builder-validation-list {
+  color: #842029;
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.builder-preview pre {
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.builder-node--readonly {
+  background: #fcfdff;
+}
+
+.builder-node-errors {
+  color: #842029;
+  font-size: 0.875rem;
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.builder-field-error {
+  color: #842029;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.builder-invalid {
+  border-color: #dc3545 !important;
+}
+
+@media (max-width: 991.98px) {
+  .builder-layout {
+    grid-template-columns: 1fr;
+  }
+}

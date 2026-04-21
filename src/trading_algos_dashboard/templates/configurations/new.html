@@ -1,11 +1,139 @@
 {% extends "base.html" %}
+{% block title %}{{ page_title or 'New configuration draft' }}{% endblock %}
 {% block content %}
-<h1>New configuration draft</h1>
-<form method="post" action="{{ url_for('configurations.create_configuration') }}">
-  <div class="mb-3">
-    <label class="form-label">Configuration JSON</label>
-    <textarea class="form-control" name="payload" rows="20">{{ form_data.payload }}</textarea>
+<form method="post" action="{{ form_action or url_for('configurations.create_configuration') }}">
+  <div id="configuration-builder-app" class="builder-layout">
+    <section class="builder-main-column">
+      <div class="builder-card mb-4">
+        <h1 class="mb-2">{{ page_title or 'New configuration draft' }}</h1>
+        <p class="text-muted mb-0">
+          Build a reusable strategy visually. The dashboard will generate the configuration JSON for you.
+        </p>
+      </div>
+
+      <div class="builder-card builder-callout mb-4">
+        <h2 class="h5 mb-3">How this builder works</h2>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="builder-callout-step">
+              <strong>1. Pick a starter</strong>
+              <p class="small text-muted mb-0">Start blank or use a ready-made structure like a single algorithm, AND, or OR strategy.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="builder-callout-step">
+              <strong>2. Add algorithms</strong>
+              <p class="small text-muted mb-0">Choose algorithms from the catalog, tune their parameters, and enable buy/sell behavior with switches.</p>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="builder-callout-step">
+              <strong>3. Combine with groups</strong>
+              <p class="small text-muted mb-0">Use AND groups when all child conditions must agree, or OR groups when any child can trigger.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="builder-card mb-4">
+        <h2 class="h5 mb-3">Start from a template</h2>
+        <div class="builder-template-grid">
+          <button class="builder-template-card" type="button" data-template="blank">
+            <span class="builder-template-title">Blank</span>
+            <span class="builder-template-description">Start with an empty canvas and choose the root structure yourself.</span>
+          </button>
+          <button class="builder-template-card" type="button" data-template="single_algorithm">
+            <span class="builder-template-title">Single algorithm</span>
+            <span class="builder-template-description">Best for a quick one-indicator strategy with no grouping.</span>
+          </button>
+          <button class="builder-template-card" type="button" data-template="and_strategy">
+            <span class="builder-template-title">AND strategy</span>
+            <span class="builder-template-description">Use when every child rule must agree before a signal is produced.</span>
+          </button>
+          <button class="builder-template-card" type="button" data-template="or_strategy">
+            <span class="builder-template-title">OR strategy</span>
+            <span class="builder-template-description">Use when any child rule can trigger the final signal.</span>
+          </button>
+          <button class="builder-template-card" type="button" data-template="breakout_example">
+            <span class="builder-template-title">Breakout example</span>
+            <span class="builder-template-description">Preloads a sample breakout-oriented structure to help you get started quickly.</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="builder-card mb-4">
+        <h2 class="h5 mb-3">Configuration details</h2>
+        <div id="configuration-metadata-form" class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="config-name">Name</label>
+            <input class="form-control" id="config-name" name="name" type="text" placeholder="e.g. Breakout confirmation">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="config-key">Config key</label>
+            <input class="form-control" id="config-key" name="config_key" type="text" placeholder="auto-generated-slug">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="config-version">Version</label>
+            <input class="form-control" id="config-version" name="version" type="text" value="1.0.0">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="config-tags">Tags</label>
+            <input class="form-control" id="config-tags" name="tagsText" type="text" placeholder="breakout, intraday, trend">
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="config-description">Description</label>
+            <textarea class="form-control" id="config-description" name="description" rows="2" placeholder="What does this configuration do?"></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="config-notes">Notes</label>
+            <textarea class="form-control" id="config-notes" name="notes" rows="3" placeholder="Optional implementation or usage notes."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="builder-card mb-4">
+        <h2 class="h5 mb-3">Structure builder</h2>
+        <div id="configuration-builder-root"></div>
+      </div>
+
+      <input id="configuration-payload-input" name="payload" type="hidden" value="{{ form_data.payload }}">
+      <script id="configuration-builder-bootstrap" type="application/json">{{ builder_bootstrap|tojson }}</script>
+
+      <div class="d-flex gap-2 flex-wrap">
+        <button class="btn btn-success" type="submit">{{ submit_label or 'Save draft' }}</button>
+        {% if draft_id %}
+        <a class="btn btn-outline-secondary" href="{{ url_for('configurations.detail_configuration', draft_id=draft_id) }}">Back to detail</a>
+        {% endif %}
+      </div>
+      <p class="text-muted small mt-2 mb-0" id="configuration-save-help">
+        Resolve validation issues before saving.
+      </p>
+      {% if draft_id %}
+      <p class="text-muted small mt-1 mb-0">Editing draft {{ draft_id }}</p>
+      {% endif %}
+      </div>
+    </section>
+
+    <aside class="builder-side-column">
+      <div id="configuration-validation" class="mb-4"></div>
+      <div id="configuration-structure-preview" class="mb-4"></div>
+      <div id="configuration-catalog-summary" class="mb-4">
+        <div class="builder-card">
+          <h2 class="h5 mb-3">Algorithm reference</h2>
+          <p class="text-muted small mb-0">Loading algorithm catalog…</p>
+        </div>
+      </div>
+      <div class="builder-card">
+        <h2 class="h5 mb-3">Advanced</h2>
+        <details>
+          <summary>Generated JSON</summary>
+          <pre id="configuration-json-preview" class="mt-3 small bg-light p-3 rounded">{{ form_data.payload }}</pre>
+        </details>
+      </div>
+    </aside>
   </div>
-  <button class="btn btn-success" type="submit">Save draft</button>
 </form>
+{% endblock %}
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/configuration_builder.js') }}"></script>
 {% endblock %}

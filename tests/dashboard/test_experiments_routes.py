@@ -72,6 +72,77 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b'name="end_time"' in response.data
 
 
+def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        {
+            "config_key": "combo_breakout",
+            "version": "1",
+            "name": "Combo Breakout",
+            "root_node_id": "alg1",
+            "nodes": [
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": "close_high_channel_breakout",
+                    "alg_param": {"window": 2},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                }
+            ],
+            "compatibility_metadata": {},
+        }
+    )
+
+    client = app.test_client()
+    response = client.get(f"/experiments/new?draft_id={draft_id}")
+
+    assert response.status_code == 200
+    assert b"Selected configuration" in response.data
+    assert b"Combo Breakout" in response.data
+    assert draft_id.encode() in response.data
+    assert b"close_high_channel_breakout" in response.data
+
+
+def test_configuration_detail_offers_run_link(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        {
+            "config_key": "combo_breakout",
+            "version": "1",
+            "name": "Combo Breakout",
+            "root_node_id": "alg1",
+            "nodes": [
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": "close_high_channel_breakout",
+                    "alg_param": {"window": 2},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                }
+            ],
+            "compatibility_metadata": {},
+        }
+    )
+
+    response = app.test_client().get(f"/configurations/{draft_id}")
+
+    assert response.status_code == 200
+    assert b"Run this configuration" in response.data
+    assert f"/experiments/new?draft_id={draft_id}".encode() in response.data
+
+
 def test_new_experiment_page_shows_recent_run_presets(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()

@@ -172,6 +172,27 @@ def _recent_experiment_presets() -> list[dict[str, str]]:
     ]
 
 
+def _load_configuration_preset(draft_id: str | None) -> dict[str, str] | None:
+    if not draft_id:
+        return None
+    payload = current_app.extensions["configuration_builder_service"].get_draft_detail(
+        draft_id
+    )
+    if payload is None:
+        return None
+    draft = payload["draft"]
+    configuration_payload = draft.get("payload")
+    if not isinstance(configuration_payload, dict):
+        return None
+    return {
+        "draft_id": str(draft.get("draft_id", "")),
+        "config_key": str(draft.get("config_key", "")),
+        "name": str(draft.get("name", "")),
+        "version": str(configuration_payload.get("version", "")),
+        "configuration_json": json.dumps(configuration_payload),
+    }
+
+
 def _render_new_experiment(
     *,
     status_code: int = 200,
@@ -183,14 +204,41 @@ def _render_new_experiment(
     effective_form_data.update(
         load_form_state(request.cookies.get(_EXPERIMENT_FORM_COOKIE))
     )
+    selected_configuration = _load_configuration_preset(request.args.get("draft_id"))
+    if selected_configuration is not None:
+        effective_form_data["configuration_json"] = selected_configuration[
+            "configuration_json"
+        ]
+        effective_form_data["algorithms_json"] = "[]"
     if form_data is not None:
         effective_form_data.update(form_data)
+
+    if (
+        selected_configuration is None
+        and effective_form_data["configuration_json"].strip()
+    ):
+        try:
+            configuration_payload = json.loads(
+                effective_form_data["configuration_json"]
+            )
+        except JSONDecodeError:
+            selected_configuration = None
+        else:
+            if isinstance(configuration_payload, dict):
+                selected_configuration = {
+                    "draft_id": "",
+                    "config_key": str(configuration_payload.get("config_key", "")),
+                    "name": str(configuration_payload.get("name", "")),
+                    "version": str(configuration_payload.get("version", "")),
+                    "configuration_json": effective_form_data["configuration_json"],
+                }
 
     return Response(
         render_template(
             "experiments/new.html",
             algorithms=catalog,
             recent_experiments=_recent_experiment_presets(),
+            selected_configuration=selected_configuration,
             form_data=effective_form_data,
         ),
         status=status_code,

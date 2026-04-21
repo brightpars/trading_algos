@@ -21,6 +21,7 @@ def _spec_to_dict(spec: Any) -> dict[str, Any]:
         "key": spec.key,
         "name": spec.name,
         "description": spec.description,
+        "param_schema": list(spec.param_schema),
         "category": spec.category,
         "tags": list(spec.tags),
         "default_param": spec.default_param,

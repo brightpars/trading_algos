@@ -1,6 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>New experiment</h1>
+{% if selected_configuration %}
+<section class="mb-4">
+  <div class="builder-card">
+    <div class="d-flex justify-content-between align-items-start gap-3">
+      <div>
+        <h2 class="h5 mb-2">Selected configuration</h2>
+        <p class="mb-1"><strong>{{ selected_configuration.name or "Unnamed configuration" }}</strong></p>
+        <div class="builder-algorithm-meta">
+          {% if selected_configuration.config_key %}
+          <span class="builder-meta-pill">key: {{ selected_configuration.config_key }}</span>
+          {% endif %}
+          {% if selected_configuration.version %}
+          <span class="builder-meta-pill">version: {{ selected_configuration.version }}</span>
+          {% endif %}
+          {% if selected_configuration.draft_id %}
+          <span class="builder-meta-pill">draft: {{ selected_configuration.draft_id }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% if selected_configuration.draft_id %}
+      <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('configurations.detail_configuration', draft_id=selected_configuration.draft_id) }}">Back to configuration</a>
+      {% endif %}
+    </div>
+    <p class="small text-muted mt-3 mb-0">This experiment will execute the selected declarative configuration graph. The raw payload is still available below in the advanced section if you need it.</p>
+  </div>
+</section>
+{% endif %}
 {% if recent_experiments %}
 <section class="mb-4">
   <div class="d-flex justify-content-between align-items-center mb-2">
@@ -67,12 +94,15 @@
   <div class="col-12">
     <label class="form-label">Algorithms JSON</label>
     <textarea class="form-control" rows="8" name="algorithms_json">{{ form_data.algorithms_json }}</textarea>
-    <div class="form-text">Example: [{"alg_key":"close_high_channel_breakout","alg_param":{"window":20}}]</div>
+    <div class="form-text">Use this for single-algorithm experiment runs. When Configuration JSON is provided, this field is ignored.</div>
   </div>
   <div class="col-12">
     <label class="form-label">Configuration JSON</label>
-    <textarea class="form-control" rows="8" name="configuration_json">{{ form_data.configuration_json }}</textarea>
-    <div class="form-text">Optional declarative configuration payload. When provided, the run executes the configuration graph.</div>
+    <details {% if selected_configuration or form_data.configuration_json %}open{% endif %}>
+      <summary>Advanced configuration payload</summary>
+      <textarea class="form-control mt-2" rows="8" name="configuration_json">{{ form_data.configuration_json }}</textarea>
+    </details>
+    <div class="form-text">Optional declarative configuration payload. When provided, the run executes the configuration graph instead of the single-algorithm list above.</div>
   </div>
   <div class="col-12">
     <label class="form-label">Notes</label>

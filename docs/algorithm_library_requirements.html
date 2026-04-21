@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Algorithm Library Requirements</title>
+<style>
+body { font-family: Arial, Helvetica, sans-serif; line-height: 1.5; margin: 0; background: #f5f7fb; color: #1f2937; }
+.container { max-width: 1400px; margin: 28px auto; background: #fff; padding: 32px 36px; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+h1,h2,h3 { color: #0f172a; }
+h1 { margin-top: 0; border-bottom: 3px solid #e5e7eb; padding-bottom: 10px; }
+.note { background: #eef4ff; border-left: 5px solid #3b82f6; padding: 14px 16px; border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 14px; }
+th, td { border: 1px solid #d1d5db; padding: 10px; text-align: left; vertical-align: top; }
+th { background: #f3f4f6; position: sticky; top: 0; }
+code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; }
+ul li { margin-bottom: 6px; }
+.small { font-size: 13px; color: #475569; }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Algorithm Library Requirements for SmartTrade / Algorithm Designer</h1>
+
+<div class="note">
+<p><strong>Purpose:</strong> This document defines a broad algorithm library for the Algorithm Designer Dashboard and SmartTrade ecosystem so a coder can implement many known trading algorithms in the same interface style as the algorithms you already have.</p>
+<p><strong>Important framing:</strong> There is no single universally fixed “complete list” of all trading algorithms. Reputable overviews consistently group algorithmic trading into broad families such as trend following, momentum, mean reversion, arbitrage/statistical arbitrage, market making/HFT, and execution algorithms such as VWAP and TWAP. Academic and practitioner sources also distinguish time-series momentum from cross-sectional momentum, and broker/execution literature treats VWAP, TWAP, participation-rate, and implementation shortfall as execution algorithms rather than alpha-generating signal strategies. citeturn799880news12turn526753search0turn526753search3turn329530search0</p>
+</div>
+
+<h2>Recommended common interface</h2>
+<ul>
+<li>Accept normalized market data in the same format as existing algorithms</li>
+<li>Accept a structured parameter object / config</li>
+<li>Use shared helper utilities for indicators, statistics, filtering, and reporting</li>
+<li>Return raw intermediate metrics / indicator series</li>
+<li>Return final state per bar or time point: <code>buy</code>, <code>sell</code>, <code>neutral</code></li>
+<li>Return optional confidence / score and optional event markers</li>
+<li>Return summary report payload compatible with the existing dashboard</li>
+<li>Support backtesting on a date/time range</li>
+<li>Support plotting/visualization through the existing dashboard pipeline</li>
+<li>Avoid arbitrary custom I/O patterns per algorithm</li>
+</ul>
+
+<h2>Suggested implementation metadata for each algorithm</h2>
+<ol>
+<li>algorithm class / identifier</li>
+<li>category</li>
+<li>required input data</li>
+<li>configurable parameters</li>
+<li>intermediate calculations</li>
+<li>final signal rule</li>
+<li>optional filters</li>
+<li>output/report fields</li>
+<li>compatibility with the existing visualization/report helpers</li>
+</ol>
+
+<h2>Library catalog</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Category</th>
+<th>Algorithm</th>
+<th>Core idea</th>
+<th>Typical inputs</th>
+<th>Signal style</th>
+<th>Implementation notes</th>
+</tr>
+</thead>
+<tbody>
+
+    <tr>
+      <td>1</td>
+      <td>Trend Following</td>
+      <td><strong>Simple Moving Average Crossover</strong></td>
+      <td>Buy when a short moving average crosses above a long moving average; sell on the opposite cross.</td>
+      <td>OHLCV close series, short window, long window</td>
+      <td>Discrete buy/sell on crossover</td>
+      <td>Baseline trend strategy; easy to fit existing helpers.</td>
+    </tr>
+    
+    <tr>
+      <td>2</td>
+      <td>Trend Following</td>
+      <td><strong>Exponential Moving Average Crossover</strong></td>
+      <td>Like SMA crossover but uses EMAs for faster reaction.</td>
+      <td>OHLCV close series, short EMA, long EMA</td>
+      <td>Discrete buy/sell on crossover</td>
+      <td>Useful faster trend variant.</td>
+    </tr>
+    
+    <tr>
+      <td>3</td>
+      <td>Trend Following</td>
+      <td><strong>Triple Moving Average Crossover</strong></td>
+      <td>Uses fast/medium/slow averages to reduce whipsaws.</td>
+      <td>OHLCV close series, 3 windows</td>
+      <td>Discrete buy/sell when ordering changes</td>
+      <td>Good for cleaner state machines.</td>
+    </tr>
+    
+    <tr>
+      <td>4</td>
+      <td>Trend Following</td>
+      <td><strong>Price vs Moving Average</strong></td>
+      <td>Long when price is above a moving average and short/flat when below.</td>
+      <td>OHLCV close series, MA window</td>
+      <td>Stateful trend regime signal</td>
+      <td>Simple reusable primitive.</td>
+    </tr>
+    
+    <tr>
+      <td>5</td>
+      <td>Trend Following</td>
+      <td><strong>Moving Average Ribbon Trend</strong></td>
+      <td>Uses a ribbon of multiple averages; signal from alignment and spread.</td>
+      <td>OHLCV close series, list of MA windows</td>
+      <td>Trend-strength signal plus buy/sell</td>
+      <td>Can expose score and final label.</td>
+    </tr>
+    
+    <tr>
+      <td>6</td>
+      <td>Trend Following</td>
+      <td><strong>Breakout (Donchian Channel)</strong></td>
+      <td>Buy on breakout above rolling high; sell on breakdown below rolling low.</td>
+      <td>OHLCV high/low, lookback window</td>
+      <td>Discrete breakout entries/exits</td>
+      <td>Classic CTA-style rule.</td>
+    </tr>
+    
+    <tr>
+      <td>7</td>
+      <td>Trend Following</td>
+      <td><strong>Channel Breakout with Confirmation</strong></td>
+      <td>Breakout must persist for N bars or exceed threshold.</td>
+      <td>OHLCV, lookback, confirmation bars/threshold</td>
+      <td>Buy/sell with confirmation</td>
+      <td>Reduces false breaks.</td>
+    </tr>
+    
+    <tr>
+      <td>8</td>
+      <td>Trend Following</td>
+      <td><strong>ADX Trend Filter</strong></td>
+      <td>Use ADX to trade only when trend strength exceeds threshold.</td>
+      <td>OHLCV, ADX window, threshold</td>
+      <td>Trend filter plus directional signal</td>
+      <td>Often combined with other entries.</td>
+    </tr>
+    
+    <tr>
+      <td>9</td>
+      <td>Trend Following</td>
+      <td><strong>Parabolic SAR Trend Following</strong></td>
+      <td>Enter/exit on Parabolic SAR flips.</td>
+      <td>OHLCV, SAR step/max</td>
+      <td>Buy/sell on SAR reversal</td>
+      <td>Good discrete signal generator.</td>
+    </tr>
+    
+    <tr>
+      <td>10</td>
+      <td>Trend Following</td>
+      <td><strong>SuperTrend</strong></td>
+      <td>Trend signal based on ATR bands and direction flips.</td>
+      <td>OHLCV, ATR window, multiplier</td>
+      <td>Buy/sell on band flips</td>
+      <td>Widely used trend indicator strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>11</td>
+      <td>Trend Following</td>
+      <td><strong>Ichimoku Trend Strategy</strong></td>
+      <td>Uses cloud, baseline, conversion line, and lagging span for trend regime.</td>
+      <td>OHLCV, Ichimoku parameters</td>
+      <td>Buy/sell plus regime confidence</td>
+      <td>Multi-rule composite strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>12</td>
+      <td>Trend Following</td>
+      <td><strong>MACD Trend Strategy</strong></td>
+      <td>Trade MACD line crossing signal line or zero line.</td>
+      <td>OHLCV close, EMA params</td>
+      <td>Buy/sell on crossovers</td>
+      <td>Can return both event and oscillator state.</td>
+    </tr>
+    
+    <tr>
+      <td>13</td>
+      <td>Trend Following</td>
+      <td><strong>Linear Regression Trend</strong></td>
+      <td>Use rolling regression slope/intercept to detect persistent trend.</td>
+      <td>OHLCV close, window</td>
+      <td>Trend-score converted to signal</td>
+      <td>Good quantitative primitive.</td>
+    </tr>
+    
+    <tr>
+      <td>14</td>
+      <td>Trend Following</td>
+      <td><strong>Time-Series Momentum</strong></td>
+      <td>Trade an asset based on its own past return sign over a lookback window.</td>
+      <td>Price returns, lookback, holding period</td>
+      <td>Long/short or buy/sell based on own trailing return</td>
+      <td>Distinct from cross-sectional momentum.</td>
+    </tr>
+    
+    <tr>
+      <td>15</td>
+      <td>Momentum</td>
+      <td><strong>Rate of Change Momentum</strong></td>
+      <td>Buy when price ROC exceeds threshold; sell when below negative threshold.</td>
+      <td>OHLCV close, ROC window, thresholds</td>
+      <td>Momentum event signal</td>
+      <td>Simple momentum implementation.</td>
+    </tr>
+    
+    <tr>
+      <td>16</td>
+      <td>Momentum</td>
+      <td><strong>Cross-Sectional Momentum</strong></td>
+      <td>Rank a universe by past returns; buy winners, sell losers.</td>
+      <td>Universe price history, lookback, ranking size</td>
+      <td>Portfolio selection / long-short signal</td>
+      <td>Needs universe-level interface.</td>
+    </tr>
+    
+    <tr>
+      <td>17</td>
+      <td>Momentum</td>
+      <td><strong>Relative Strength Momentum</strong></td>
+      <td>Trade instruments with strongest recent relative performance.</td>
+      <td>Universe prices, lookback</td>
+      <td>Rank-based buy preference</td>
+      <td>Can be implemented as score output.</td>
+    </tr>
+    
+    <tr>
+      <td>18</td>
+      <td>Momentum</td>
+      <td><strong>Dual Momentum</strong></td>
+      <td>Combines absolute momentum and relative momentum.</td>
+      <td>Universe prices, benchmark/cash proxy, lookbacks</td>
+      <td>Asset selection and risk-off signals</td>
+      <td>Good for allocation layer.</td>
+    </tr>
+    
+    <tr>
+      <td>19</td>
+      <td>Momentum</td>
+      <td><strong>Residual Momentum</strong></td>
+      <td>Momentum after removing factor/market effects.</td>
+      <td>Returns, factor model inputs</td>
+      <td>Ranked momentum score</td>
+      <td>Requires risk-model helper.</td>
+    </tr>
+    
+    <tr>
+      <td>20</td>
+      <td>Momentum</td>
+      <td><strong>Accelerating Momentum</strong></td>
+      <td>Trade when momentum itself is strengthening.</td>
+      <td>Returns, multi-horizon ROC</td>
+      <td>Momentum-strength signal</td>
+      <td>Useful extension of ROC.</td>
+    </tr>
+    
+    <tr>
+      <td>21</td>
+      <td>Momentum</td>
+      <td><strong>RSI Momentum Continuation</strong></td>
+      <td>Use RSI in continuation mode rather than mean reversion mode.</td>
+      <td>OHLCV close, RSI window, thresholds</td>
+      <td>Buy in strong uptrends, sell in downtrends</td>
+      <td>Different from RSI reversal use.</td>
+    </tr>
+    
+    <tr>
+      <td>22</td>
+      <td>Momentum</td>
+      <td><strong>Stochastic Momentum</strong></td>
+      <td>Use stochastic oscillator strength/cross for continuation.</td>
+      <td>OHLCV high/low/close, stoch params</td>
+      <td>Buy/sell on momentum cross</td>
+      <td>Can be noisy without filters.</td>
+    </tr>
+    
+    <tr>
+      <td>23</td>
+      <td>Momentum</td>
+      <td><strong>CCI Momentum</strong></td>
+      <td>Commodity Channel Index used for continuation breakout style entries.</td>
+      <td>OHLCV typical price, CCI window</td>
+      <td>Buy/sell on threshold crossings</td>
+      <td>Indicator-based momentum.</td>
+    </tr>
+    
+    <tr>
+      <td>24</td>
+      <td>Momentum</td>
+      <td><strong>KST (Know Sure Thing)</strong></td>
+      <td>Multi-horizon momentum oscillator strategy.</td>
+      <td>OHLCV close, multiple ROC windows</td>
+      <td>Buy/sell on KST/signal cross</td>
+      <td>Encapsulates several momentum horizons.</td>
+    </tr>
+    
+    <tr>
+      <td>25</td>
+      <td>Momentum</td>
+      <td><strong>Volume-Confirmed Momentum</strong></td>
+      <td>Trade momentum only when supported by abnormal volume.</td>
+      <td>OHLCV, volume filters</td>
+      <td>Buy/sell with volume confirmation</td>
+      <td>Common practical variant.</td>
+    </tr>
+    
+    <tr>
+      <td>26</td>
+      <td>Mean Reversion</td>
+      <td><strong>Z-Score Mean Reversion</strong></td>
+      <td>Buy when price/spread is far below rolling mean; sell when far above.</td>
+      <td>Price or spread series, window, std threshold</td>
+      <td>Reversion entries/exits</td>
+      <td>Core reusable reversion pattern.</td>
+    </tr>
+    
+    <tr>
+      <td>27</td>
+      <td>Mean Reversion</td>
+      <td><strong>Bollinger Bands Reversion</strong></td>
+      <td>Fade moves outside Bollinger Bands back toward the mean.</td>
+      <td>OHLCV close, MA window, std multiplier</td>
+      <td>Buy low-band touches, sell high-band touches</td>
+      <td>Classic range strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>28</td>
+      <td>Mean Reversion</td>
+      <td><strong>RSI Reversion</strong></td>
+      <td>Buy oversold, sell overbought using RSI.</td>
+      <td>OHLCV close, RSI window, thresholds</td>
+      <td>Reversal entries</td>
+      <td>Popular baseline reversal strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>29</td>
+      <td>Mean Reversion</td>
+      <td><strong>Stochastic Reversion</strong></td>
+      <td>Use stochastic oscillator extremes for reversal.</td>
+      <td>OHLCV high/low/close, params</td>
+      <td>Buy/sell from extreme zones</td>
+      <td>Often range-market only.</td>
+    </tr>
+    
+    <tr>
+      <td>30</td>
+      <td>Mean Reversion</td>
+      <td><strong>CCI Reversion</strong></td>
+      <td>Fade extreme CCI readings back to neutral.</td>
+      <td>OHLCV typical price, window, thresholds</td>
+      <td>Buy/sell from extremes</td>
+      <td>Alternative oscillator reversion.</td>
+    </tr>
+    
+    <tr>
+      <td>31</td>
+      <td>Mean Reversion</td>
+      <td><strong>Williams %R Reversion</strong></td>
+      <td>Mean reversion using Williams %R overbought/oversold zones.</td>
+      <td>OHLCV high/low/close, window</td>
+      <td>Buy/sell from extremes</td>
+      <td>Simple oscillator implementation.</td>
+    </tr>
+    
+    <tr>
+      <td>32</td>
+      <td>Mean Reversion</td>
+      <td><strong>Intraday VWAP Reversion</strong></td>
+      <td>Fade price deviations away from session VWAP.</td>
+      <td>Intraday OHLCV, VWAP state, thresholds</td>
+      <td>Buy/sell toward VWAP</td>
+      <td>Useful intraday strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>33</td>
+      <td>Mean Reversion</td>
+      <td><strong>Opening Gap Fade</strong></td>
+      <td>Fade opening gaps that historically close intraday.</td>
+      <td>Daily/intraday OHLCV, gap filters</td>
+      <td>Buy/sell against gap direction</td>
+      <td>Needs session-aware helper.</td>
+    </tr>
+    
+    <tr>
+      <td>34</td>
+      <td>Mean Reversion</td>
+      <td><strong>Range Reversion</strong></td>
+      <td>Trade reversals inside identified range-bound regime.</td>
+      <td>OHLCV, range detector, support/resistance bands</td>
+      <td>Buy near support, sell near resistance</td>
+      <td>Best when combined with trend filter.</td>
+    </tr>
+    
+    <tr>
+      <td>35</td>
+      <td>Mean Reversion</td>
+      <td><strong>Ornstein-Uhlenbeck Reversion</strong></td>
+      <td>Model spread or price as OU process and trade toward equilibrium.</td>
+      <td>Price/spread series, OU params</td>
+      <td>Probabilistic reversion signal</td>
+      <td>Good for more advanced stat-arb.</td>
+    </tr>
+    
+    <tr>
+      <td>36</td>
+      <td>Mean Reversion</td>
+      <td><strong>Long-Horizon Reversal</strong></td>
+      <td>Trade multi-month/long-term reversals rather than short-term mean reversion.</td>
+      <td>Returns, long lookback</td>
+      <td>Contrarian buy/sell</td>
+      <td>Distinct from short-term oscillators.</td>
+    </tr>
+    
+    <tr>
+      <td>37</td>
+      <td>Mean Reversion</td>
+      <td><strong>Volatility-Adjusted Reversion</strong></td>
+      <td>Thresholds scale with realized volatility or ATR.</td>
+      <td>OHLCV, volatility estimator</td>
+      <td>Normalized reversal signal</td>
+      <td>Makes thresholds portable across assets.</td>
+    </tr>
+    
+    <tr>
+      <td>38</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Pairs Trading (Distance Method)</strong></td>
+      <td>Trade divergence/convergence of historically correlated pair.</td>
+      <td>Two price series, normalized spread, thresholds</td>
+      <td>Long one / short the other</td>
+      <td>Canonical pairs strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>39</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Pairs Trading (Cointegration)</strong></td>
+      <td>Trade pair spread when cointegrated relationship deviates from equilibrium.</td>
+      <td>Two price series, cointegration / hedge ratio</td>
+      <td>Spread reversion entries/exits</td>
+      <td>More robust than simple correlation.</td>
+    </tr>
+    
+    <tr>
+      <td>40</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Basket Statistical Arbitrage</strong></td>
+      <td>Trade one asset against a basket or multiple related assets.</td>
+      <td>Multi-asset prices, hedge weights, spread model</td>
+      <td>Spread signal</td>
+      <td>Generalizes pairs trading.</td>
+    </tr>
+    
+    <tr>
+      <td>41</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Kalman Filter Pairs Trading</strong></td>
+      <td>Dynamically estimate hedge ratio and spread using Kalman filter.</td>
+      <td>Two price series, Kalman parameters</td>
+      <td>Adaptive spread signal</td>
+      <td>Useful when relationships drift.</td>
+    </tr>
+    
+    <tr>
+      <td>42</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Index Arbitrage</strong></td>
+      <td>Trade mispricing between index future/ETF and underlying basket.</td>
+      <td>Index, futures/ETF, basket prices, carry costs</td>
+      <td>Arbitrage buy/sell</td>
+      <td>Needs multi-instrument pricing.</td>
+    </tr>
+    
+    <tr>
+      <td>43</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>ETF-NAV Arbitrage</strong></td>
+      <td>Trade ETF price deviations versus indicative NAV or fair value proxy.</td>
+      <td>ETF price, basket/NAV proxy</td>
+      <td>Arbitrage spread signal</td>
+      <td>Useful where basket data exists.</td>
+    </tr>
+    
+    <tr>
+      <td>44</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>ADR Dual-Listing Arbitrage</strong></td>
+      <td>Exploit price mismatch between dual-listed securities/ADRs.</td>
+      <td>Two market prices, FX, fees</td>
+      <td>Arbitrage entries</td>
+      <td>Requires cross-market normalization.</td>
+    </tr>
+    
+    <tr>
+      <td>45</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Convertible Arbitrage</strong></td>
+      <td>Trade convertibles versus equity/credit/vol components.</td>
+      <td>Convertible data, equity price, rates, vol estimates</td>
+      <td>Relative value signal</td>
+      <td>Advanced; often institutional.</td>
+    </tr>
+    
+    <tr>
+      <td>46</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Merger Arbitrage</strong></td>
+      <td>Trade target/acquirer spread around announced deals.</td>
+      <td>Deal terms, stock prices, probabilities, dates</td>
+      <td>Event-driven spread signal</td>
+      <td>Event-driven category.</td>
+    </tr>
+    
+    <tr>
+      <td>47</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Futures Cash-and-Carry Arbitrage</strong></td>
+      <td>Exploit mispricing between spot and futures net of carry.</td>
+      <td>Spot, futures, rates, storage/dividend/carry</td>
+      <td>Arbitrage buy/sell</td>
+      <td>Important pricing-based strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>48</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Reverse Cash-and-Carry Arbitrage</strong></td>
+      <td>Opposite of cash-and-carry when futures underpriced.</td>
+      <td>Spot, futures, carry inputs</td>
+      <td>Arbitrage buy/sell</td>
+      <td>Mirror case.</td>
+    </tr>
+    
+    <tr>
+      <td>49</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Triangular Arbitrage (FX/Crypto)</strong></td>
+      <td>Exploit inconsistent cross-rates among three pairs.</td>
+      <td>Three quoted exchange rates, fees</td>
+      <td>Instant arbitrage signal</td>
+      <td>Execution-sensitive.</td>
+    </tr>
+    
+    <tr>
+      <td>50</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Latency / Exchange Arbitrage</strong></td>
+      <td>Exploit temporary price differences across venues.</td>
+      <td>Multi-venue quotes, latency data, fees</td>
+      <td>Very short-lived arbitrage signal</td>
+      <td>Infrastructure-heavy.</td>
+    </tr>
+    
+    <tr>
+      <td>51</td>
+      <td>Statistical Arbitrage</td>
+      <td><strong>Funding/Basis Arbitrage</strong></td>
+      <td>Trade spot-perp or spot-futures basis and funding differentials.</td>
+      <td>Spot, perp/futures prices, funding/basis</td>
+      <td>Carry/arbitrage signal</td>
+      <td>Common in crypto and futures.</td>
+    </tr>
+    
+    <tr>
+      <td>52</td>
+      <td>Volatility / Options</td>
+      <td><strong>Volatility Breakout</strong></td>
+      <td>Trade price breakout when volatility expands from compression.</td>
+      <td>OHLCV, ATR/volatility compression metrics</td>
+      <td>Buy/sell breakout signal</td>
+      <td>Can be implemented without options.</td>
+    </tr>
+    
+    <tr>
+      <td>53</td>
+      <td>Volatility / Options</td>
+      <td><strong>ATR Channel Breakout</strong></td>
+      <td>Breakout using ATR-based dynamic bands.</td>
+      <td>OHLCV, ATR window, multiplier</td>
+      <td>Buy/sell on ATR-band break</td>
+      <td>Robust trend breakout variant.</td>
+    </tr>
+    
+    <tr>
+      <td>54</td>
+      <td>Volatility / Options</td>
+      <td><strong>Volatility Mean Reversion</strong></td>
+      <td>Fade unusually high/low realized or implied volatility.</td>
+      <td>Volatility series, thresholds</td>
+      <td>Volatility reversion signal</td>
+      <td>May drive delta-neutral positions.</td>
+    </tr>
+    
+    <tr>
+      <td>55</td>
+      <td>Volatility / Options</td>
+      <td><strong>Delta-Neutral Volatility Trading</strong></td>
+      <td>Trade volatility while hedging directional delta.</td>
+      <td>Option chain, underlying price, greeks</td>
+      <td>Volatility entry/exit signal</td>
+      <td>Options-support required.</td>
+    </tr>
+    
+    <tr>
+      <td>56</td>
+      <td>Volatility / Options</td>
+      <td><strong>Gamma Scalping</strong></td>
+      <td>Maintain delta-neutral option position and scalp underlying around volatility.</td>
+      <td>Options greeks, underlying ticks</td>
+      <td>Hedging/trading actions</td>
+      <td>Advanced options workflow.</td>
+    </tr>
+    
+    <tr>
+      <td>57</td>
+      <td>Volatility / Options</td>
+      <td><strong>Volatility Risk Premium Capture</strong></td>
+      <td>Systematically short or long implied vs realized volatility spread.</td>
+      <td>Options IV, realized vol estimates</td>
+      <td>Carry/vol signal</td>
+      <td>Common options systematic theme.</td>
+    </tr>
+    
+    <tr>
+      <td>58</td>
+      <td>Volatility / Options</td>
+      <td><strong>Dispersion Trading</strong></td>
+      <td>Trade index options versus constituent options to isolate correlation/dispersion.</td>
+      <td>Index and constituent option vols</td>
+      <td>Relative value signal</td>
+      <td>Institutional/advanced.</td>
+    </tr>
+    
+    <tr>
+      <td>59</td>
+      <td>Volatility / Options</td>
+      <td><strong>Skew Trading</strong></td>
+      <td>Trade relative richness/cheapness of downside vs upside implied vols.</td>
+      <td>Option surface/skew metrics</td>
+      <td>Options relative value signal</td>
+      <td>Surface-analytics heavy.</td>
+    </tr>
+    
+    <tr>
+      <td>60</td>
+      <td>Volatility / Options</td>
+      <td><strong>Term Structure Trading</strong></td>
+      <td>Trade implied volatility across maturities.</td>
+      <td>Option/futures term structure</td>
+      <td>Relative value signal</td>
+      <td>Can also apply to futures curves.</td>
+    </tr>
+    
+    <tr>
+      <td>61</td>
+      <td>Volatility / Options</td>
+      <td><strong>Straddle Breakout Timing</strong></td>
+      <td>Enter long-vol structures ahead of expected large move or realized-vol expansion.</td>
+      <td>Options IV/RV, event calendar</td>
+      <td>Volatility timing signal</td>
+      <td>Event-aware strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>62</td>
+      <td>Microstructure / HFT / Market Making</td>
+      <td><strong>Bid-Ask Market Making</strong></td>
+      <td>Post both sides, capture spread, manage inventory.</td>
+      <td>Best bid/ask, order book, inventory, fees</td>
+      <td>Continuous quoting actions</td>
+      <td>Execution/inventory engine needed.</td>
+    </tr>
+    
+    <tr>
+      <td>63</td>
+      <td>Microstructure / HFT / Market Making</td>
+      <td><strong>Inventory-Skewed Market Making</strong></td>
+      <td>Adjust quotes based on inventory to stay balanced.</td>
+      <td>Order book, inventory target</td>
+      <td>Quote placement signals</td>
+      <td>Practical MM extension.</td>
+    </tr>
+    
+    <tr>
+      <td>64</td>
+      <td>Microstructure / HFT / Market Making</td>
+      <td><strong>Order Book Imbalance Strategy</strong></td>
+      <td>Trade short-term moves from depth imbalance.</td>
+      <td>Level 2 book, imbalance metrics</td>
+      <td>Short-horizon buy/sell</td>
+      <td>Needs high-frequency data.</td>
+    </tr>
+    
+    <tr>
+      <td>65</td>
+      <td>Microstructure / HFT / Market Making</td>
+      <td><strong>Microprice Strategy</strong></td>
+      <td>Use weighted bid/ask microprice to predict near-term direction.</td>
+      <td>Top-of-book prices and sizes</td>
+      <td>Short-horizon directional signal</td>
+      <td>Useful microstructure primitive.</td>
+    </tr>
+    
+    <tr>
+      <td>66</td>
+      <td>Microstructure / HFT / Market Making</td>
+      <td><strong>Queue Position Strategy</strong></td>
+      <td>Manage passive orders based on queue rank and fill probability.</td>
+      <td>Order book + own order state</td>
+      <td>Order amend/cancel actions</td>
+      <td>Execution-centric.</td>
+    </tr>
+    
+    <tr>
+      <td>67</td>
+      <td>Microstructure / HFT / Market Making</td>
+      <td><strong>Liquidity Rebate Capture</strong></td>
+      <td>Seek maker rebates while controlling adverse selection.</td>
+      <td>Fee schedule, book data, inventory</td>
+      <td>Quoting/actions</td>
+      <td>Venue-specific strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>68</td>
+      <td>Microstructure / HFT / Market Making</td>
+      <td><strong>Opening Auction Strategy</strong></td>
+      <td>Trade around auction imbalance or expected open price.</td>
+      <td>Auction imbalance/feed, pre-open prices</td>
+      <td>Auction participation signal</td>
+      <td>Session-event strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>69</td>
+      <td>Microstructure / HFT / Market Making</td>
+      <td><strong>Closing Auction Strategy</strong></td>
+      <td>Trade close auction flows or MOC imbalances.</td>
+      <td>Auction feed, near-close data</td>
+      <td>Auction participation signal</td>
+      <td>Common institutional use case.</td>
+    </tr>
+    
+    <tr>
+      <td>70</td>
+      <td>Pattern / Price Action</td>
+      <td><strong>Support and Resistance Bounce</strong></td>
+      <td>Buy at support, sell at resistance with tolerance bands.</td>
+      <td>OHLCV, detected levels</td>
+      <td>Reversal entries/exits</td>
+      <td>Can reuse level-detection helper.</td>
+    </tr>
+    
+    <tr>
+      <td>71</td>
+      <td>Pattern / Price Action</td>
+      <td><strong>Breakout Retest</strong></td>
+      <td>Enter after breakout and successful retest of broken level.</td>
+      <td>OHLCV, levels, retest logic</td>
+      <td>Buy/sell after confirmation</td>
+      <td>Popular discretionary-to-systematic translation.</td>
+    </tr>
+    
+    <tr>
+      <td>72</td>
+      <td>Pattern / Price Action</td>
+      <td><strong>Pivot Point Strategy</strong></td>
+      <td>Trade around daily/weekly pivot levels.</td>
+      <td>OHLCV, pivot formulas</td>
+      <td>Buy/sell near pivot interactions</td>
+      <td>Session-based rule system.</td>
+    </tr>
+    
+    <tr>
+      <td>73</td>
+      <td>Pattern / Price Action</td>
+      <td><strong>Opening Range Breakout</strong></td>
+      <td>Trade break of initial session range.</td>
+      <td>Intraday OHLCV, opening range duration</td>
+      <td>Buy/sell breakout signal</td>
+      <td>Widely used intraday algorithm.</td>
+    </tr>
+    
+    <tr>
+      <td>74</td>
+      <td>Pattern / Price Action</td>
+      <td><strong>Inside Bar Breakout</strong></td>
+      <td>Trade break of an inside-bar pattern.</td>
+      <td>OHLCV candle patterns</td>
+      <td>Pattern breakout signal</td>
+      <td>Simple candle-based rule.</td>
+    </tr>
+    
+    <tr>
+      <td>75</td>
+      <td>Pattern / Price Action</td>
+      <td><strong>Gap-and-Go</strong></td>
+      <td>Trade in direction of significant opening gap with continuation filters.</td>
+      <td>Daily/intraday OHLCV, volume</td>
+      <td>Momentum continuation signal</td>
+      <td>Session-aware.</td>
+    </tr>
+    
+    <tr>
+      <td>76</td>
+      <td>Pattern / Price Action</td>
+      <td><strong>Trendline Break Strategy</strong></td>
+      <td>Trade breaks of fitted trendlines/channels.</td>
+      <td>OHLCV, swing points, regression lines</td>
+      <td>Buy/sell on line break</td>
+      <td>Requires pattern extractor.</td>
+    </tr>
+    
+    <tr>
+      <td>77</td>
+      <td>Pattern / Price Action</td>
+      <td><strong>Volatility Squeeze Breakout</strong></td>
+      <td>Trade expansion after Bollinger/Keltner squeeze.</td>
+      <td>OHLCV, BB/KC params</td>
+      <td>Breakout signal</td>
+      <td>Popular squeeze setup.</td>
+    </tr>
+    
+    <tr>
+      <td>78</td>
+      <td>Cross-Asset / Macro / Carry</td>
+      <td><strong>Carry Trade (FX/Rates)</strong></td>
+      <td>Go long higher carry assets and short lower carry assets.</td>
+      <td>Rates/yields, FX forwards/spot</td>
+      <td>Long/short carry signal</td>
+      <td>Cross-asset allocation strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>79</td>
+      <td>Cross-Asset / Macro / Carry</td>
+      <td><strong>Yield Curve Steepener/Flattener</strong></td>
+      <td>Trade changes in slope of rates curve.</td>
+      <td>Multi-maturity yields/futures</td>
+      <td>Relative value signal</td>
+      <td>Macro/rates oriented.</td>
+    </tr>
+    
+    <tr>
+      <td>80</td>
+      <td>Cross-Asset / Macro / Carry</td>
+      <td><strong>Curve Roll-Down Strategy</strong></td>
+      <td>Harvest roll along the term structure.</td>
+      <td>Yield/futures curves, carry metrics</td>
+      <td>Carry/relative value signal</td>
+      <td>Common fixed-income systematic theme.</td>
+    </tr>
+    
+    <tr>
+      <td>81</td>
+      <td>Cross-Asset / Macro / Carry</td>
+      <td><strong>Commodity Term Structure / Roll Yield</strong></td>
+      <td>Trade backwardation/contango effects.</td>
+      <td>Futures curve data</td>
+      <td>Carry signal</td>
+      <td>Commodity systematic family.</td>
+    </tr>
+    
+    <tr>
+      <td>82</td>
+      <td>Cross-Asset / Macro / Carry</td>
+      <td><strong>Risk-On / Risk-Off Regime</strong></td>
+      <td>Allocate based on macro or cross-asset regime state.</td>
+      <td>Cross-asset returns/vol/macro inputs</td>
+      <td>Regime signal</td>
+      <td>Works as top-level filter.</td>
+    </tr>
+    
+    <tr>
+      <td>83</td>
+      <td>Cross-Asset / Macro / Carry</td>
+      <td><strong>Intermarket Confirmation</strong></td>
+      <td>Trade one asset using signals from correlated assets (e.g., bonds, dollar, sector ETF).</td>
+      <td>Multiple asset time series</td>
+      <td>Confirmation-filtered signal</td>
+      <td>Useful framework feature.</td>
+    </tr>
+    
+    <tr>
+      <td>84</td>
+      <td>Cross-Asset / Macro / Carry</td>
+      <td><strong>Seasonality / Calendar Effects</strong></td>
+      <td>Trade recurring calendar anomalies (month-end, turn-of-month, day-of-week, holiday).</td>
+      <td>Calendar + returns history</td>
+      <td>Scheduled buy/sell windows</td>
+      <td>Implementation should be modular.</td>
+    </tr>
+    
+    <tr>
+      <td>85</td>
+      <td>Cross-Asset / Macro / Carry</td>
+      <td><strong>Earnings Drift / Post-Event Momentum</strong></td>
+      <td>Trade persistent drift after earnings or scheduled events.</td>
+      <td>Event calendar, surprise data, prices</td>
+      <td>Event-driven momentum signal</td>
+      <td>Needs event dataset.</td>
+    </tr>
+    
+    <tr>
+      <td>86</td>
+      <td>Fundamental / ML / Composite</td>
+      <td><strong>Value Strategy</strong></td>
+      <td>Buy relatively cheap assets by valuation, sell expensive ones.</td>
+      <td>Fundamental factors / ratios</td>
+      <td>Ranked buy/sell signal</td>
+      <td>Slower-frequency signal family.</td>
+    </tr>
+    
+    <tr>
+      <td>87</td>
+      <td>Fundamental / ML / Composite</td>
+      <td><strong>Quality Strategy</strong></td>
+      <td>Use profitability, balance-sheet, earnings-quality metrics.</td>
+      <td>Fundamental data</td>
+      <td>Ranked signal</td>
+      <td>Portfolio-style factor strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>88</td>
+      <td>Fundamental / ML / Composite</td>
+      <td><strong>Multi-Factor Composite</strong></td>
+      <td>Combine value, momentum, quality, low-volatility, carry, etc.</td>
+      <td>Factor inputs and weights</td>
+      <td>Composite score + signal</td>
+      <td>Natural use case for your config builder.</td>
+    </tr>
+    
+    <tr>
+      <td>89</td>
+      <td>Fundamental / ML / Composite</td>
+      <td><strong>Sentiment Strategy</strong></td>
+      <td>Trade news, analyst, social, or options sentiment signals.</td>
+      <td>Sentiment feed + price data</td>
+      <td>Directional signal</td>
+      <td>Data-dependent external input.</td>
+    </tr>
+    
+    <tr>
+      <td>90</td>
+      <td>Fundamental / ML / Composite</td>
+      <td><strong>Machine Learning Classifier</strong></td>
+      <td>Model probability of next move/state and convert to trade signal.</td>
+      <td>Feature matrix, labels, model params</td>
+      <td>Probability/score + buy/sell</td>
+      <td>Should conform to same I/O contract.</td>
+    </tr>
+    
+    <tr>
+      <td>91</td>
+      <td>Fundamental / ML / Composite</td>
+      <td><strong>Machine Learning Regressor</strong></td>
+      <td>Predict future return or target and threshold into actions.</td>
+      <td>Feature matrix, regression target</td>
+      <td>Predicted return + signal</td>
+      <td>Useful when probability not desired.</td>
+    </tr>
+    
+    <tr>
+      <td>92</td>
+      <td>Fundamental / ML / Composite</td>
+      <td><strong>Regime-Switching Strategy</strong></td>
+      <td>Use HMM or similar to detect regime and switch sub-strategies.</td>
+      <td>Returns, vol, macro features</td>
+      <td>Regime label plus delegated signal</td>
+      <td>Excellent meta-strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>93</td>
+      <td>Fundamental / ML / Composite</td>
+      <td><strong>Ensemble / Voting Strategy</strong></td>
+      <td>Combine outputs of multiple sub-strategies via voting or weighting.</td>
+      <td>Child strategy outputs, weights/rules</td>
+      <td>Composite final signal</td>
+      <td>Very aligned with your new framework.</td>
+    </tr>
+    
+    <tr>
+      <td>94</td>
+      <td>Execution Algorithms</td>
+      <td><strong>TWAP</strong></td>
+      <td>Split order evenly across time between start and end.</td>
+      <td>Parent order size, start/end time</td>
+      <td>Execution slices / schedule</td>
+      <td>Execution algo, not alpha strategy.</td>
+    </tr>
+    
+    <tr>
+      <td>95</td>
+      <td>Execution Algorithms</td>
+      <td><strong>VWAP</strong></td>
+      <td>Schedule slices against expected volume curve to track VWAP.</td>
+      <td>Parent order, historical/real-time volume curve</td>
+      <td>Execution schedule</td>
+      <td>Execution benchmark algorithm.</td>
+    </tr>
+    
+    <tr>
+      <td>96</td>
+      <td>Execution Algorithms</td>
+      <td><strong>POV / Participation Rate</strong></td>
+      <td>Trade as a fixed percentage of market volume.</td>
+      <td>Parent order, target participation, market volume</td>
+      <td>Dynamic child orders</td>
+      <td>Execution-style algorithm.</td>
+    </tr>
+    
+    <tr>
+      <td>97</td>
+      <td>Execution Algorithms</td>
+      <td><strong>Implementation Shortfall / Arrival Price</strong></td>
+      <td>Optimize execution versus decision price while balancing impact and risk.</td>
+      <td>Parent order, urgency/risk settings, market data</td>
+      <td>Adaptive execution schedule</td>
+      <td>Benchmark-driven execution algo.</td>
+    </tr>
+    
+    <tr>
+      <td>98</td>
+      <td>Execution Algorithms</td>
+      <td><strong>Iceberg / Hidden Size</strong></td>
+      <td>Expose partial displayed size while retaining larger hidden quantity.</td>
+      <td>Parent order, clip size</td>
+      <td>Order placement actions</td>
+      <td>Microstructure execution logic.</td>
+    </tr>
+    
+    <tr>
+      <td>99</td>
+      <td>Execution Algorithms</td>
+      <td><strong>Sniper / Opportunistic Execution</strong></td>
+      <td>Trade aggressively only when liquidity or price conditions are favorable.</td>
+      <td>Liquidity and spread conditions</td>
+      <td>Adaptive execution actions</td>
+      <td>Useful advanced execution family.</td>
+    </tr>
+    
+</tbody>
+</table>
+
+<h2>Implementation guidance for the coder</h2>
+
+<h3>A. Reuse-first principle</h3>
+<p>The coder should first inspect the already-implemented algorithms and identify the exact algorithm base class or interface, helper methods for indicator calculation, signal/state encoding conventions, report-generation helpers, visualization payload builders, parameter validation pattern, and registration/discovery mechanism. All new algorithms should fit into that same architecture.</p>
+
+<h3>B. Registration / discovery</h3>
+<p>Each algorithm should be discoverable by the Algorithm Designer Dashboard through the same registration system as the existing algorithms, so they can appear automatically in the library/configuration builder.</p>
+
+<h3>C. Parameter schema</h3>
+<p>Each algorithm should expose a machine-readable parameter schema so the dashboard can auto-generate parameter forms, validate user input, save configs, publish configs to SmartTrade, and show defaults and descriptions.</p>
+
+<h3>D. Output normalization</h3>
+<p>Even if the internal math differs, all algorithms should emit normalized outputs so they can be composed using your framework’s AND / OR / pipeline / voting logic.</p>
+<ul>
+<li>timestamp</li>
+<li>signal label: <code>buy</code>, <code>sell</code>, <code>neutral</code></li>
+<li>numeric score (optional)</li>
+<li>confidence (optional)</li>
+<li>reason codes / triggered rule names (optional)</li>
+</ul>
+
+<h3>E. Composition readiness</h3>
+<p>Algorithms should be implemented so they can later be combined easily into composite configurations: hard signal output, optional soft score, optional filter-only mode, and optional regime-only mode.</p>
+
+<h3>F. Practical rollout suggestion</h3>
+<ol>
+<li>core trend + momentum + mean reversion set</li>
+<li>statistical arbitrage set</li>
+<li>volatility/options set</li>
+<li>microstructure / execution set</li>
+<li>macro / factor / ML / composite set</li>
+</ol>
+
+<h2>Final note</h2>
+<p>This catalog is intentionally broader than a typical retail “top 10 strategies” list. It reflects the main families repeatedly cited in mainstream, academic, and execution-oriented references, including trend following, mean reversion, momentum, statistical arbitrage, market making/HFT, and benchmark-oriented execution algorithms. citeturn799880news12turn799880search6turn526753search0turn329530search0</p>
+
+<p class="small">Total catalog size: 99 algorithms / strategy templates.</p>
+</div>
+</body>
+</html>

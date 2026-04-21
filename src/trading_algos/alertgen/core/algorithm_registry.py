@@ -16,6 +16,7 @@ class AlertAlgorithmSpec:
     default_param: Any
     param_normalizer: Normalizer
     description: str = ""
+    param_schema: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     supports_buy: bool = True
     supports_sell: bool = True
     tags: tuple[str, ...] = field(default_factory=tuple)

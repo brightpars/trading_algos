@@ -1,9 +1,104 @@
 {% extends "base.html" %}
 {% block content %}
+{% macro render_structure_node(node) %}
+  {% if node %}
+  <div class="builder-node {% if node.node_type == 'algorithm' %}builder-node--algorithm{% else %}builder-node--group{% endif %} builder-node--readonly">
+    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+      <div>
+        <span class="builder-badge {% if node.node_type == 'algorithm' %}builder-badge--algorithm{% else %}builder-badge--group{% endif %}">{{ node.node_type|upper }}</span>
+        <h3 class="h6 mt-2 mb-1">{{ node.name }}</h3>
+        {% if node.description %}
+        <p class="text-muted small mb-0">{{ node.description }}</p>
+        {% endif %}
+      </div>
+      <small class="text-muted">{{ node.node_id }}</small>
+    </div>
+    {% if node.node_type == 'algorithm' %}
+    <dl class="row small mb-0">
+      <dt class="col-sm-3">Algorithm</dt>
+      <dd class="col-sm-9">{{ node.alg_key }}</dd>
+      <dt class="col-sm-3">Params</dt>
+      <dd class="col-sm-9"><code>{{ node.alg_param }}</code></dd>
+      <dt class="col-sm-3">Signals</dt>
+      <dd class="col-sm-9">buy={{ node.buy_enabled }} sell={{ node.sell_enabled }}</dd>
+    </dl>
+    {% else %}
+    <div class="builder-children mt-3">
+      {% for child in node.children %}
+        {{ render_structure_node(child) }}
+      {% else %}
+      <p class="text-muted small mb-0">No children.</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+{% endmacro %}
+
 <h1>Configuration {{ draft.draft_id }}</h1>
 <p><strong>Config key:</strong> {{ draft.config_key }}</p>
 <p><strong>Name:</strong> {{ draft.name }}</p>
+<div class="builder-layout mb-4">
+  <section class="builder-main-column">
+    <div class="builder-card mb-4">
+      <h2 class="h5 mb-3">Configuration summary</h2>
+      <div class="builder-summary-grid">
+        <div class="builder-summary-item">
+          <span class="builder-summary-label">Version</span>
+          <strong>{{ summary.version or 'unknown' }}</strong>
+        </div>
+        <div class="builder-summary-item">
+          <span class="builder-summary-label">Status</span>
+          <strong>{{ summary.status }}</strong>
+        </div>
+        <div class="builder-summary-item">
+          <span class="builder-summary-label">Root node</span>
+          <strong>{{ summary.root_node_id or 'missing' }}</strong>
+        </div>
+        <div class="builder-summary-item">
+          <span class="builder-summary-label">Nodes</span>
+          <strong>{{ summary.node_count }}</strong>
+        </div>
+        <div class="builder-summary-item">
+          <span class="builder-summary-label">Algorithms</span>
+          <strong>{{ summary.algorithm_count }}</strong>
+        </div>
+        <div class="builder-summary-item">
+          <span class="builder-summary-label">Groups</span>
+          <strong>{{ summary.group_count }}</strong>
+        </div>
+      </div>
+      {% if summary.tags %}
+      <div class="builder-algorithm-meta mt-3">
+        {% for tag in summary.tags %}
+        <span class="builder-meta-pill">{{ tag }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="builder-card mb-4">
+      <h2 class="h5 mb-3">Structure summary</h2>
+      {% if structure_tree %}
+      {{ render_structure_node(structure_tree) }}
+      {% else %}
+      <p class="text-muted mb-0">No structure preview available.</p>
+      {% endif %}
+    </div>
+  </section>
+  <aside class="builder-side-column">
+    <div class="builder-card mb-4">
+      <h2 class="h5 mb-3">Advanced JSON</h2>
+      <details open>
+        <summary>Show raw payload</summary>
+        <pre class="bg-light p-3 rounded small mt-3 mb-0">{{ draft.payload|tojson(indent=2) }}</pre>
+      </details>
+    </div>
+  </aside>
+</div>
 <div class="d-flex gap-2 mb-3">
+  <a class="btn btn-outline-secondary" href="{{ url_for('configurations.edit_configuration', draft_id=draft.draft_id) }}">Edit draft</a>
+  <a class="btn btn-outline-success" href="{{ url_for('experiments.new_experiment', draft_id=draft.draft_id) }}">Run this configuration</a>
   <form method="post" action="{{ url_for('configurations.validate_configuration_remote', draft_id=draft.draft_id) }}">
     <button class="btn btn-outline-primary" type="submit">Validate in SmartTrade</button>
   </form>
@@ -11,19 +106,49 @@
     <button class="btn btn-success" type="submit">Publish to SmartTrade</button>
   </form>
 </div>
-<pre class="bg-light p-3 rounded small">{{ draft.payload|tojson(indent=2) }}</pre>
 <h2 class="h4 mt-4">Revision history</h2>
-<ul>
+<div class="builder-history-list mb-4">
   {% for revision in revisions %}
-  <li>Revision {{ revision.revision_no }} — {{ revision.created_at }}</li>
+  <div class="builder-card builder-history-card">
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+      <div>
+        <h3 class="h6 mb-1">Revision {{ revision.revision_no }}</h3>
+        <p class="text-muted small mb-0">{{ revision.created_at }}</p>
+      </div>
+      {% if loop.first %}
+      <span class="builder-meta-pill">Current</span>
+      {% endif %}
+    </div>
+    <ul class="mb-0 small">
+      {% for item in revision.change_summary %}
+      <li>{{ item }}</li>
+      {% endfor %}
+    </ul>
+  </div>
   {% endfor %}
-</ul>
+</div>
 <h2 class="h4 mt-4">Publish history</h2>
-<ul>
+<div class="builder-history-list">
   {% for record in publication_records %}
-  <li>{{ record.created_at }} — remote_config_id={{ record.remote_config_id or 'unknown' }} — {{ record.remote_status or 'unknown' }}</li>
+  <div class="builder-card builder-history-card">
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+      <div>
+        <h3 class="h6 mb-1">Publish event</h3>
+        <p class="text-muted small mb-0">{{ record.created_at }}</p>
+      </div>
+      <span class="badge text-bg-{{ record.status_class }}">{{ record.status_label }}</span>
+    </div>
+    <dl class="row small mb-0">
+      <dt class="col-sm-4">Remote config ID</dt>
+      <dd class="col-sm-8">{{ record.remote_config_id or 'unknown' }}</dd>
+      <dt class="col-sm-4">Remote version</dt>
+      <dd class="col-sm-8">{{ record.remote_version or 'unknown' }}</dd>
+      <dt class="col-sm-4">Status</dt>
+      <dd class="col-sm-8">{{ record.remote_status or 'unknown' }}</dd>
+    </dl>
+  </div>
   {% else %}
-  <li>No publish records yet.</li>
+  <div class="builder-card"><p class="text-muted mb-0">No publish records yet.</p></div>
   {% endfor %}
-</ul>
+</div>
 {% endblock %}

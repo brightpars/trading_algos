@@ -105,6 +105,13 @@ def test_new_configuration_page_renders(monkeypatch):
     response = app.test_client().get("/configurations/new")
     assert response.status_code == 200
     assert b"New configuration draft" in response.data
+    assert b"How this builder works" in response.data
+    assert b"configuration-builder-root" in response.data
+    assert b"configuration-payload-input" in response.data
+    assert b"Start from a template" in response.data
+    assert b"Configuration details" in response.data
+    assert b"Algorithm reference" in response.data
+    assert b"Generated JSON" in response.data
 
 
 def test_create_configuration_creates_draft(monkeypatch):
@@ -116,6 +123,77 @@ def test_create_configuration_creates_draft(monkeypatch):
     )
     assert response.status_code == 302
     assert "/configurations/cfgdraft_" in response.headers["Location"]
+
+
+def test_create_configuration_preserves_builder_state_on_validation_error(monkeypatch):
+    app = _build_app(monkeypatch)
+    response = app.test_client().post(
+        "/configurations",
+        data={
+            "payload": __import__("json").dumps(
+                {
+                    **_sample_configuration_payload(),
+                    "name": "",
+                }
+            )
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 400
+    assert b"configuration-builder-bootstrap" in response.data
+    assert b"combo_breakout" in response.data
+
+
+def test_edit_configuration_page_renders_existing_payload(monkeypatch):
+    app = _build_app(monkeypatch)
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        _sample_configuration_payload()
+    )
+    response = app.test_client().get(f"/configurations/{draft_id}/edit")
+    assert response.status_code == 200
+    assert b"Edit configuration draft" in response.data
+    assert b"Save changes" in response.data
+    assert b"configuration-builder-bootstrap" in response.data
+
+
+def test_edit_configuration_updates_draft_and_creates_revision(monkeypatch):
+    app = _build_app(monkeypatch)
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        _sample_configuration_payload()
+    )
+    updated_payload = {
+        **_sample_configuration_payload(),
+        "name": "Updated Combo Breakout",
+    }
+    response = app.test_client().post(
+        f"/configurations/{draft_id}/edit",
+        data={"payload": __import__("json").dumps(updated_payload)},
+        follow_redirects=False,
+    )
+    assert response.status_code == 302
+    detail = app.extensions["configuration_builder_service"].get_draft_detail(draft_id)
+    assert detail is not None
+    assert detail["draft"]["name"] == "Updated Combo Breakout"
+    assert len(detail["revisions"]) == 2
+
+
+def test_edit_configuration_preserves_state_on_validation_error(monkeypatch):
+    app = _build_app(monkeypatch)
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        _sample_configuration_payload()
+    )
+    invalid_payload = {
+        **_sample_configuration_payload(),
+        "root_node_id": "",
+    }
+    response = app.test_client().post(
+        f"/configurations/{draft_id}/edit",
+        data={"payload": __import__("json").dumps(invalid_payload)},
+        follow_redirects=False,
+    )
+    assert response.status_code == 400
+    assert b"configuration-builder-bootstrap" in response.data
+    assert b"Save changes" in response.data
 
 
 def test_configuration_detail_shows_publish_history(monkeypatch):
@@ -134,8 +212,53 @@ def test_configuration_detail_shows_publish_history(monkeypatch):
     )
     response = app.test_client().get(f"/configurations/{draft_id}")
     assert response.status_code == 200
+    assert b"Configuration summary" in response.data
     assert b"Publish history" in response.data
     assert b"algcfg_1" in response.data
+    assert b"Structure summary" in response.data
+    assert b"Edit draft" in response.data
+    assert b"Revision 1" in response.data
+    assert b"Initial revision created." in response.data
+    assert b"Published" in response.data
+
+
+def test_configuration_detail_shows_revision_change_summary(monkeypatch):
+    app = _build_app(monkeypatch)
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        _sample_configuration_payload()
+    )
+    updated_payload = _sample_configuration_payload()
+    updated_payload["name"] = "Combo Breakout Updated"
+    updated_payload["nodes"] = [
+        {
+            "node_id": "root",
+            "node_type": "and",
+            "children": ["alg1", "alg3"],
+        },
+        updated_payload["nodes"][1],
+        {
+            "node_id": "alg3",
+            "node_type": "algorithm",
+            "alg_key": "boundary_breakout",
+            "alg_param": {"period": 7},
+            "buy_enabled": True,
+            "sell_enabled": True,
+        },
+    ]
+    app.extensions["configuration_builder_service"].update_draft(
+        draft_id,
+        updated_payload,
+    )
+    response = app.test_client().get(f"/configurations/{draft_id}")
+    assert response.status_code == 200
+    assert b"Changed name from" in response.data
+    assert b"Combo Breakout Updated" in response.data
+
+
+def test_edit_configuration_missing_draft_returns_404(monkeypatch):
+    app = _build_app(monkeypatch)
+    response = app.test_client().get("/configurations/not-real/edit")
+    assert response.status_code == 404
 
 
 def test_configuration_detail_validate_remote_uses_publish_service(monkeypatch):

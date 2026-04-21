@@ -13,3 +13,5 @@ def test_catalog_service_exposes_registered_algorithms():
 def test_catalog_service_returns_single_entry():
     item = get_algorithm_catalog_entry("close_high_channel_breakout")
     assert item["name"] == "Close/High Channel Breakout"
+    assert item["param_schema"]
+    assert item["param_schema"][0]["key"] == "window"
