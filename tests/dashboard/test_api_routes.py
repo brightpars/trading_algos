@@ -157,3 +157,31 @@ def test_experiment_api_returns_runtime_metadata(monkeypatch):
     assert payload["experiment"]["duration_seconds"] == 300.0
     assert payload["experiment"]["repo_revision"] == "abc123"
     assert payload["experiment"]["dataset_source"]["endpoint"] == "127.0.0.1:7003"
+
+
+def test_experiment_api_returns_running_status_metadata(monkeypatch):
+    app = _build_app(monkeypatch)
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_running",
+            "created_at": "2024-02-03T12:00:00Z",
+            "started_at": "2024-02-03T12:00:00Z",
+            "finished_at": None,
+            "duration_seconds": None,
+            "repo_revision": "abc123",
+            "status": "running",
+            "symbol": "AAPL",
+            "dataset_source": None,
+            "candle_count": None,
+            "error_message": None,
+        }
+    )
+
+    response = app.test_client().get("/api/experiments/exp_running")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["experiment"]["status"] == "running"
+    assert payload["experiment"]["finished_at"] is None
+    assert payload["experiment"]["duration_seconds"] is None
+    assert payload["experiment"]["dataset_source"] is None

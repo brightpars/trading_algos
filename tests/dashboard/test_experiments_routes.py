@@ -378,6 +378,7 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
         "_repo_revision",
         lambda: "abc123def456",
     )
+    app.extensions["experiment_service"].task_launcher = lambda job: job()
 
     client = app.test_client()
     response = client.post(
@@ -402,6 +403,7 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
 
     stored_experiments = app.extensions["experiment_repository"].list_experiments()
     assert len(stored_experiments) == 1
+    assert stored_experiments[0]["status"] == "completed"
     assert stored_experiments[0]["selected_algorithms"] == [
         {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
     ]
@@ -417,6 +419,49 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
     assert stored_experiments[0]["finished_at"] >= stored_experiments[0]["started_at"]
     assert stored_experiments[0]["duration_seconds"] >= 0
     assert Path(stored_experiments[0]["report_base_path"]).exists()
+
+
+def test_create_experiment_redirects_to_running_detail_page(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+            "/tmp/smarttrade",
+            1,
+        )
+    )
+    app.extensions["experiment_service"].task_launcher = lambda _job: None
+
+    response = app.test_client().post(
+        "/experiments",
+        data={
+            "symbol": "AAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-31",
+            "end_time": "16:00",
+            "algorithms_json": (
+                '[{"alg_key":"close_high_channel_breakout","alg_param":{"window":2}}]'
+            ),
+            "notes": "good payload",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert "/experiments/exp_" in location
+
+    stored_experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(stored_experiments) == 1
+    assert stored_experiments[0]["status"] == "running"
+    assert stored_experiments[0]["finished_at"] is None
+    assert stored_experiments[0]["duration_seconds"] is None
 
 
 def test_experiment_detail_shows_runtime_metadata(monkeypatch):
@@ -463,6 +508,212 @@ def test_experiment_detail_shows_runtime_metadata(monkeypatch):
     assert b"accfd73bac055e1555c2d6f8f031cea7095ff35d" in response.data
 
 
+def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_running",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "started_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "finished_at": None,
+            "duration_seconds": None,
+            "repo_revision": "abc123",
+            "symbol": "AAPL",
+            "status": "running",
+            "dataset_source": None,
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [
+                {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+            ],
+            "input_kind": "single_algorithm",
+            "input_snapshot": {
+                "algorithms": [
+                    {
+                        "alg_key": "close_high_channel_breakout",
+                        "alg_param": {"window": 2},
+                    }
+                ]
+            },
+            "notes": "runtime payload",
+            "candle_count": None,
+        }
+    )
+
+    response = app.test_client().get("/experiments/exp_running")
+
+    assert response.status_code == 200
+    assert b"Running experiment" in response.data
+    assert b"This page updates automatically every second" in response.data
+    assert b"data-experiment-runtime=" in response.data
+    assert b"data-status-api-url=" in response.data
+    assert b"00:00:00" in response.data
+    assert b"close_high_channel_breakout" in response.data
+    assert b"Stop experiment" in response.data
+
+
+def test_cancel_experiment_requests_graceful_stop(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_running",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "started_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "finished_at": None,
+            "duration_seconds": None,
+            "repo_revision": "abc123",
+            "symbol": "AAPL",
+            "status": "running",
+            "dataset_source": None,
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [],
+            "input_kind": "single_algorithm",
+            "input_snapshot": {"algorithms": []},
+            "notes": "runtime payload",
+            "candle_count": None,
+            "error_message": None,
+            "cancel_requested_at": None,
+            "cancelled_at": None,
+        }
+    )
+
+    response = app.test_client().post(
+        "/experiments/exp_running/cancel",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Experiment cancellation requested." in response.data
+    stored = app.extensions["experiment_repository"].get_experiment("exp_running")
+    assert stored is not None
+    assert stored["status"] == "cancelling"
+    assert stored["cancel_requested_at"] is not None
+    assert b"Cancelling experiment" in response.data
+    assert b"Stopping\xe2\x80\xa6" in response.data
+
+
+def test_cancel_experiment_marks_cancelled_when_job_observes_request(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+            "/tmp/smarttrade",
+            1,
+        )
+    )
+
+    service = app.extensions["experiment_service"]
+    service.task_launcher = lambda _job: None
+
+    experiment_id = service.create_experiment(
+        symbol="AAPL",
+        start_date="2024-01-01",
+        start_time="09:30",
+        end_date="2024-01-01",
+        end_time="09:30",
+        algorithms=[
+            {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+        ],
+        notes="cancel me",
+    )
+
+    requested = service.request_cancel(experiment_id)
+
+    assert requested is True
+
+    service._run_experiment_job(
+        experiment_id=experiment_id,
+        created_at=app.extensions["experiment_repository"].get_experiment(
+            experiment_id
+        )["created_at"],
+        started_at=app.extensions["experiment_repository"].get_experiment(
+            experiment_id
+        )["started_at"],
+        symbol="AAPL",
+        start_dt=datetime.fromisoformat("2024-01-01T09:30"),
+        end_dt=datetime.fromisoformat("2024-01-01T09:30"),
+        normalized_algorithms=[
+            {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+        ],
+        configuration_payload=None,
+        report_dir=Path(
+            app.extensions["experiment_repository"].get_experiment(experiment_id)[
+                "report_base_path"
+            ]
+        ),
+    )
+
+    stored = app.extensions["experiment_repository"].get_experiment(experiment_id)
+    assert stored is not None
+    assert stored["status"] == "cancelled"
+    assert stored["cancelled_at"] is not None
+    assert stored["finished_at"] is not None
+
+
+def test_cancel_experiment_rejects_completed_experiment(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_done",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "started_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "finished_at": datetime(2024, 2, 3, 12, 5, tzinfo=timezone.utc),
+            "duration_seconds": 300.0,
+            "repo_revision": "abc123",
+            "symbol": "AAPL",
+            "status": "completed",
+            "dataset_source": None,
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [],
+            "input_kind": "single_algorithm",
+            "input_snapshot": {"algorithms": []},
+            "notes": "done",
+            "candle_count": 1,
+            "error_message": None,
+            "cancel_requested_at": None,
+            "cancelled_at": None,
+        }
+    )
+
+    response = app.test_client().post(
+        "/experiments/exp_done/cancel",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"cannot be cancelled" in response.data
+
+
 def test_create_experiment_returns_400_when_data_fetch_fault_occurs(
     monkeypatch, tmp_path
 ):
@@ -489,6 +740,7 @@ def test_create_experiment_returns_400_when_data_fetch_fault_occurs(
         "_data_proxy",
         lambda: _FaultyProxy(),
     )
+    app.extensions["experiment_service"].task_launcher = lambda job: job()
 
     client = app.test_client()
     response = client.post(
@@ -505,15 +757,26 @@ def test_create_experiment_returns_400_when_data_fetch_fault_occurs(
             "notes": "fault payload",
         },
     )
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert "/experiments/exp_" in location
 
-    assert response.status_code == 400
+    stored_experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(stored_experiments) == 1
+    assert stored_experiments[0]["status"] == "failed"
+    assert (
+        stored_experiments[0]["error_message"]
+        == "No candle data is available for the requested symbol and time range. Please choose a range that contains market data."
+    )
+
+    detail_response = client.get(location)
+    assert detail_response.status_code == 200
+    assert b"Experiment failed" in detail_response.data
     assert (
         b"No candle data is available for the requested symbol and time range."
-        in response.data
+        in detail_response.data
     )
-    assert b"New experiment" in response.data
-    assert b'value="AAPL"' in response.data
-    assert b"fault payload" in response.data
+    assert b"fault payload" in detail_response.data
 
 
 def test_create_experiment_returns_400_when_no_market_data_is_available(

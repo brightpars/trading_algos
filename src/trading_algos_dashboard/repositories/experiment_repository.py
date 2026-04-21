@@ -21,6 +21,12 @@ class ExperimentRepository(MongoRepository):
             {"$set": {"status": status}},
         )
 
+    def update_experiment(self, experiment_id: str, values: Mapping[str, Any]) -> None:
+        self.collection.update_one(
+            {"experiment_id": experiment_id},
+            {"$set": dict(values)},
+        )
+
     def update_selected_algorithms(
         self, experiment_id: str, selected_algorithms: list[dict[str, Any]]
     ) -> None:

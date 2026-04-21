@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import subprocess
+import threading
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,10 @@ from trading_algos_dashboard.services.data_source_service import (
 )
 
 
+class CancelledExperimentError(Exception):
+    pass
+
+
 class ExperimentService:
     def __init__(
         self,
@@ -32,11 +38,15 @@ class ExperimentService:
         result_repository: ResultRepository,
         data_source_service: SmarttradeDataSourceService,
         report_base_path: str,
+        task_launcher: Callable[[Callable[[], None]], None] | None = None,
     ):
         self.experiment_repository = experiment_repository
         self.result_repository = result_repository
         self.data_source_service = data_source_service
         self.report_base_path = report_base_path
+        self.task_launcher = task_launcher or self._launch_background_task
+        self._cancel_events: dict[str, threading.Event] = {}
+        self._cancel_events_lock = threading.Lock()
 
     def create_experiment(
         self,
@@ -83,58 +93,24 @@ class ExperimentService:
             end_date,
             end_time,
         )
-        dataset_source = self.data_source_service.get_market_data_server_details()
         repo_revision = self._repo_revision()
-        candles = self.data_source_service.fetch_candles(
-            symbol=symbol,
-            start=start_dt,
-            end=end_dt,
-        )
         report_dir = Path(self.report_base_path) / experiment_id
         report_dir.mkdir(parents=True, exist_ok=True)
-
-        if configuration_payload is not None:
-            result = run_configuration_payload(
-                payload=configuration_payload,
-                symbol=symbol,
-                report_base_path=str(report_dir),
-                candles=candles,
-            )
-            self.result_repository.insert_result(
-                {"experiment_id": experiment_id, "created_at": created_at, **result}
-            )
-        else:
-            for sensor_config in normalized_algorithms:
-                result = run_alert_algorithm(
-                    sensor_config=sensor_config,
-                    report_base_path=str(report_dir),
-                    candles=candles,
-                )
-                self.result_repository.insert_result(
-                    {
-                        "experiment_id": experiment_id,
-                        "created_at": created_at,
-                        **result,
-                    }
-                )
-
-        finished_at = datetime.now(timezone.utc)
-        duration_seconds = (finished_at - started_at).total_seconds()
 
         self.experiment_repository.create_experiment(
             {
                 "experiment_id": experiment_id,
                 "created_at": created_at,
-                "updated_at": finished_at,
-                "status": "completed",
+                "updated_at": started_at,
+                "status": "running",
                 "started_at": started_at,
-                "finished_at": finished_at,
-                "duration_seconds": duration_seconds,
+                "finished_at": None,
+                "duration_seconds": None,
                 "repo_revision": repo_revision,
                 "symbol": symbol,
-                "dataset_source": dataset_source,
+                "dataset_source": None,
                 "time_range": {"start": start_dt, "end": end_dt},
-                "candle_count": len(candles),
+                "candle_count": None,
                 "input_kind": "configuration"
                 if configuration_payload is not None
                 else "single_algorithm",
@@ -158,9 +134,185 @@ class ExperimentService:
                 ],
                 "notes": notes,
                 "report_base_path": str(report_dir),
+                "error_message": None,
+                "cancel_requested_at": None,
+                "cancelled_at": None,
             }
         )
+        self._register_cancel_event(experiment_id)
+        self.task_launcher(
+            lambda: self._run_experiment_job(
+                experiment_id=experiment_id,
+                created_at=created_at,
+                started_at=started_at,
+                symbol=symbol,
+                start_dt=start_dt,
+                end_dt=end_dt,
+                normalized_algorithms=normalized_algorithms,
+                configuration_payload=configuration_payload,
+                report_dir=report_dir,
+            )
+        )
         return experiment_id
+
+    def _run_experiment_job(
+        self,
+        *,
+        experiment_id: str,
+        created_at: datetime,
+        started_at: datetime,
+        symbol: str,
+        start_dt: datetime,
+        end_dt: datetime,
+        normalized_algorithms: list[dict[str, Any]],
+        configuration_payload: dict[str, Any] | None,
+        report_dir: Path,
+    ) -> None:
+        try:
+            self._raise_if_cancel_requested(experiment_id)
+            dataset_source = self.data_source_service.get_market_data_server_details()
+            self._raise_if_cancel_requested(experiment_id)
+            candles = self.data_source_service.fetch_candles(
+                symbol=symbol,
+                start=start_dt,
+                end=end_dt,
+            )
+            self._raise_if_cancel_requested(experiment_id)
+            self.experiment_repository.update_experiment(
+                experiment_id,
+                {
+                    "dataset_source": dataset_source,
+                    "candle_count": len(candles),
+                    "updated_at": datetime.now(timezone.utc),
+                },
+            )
+
+            if configuration_payload is not None:
+                self._raise_if_cancel_requested(experiment_id)
+                result = run_configuration_payload(
+                    payload=configuration_payload,
+                    symbol=symbol,
+                    report_base_path=str(report_dir),
+                    candles=candles,
+                )
+                self.result_repository.insert_result(
+                    {"experiment_id": experiment_id, "created_at": created_at, **result}
+                )
+            else:
+                for sensor_config in normalized_algorithms:
+                    self._raise_if_cancel_requested(experiment_id)
+                    result = run_alert_algorithm(
+                        sensor_config=sensor_config,
+                        report_base_path=str(report_dir),
+                        candles=candles,
+                    )
+                    self._raise_if_cancel_requested(experiment_id)
+                    self.result_repository.insert_result(
+                        {
+                            "experiment_id": experiment_id,
+                            "created_at": created_at,
+                            **result,
+                        }
+                    )
+        except CancelledExperimentError:
+            self._mark_cancelled(experiment_id=experiment_id, started_at=started_at)
+            self._clear_cancel_event(experiment_id)
+            return
+        except Exception as exc:
+            finished_at = datetime.now(timezone.utc)
+            self.experiment_repository.update_experiment(
+                experiment_id,
+                {
+                    "updated_at": finished_at,
+                    "status": "failed",
+                    "finished_at": finished_at,
+                    "duration_seconds": (finished_at - started_at).total_seconds(),
+                    "error_message": str(exc),
+                    "cancelled_at": None,
+                },
+            )
+            self._clear_cancel_event(experiment_id)
+            return
+
+        finished_at = datetime.now(timezone.utc)
+        self.experiment_repository.update_experiment(
+            experiment_id,
+            {
+                "updated_at": finished_at,
+                "status": "completed",
+                "finished_at": finished_at,
+                "duration_seconds": (finished_at - started_at).total_seconds(),
+                "error_message": None,
+                "cancelled_at": None,
+            },
+        )
+        self._clear_cancel_event(experiment_id)
+
+    def request_cancel(self, experiment_id: str) -> bool:
+        experiment = self.experiment_repository.get_experiment(experiment_id)
+        if experiment is None:
+            raise ValueError("Experiment was not found")
+
+        status = experiment.get("status")
+        if status not in {"running", "cancelling"}:
+            return False
+
+        requested_at = datetime.now(timezone.utc)
+        self.experiment_repository.update_experiment(
+            experiment_id,
+            {
+                "status": "cancelling",
+                "updated_at": requested_at,
+                "cancel_requested_at": requested_at,
+            },
+        )
+        self._register_cancel_event(experiment_id).set()
+        return True
+
+    def _register_cancel_event(self, experiment_id: str) -> threading.Event:
+        with self._cancel_events_lock:
+            event = self._cancel_events.get(experiment_id)
+            if event is None:
+                event = threading.Event()
+                self._cancel_events[experiment_id] = event
+            return event
+
+    def _clear_cancel_event(self, experiment_id: str) -> None:
+        with self._cancel_events_lock:
+            self._cancel_events.pop(experiment_id, None)
+
+    def _is_cancel_requested(self, experiment_id: str) -> bool:
+        with self._cancel_events_lock:
+            event = self._cancel_events.get(experiment_id)
+        if event is not None and event.is_set():
+            return True
+        experiment = self.experiment_repository.get_experiment(experiment_id)
+        if experiment is None:
+            return False
+        return experiment.get("status") == "cancelling"
+
+    def _raise_if_cancel_requested(self, experiment_id: str) -> None:
+        if self._is_cancel_requested(experiment_id):
+            raise CancelledExperimentError()
+
+    def _mark_cancelled(self, *, experiment_id: str, started_at: datetime) -> None:
+        cancelled_at = datetime.now(timezone.utc)
+        self.experiment_repository.update_experiment(
+            experiment_id,
+            {
+                "updated_at": cancelled_at,
+                "status": "cancelled",
+                "finished_at": cancelled_at,
+                "cancelled_at": cancelled_at,
+                "duration_seconds": (cancelled_at - started_at).total_seconds(),
+                "error_message": None,
+            },
+        )
+
+    @staticmethod
+    def _launch_background_task(job: Callable[[], None]) -> None:
+        thread = threading.Thread(target=job, daemon=True)
+        thread.start()
 
     @staticmethod
     def _repo_revision() -> str | None:

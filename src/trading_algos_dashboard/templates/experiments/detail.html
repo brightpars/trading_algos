@@ -4,8 +4,111 @@
   <h1>Experiment {{ experiment.experiment_id }}</h1>
   <a class="btn btn-outline-primary" href="{{ url_for('experiments.compare', experiment_id=experiment.experiment_id) }}">Compare view</a>
 </div>
-<p><strong>Symbol:</strong> {{ experiment.symbol }} | <strong>Candles:</strong> {{ experiment.candle_count }}</p>
+<p><strong>Symbol:</strong> {{ experiment.symbol }} | <strong>Candles:</strong> {{ experiment.candle_count if experiment.candle_count is not none else 'Loading…' }}</p>
 <p><strong>Input kind:</strong> {{ experiment.input_kind or 'single_algorithm' }}</p>
+
+{% if experiment.is_running or experiment.is_cancelling or experiment.is_failed or experiment.is_cancelled %}
+<section
+  class="experiment-runtime-panel mb-4"
+  data-experiment-runtime='{{ experiment_runtime_payload|tojson }}'
+  data-status-api-url="{{ url_for('api.experiment', experiment_id=experiment.experiment_id) }}"
+>
+  <div class="builder-card experiment-runtime-card{% if experiment.is_failed or experiment.is_cancelled %} is-failed{% endif %}">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <div class="experiment-runtime-label">Experiment status</div>
+        <h2 class="h4 mb-2 experiment-runtime-status">
+          {% if experiment.is_running %}
+          Running experiment…
+          {% elif experiment.is_cancelling %}
+          Cancelling experiment…
+          {% elif experiment.is_cancelled %}
+          Experiment cancelled
+          {% else %}
+          Experiment failed
+          {% endif %}
+        </h2>
+        <p class="text-muted mb-0 experiment-runtime-message">
+          {% if experiment.is_running %}
+          Your algorithm run is in progress. This page updates automatically every second.
+          {% elif experiment.is_cancelling %}
+          Stop requested. The run will finish its current safe checkpoint and then stop.
+          {% elif experiment.is_cancelled %}
+          This experiment was stopped by the user before completion.
+          {% else %}
+          {{ experiment.error_message or 'The experiment stopped before completion.' }}
+          {% endif %}
+        </p>
+      </div>
+      <div class="experiment-runtime-timer-wrap text-md-end">
+        <div class="experiment-runtime-label">Elapsed</div>
+        <div class="experiment-runtime-timer" data-elapsed-timer>
+          {% if experiment.duration_seconds is not none %}
+          {{ experiment.duration_seconds }}s
+          {% else %}
+          00:00:00
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if experiment.is_running or experiment.is_cancelling %}
+    <div class="mt-3">
+      <form method="post" action="{{ url_for('experiments.cancel_experiment', experiment_id=experiment.experiment_id) }}">
+        <button class="btn btn-outline-danger" type="submit" {% if experiment.is_cancelling %}disabled{% endif %}>
+          {% if experiment.is_cancelling %}Stopping…{% else %}Stop experiment{% endif %}
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="builder-summary-grid mt-4">
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Started</span>
+        <div data-runtime-field="started_at">{{ experiment.started_at or experiment.created_at or '—' }}</div>
+      </div>
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Finished</span>
+        <div data-runtime-field="finished_at">{{ experiment.finished_at or '—' }}</div>
+      </div>
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Status</span>
+        <div data-runtime-field="status">{{ experiment.status or 'unknown' }}</div>
+      </div>
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Market data server</span>
+        <div data-runtime-field="dataset_endpoint">{{ experiment.dataset_source.endpoint if experiment.dataset_source else 'Loading…' }}</div>
+      </div>
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Time range</span>
+        <div>{{ experiment.time_range.start if experiment.time_range else '—' }} → {{ experiment.time_range.end if experiment.time_range else '—' }}</div>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <h3 class="h6">Execution details</h3>
+      {% if experiment.input_kind == 'configuration' %}
+      <p class="mb-2"><strong>Configuration:</strong> <code>{{ experiment.input_snapshot.config_key or experiment.input_snapshot.name or 'Declarative configuration' }}</code></p>
+      <pre class="small bg-light p-3 rounded mb-0">{{ experiment.input_snapshot }}</pre>
+      {% else %}
+      <ul class="mb-0">
+        {% for algorithm in experiment.selected_algorithms %}
+        <li><code>{{ algorithm.alg_key }}</code> — {{ algorithm.alg_param }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+
+    {% if experiment.notes %}
+    <div class="mt-4">
+      <h3 class="h6">Notes</h3>
+      <p class="mb-0">{{ experiment.notes }}</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
 <div class="mb-4">
   <p class="mb-1"><strong>Started:</strong> {{ experiment.started_at or experiment.created_at }}</p>
   <p class="mb-1"><strong>Finished:</strong> {{ experiment.finished_at or '—' }}</p>
@@ -36,4 +139,9 @@
     </div>
   </div>
 {% endfor %}
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script src="{{ url_for('static', filename='js/experiment_runtime.js') }}"></script>
 {% endblock %}

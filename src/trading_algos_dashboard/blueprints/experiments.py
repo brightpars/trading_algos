@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from json import JSONDecodeError
 
 from flask import (
@@ -105,7 +105,24 @@ def _decorate_experiment(experiment: dict[str, object]) -> dict[str, object]:
     decorated["has_legacy_selected_algorithms"] = _has_legacy_selected_algorithms(
         decorated.get("selected_algorithms")
     )
+    started_at = decorated.get("started_at")
+    decorated["started_at_epoch_ms"] = (
+        int(started_at.timestamp() * 1000) if isinstance(started_at, datetime) else None
+    )
+    decorated["is_running"] = decorated.get("status") == "running"
+    decorated["is_cancelling"] = decorated.get("status") == "cancelling"
+    decorated["is_failed"] = decorated.get("status") == "failed"
+    decorated["is_cancelled"] = decorated.get("status") == "cancelled"
     return decorated
+
+
+def _serialize_experiment_runtime(experiment: dict[str, object]) -> dict[str, object]:
+    serialized = dict(experiment)
+    for field in ("created_at", "updated_at", "started_at", "finished_at"):
+        value = serialized.get(field)
+        if isinstance(value, datetime):
+            serialized[field] = value.astimezone(timezone.utc).isoformat()
+    return serialized
 
 
 def _cleanup_selected_algorithms_payload(
@@ -275,6 +292,22 @@ def cleanup_selected_algorithms(experiment_id: str):
     return redirect(request.referrer or url_for("experiments.history"))
 
 
+@bp.post("/<experiment_id>/cancel")
+def cancel_experiment(experiment_id: str):
+    service = current_app.extensions["experiment_service"]
+    try:
+        was_requested = service.request_cancel(experiment_id)
+    except ValueError:
+        abort(404)
+
+    if was_requested:
+        flash("Experiment cancellation requested.", "info")
+    else:
+        flash("Experiment is no longer running and cannot be cancelled.", "warning")
+
+    return redirect(url_for("experiments.detail", experiment_id=experiment_id))
+
+
 @bp.post("")
 def create_experiment():
     submitted_form_data = {
@@ -362,6 +395,9 @@ def detail(experiment_id: str):
     if payload is None:
         abort(404)
     payload["experiment"] = _decorate_experiment(payload["experiment"])
+    payload["experiment_runtime_payload"] = _serialize_experiment_runtime(
+        payload["experiment"]
+    )
     return render_template("experiments/detail.html", **payload)
 
 
