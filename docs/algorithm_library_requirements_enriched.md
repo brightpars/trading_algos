@@ -1,0 +1,1414 @@
+# Algorithm Library Requirements — Enriched Version
+
+## What changed in this version
+
+This version keeps the full library and adds the fields you asked for:
+
+1. **Very advanced / institutional-only?**
+2. **Best use / trading horizon**
+3. **Extended implementation details** with enough structure for a coder to implement and a human to understand
+4. **Home suitability score** on a 1–3 scale  
+   - **1** = very suitable to run at home with relatively strong hardware  
+   - **2** = possible at home, but data / execution / complexity is materially harder  
+   - **3** = generally a poor fit for home deployment because of data, latency, capital, or venue requirements
+5. **Initial reference** showing the starting source I used when placing the item into the catalog
+
+## Important validity notes
+
+- There is **no single canonical “complete list”** of all trading algorithms. This library is intentionally broad and organized by family.
+- The **Advanced?** and **Home suitability** columns are **practical implementation judgments** made for your use case; they are not meant to claim that a source explicitly labeled the strategy that way.
+- The **Initial reference** column is the **starting source** I used when placing the strategy in the catalog. For many items, the exact named variant has a broader academic and practitioner literature beyond that starting source.
+- The library is designed so a coder can implement each algorithm under **one common interface** compatible with your existing framework.
+
+## Recommended common interface
+
+Every algorithm should, as much as possible, follow the same contract:
+- Accept normalized market data in the same format as your existing algorithms
+- Accept a structured parameter object / config
+- Reuse shared indicator/statistics/report helpers
+- Return:
+  - raw intermediate metrics / indicator series
+  - final normalized state per bar or time point: `buy`, `sell`, `neutral`
+  - optional confidence / score
+  - optional reason codes / event markers
+  - report payload compatible with your current dashboard
+
+## Library catalog
+
+
+<table>
+<thead>
+<tr>
+<th>#</th><th>Category</th><th>Algorithm</th><th>Advanced / Institutional only?</th><th>Best use / horizon</th><th>Home suitability (1-3)</th><th>Core idea</th><th>Typical inputs</th><th>Signal style</th><th>Extended implementation details</th><th>Initial reference</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Trend Following</td>
+<td><strong>Simple Moving Average Crossover</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Buy when a short moving average crosses above a long moving average; sell on the opposite cross.</td>
+<td>OHLCV close series, short window, long window</td>
+<td>Discrete buy/sell on crossover</td>
+<td>Use your existing normalized input schema (OHLCV close series, short window, long window) and shared helpers, then implement the strategy rule described here: Buy when a short moving average crosses above a long moving average; sell on the opposite cross. Compute the required moving-average series on close prices, keep the raw indicator values in the report payload, and derive a signed spread or ordered-state variable that changes only when the configured relationship flips. Emit `buy` when the fast/trend side becomes dominant, `sell` when the opposite state takes over, and optionally persist `neutral` or the prior state between transitions. Add configurable hysteresis, minimum distance, ATR/volume confirmation, and warm-up handling so the algorithm composes cleanly with other strategies.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Trend Following</td>
+<td><strong>Exponential Moving Average Crossover</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Like SMA crossover but uses EMAs for faster reaction.</td>
+<td>OHLCV close series, short EMA, long EMA</td>
+<td>Discrete buy/sell on crossover</td>
+<td>Use your existing normalized input schema (OHLCV close series, short EMA, long EMA) and shared helpers, then implement the strategy rule described here: Like SMA crossover but uses EMAs for faster reaction. Compute the required moving-average series on close prices, keep the raw indicator values in the report payload, and derive a signed spread or ordered-state variable that changes only when the configured relationship flips. Emit `buy` when the fast/trend side becomes dominant, `sell` when the opposite state takes over, and optionally persist `neutral` or the prior state between transitions. Add configurable hysteresis, minimum distance, ATR/volume confirmation, and warm-up handling so the algorithm composes cleanly with other strategies.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Trend Following</td>
+<td><strong>Triple Moving Average Crossover</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Uses fast/medium/slow averages to reduce whipsaws.</td>
+<td>OHLCV close series, 3 windows</td>
+<td>Discrete buy/sell when ordering changes</td>
+<td>Use your existing normalized input schema (OHLCV close series, 3 windows) and shared helpers, then implement the strategy rule described here: Uses fast/medium/slow averages to reduce whipsaws. Compute the required moving-average series on close prices, keep the raw indicator values in the report payload, and derive a signed spread or ordered-state variable that changes only when the configured relationship flips. Emit `buy` when the fast/trend side becomes dominant, `sell` when the opposite state takes over, and optionally persist `neutral` or the prior state between transitions. Add configurable hysteresis, minimum distance, ATR/volume confirmation, and warm-up handling so the algorithm composes cleanly with other strategies.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Trend Following</td>
+<td><strong>Price vs Moving Average</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Long when price is above a moving average and short/flat when below.</td>
+<td>OHLCV close series, MA window</td>
+<td>Stateful trend regime signal</td>
+<td>Use your existing normalized input schema (OHLCV close series, MA window) and shared helpers, then implement the strategy rule described here: Long when price is above a moving average and short/flat when below. Compute the required moving-average series on close prices, keep the raw indicator values in the report payload, and derive a signed spread or ordered-state variable that changes only when the configured relationship flips. Emit `buy` when the fast/trend side becomes dominant, `sell` when the opposite state takes over, and optionally persist `neutral` or the prior state between transitions. Add configurable hysteresis, minimum distance, ATR/volume confirmation, and warm-up handling so the algorithm composes cleanly with other strategies.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Trend Following</td>
+<td><strong>Moving Average Ribbon Trend</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Uses a ribbon of multiple averages; signal from alignment and spread.</td>
+<td>OHLCV close series, list of MA windows</td>
+<td>Trend-strength signal plus buy/sell</td>
+<td>Use your existing normalized input schema (OHLCV close series, list of MA windows) and shared helpers, then implement the strategy rule described here: Uses a ribbon of multiple averages; signal from alignment and spread. Compute the required moving-average series on close prices, keep the raw indicator values in the report payload, and derive a signed spread or ordered-state variable that changes only when the configured relationship flips. Emit `buy` when the fast/trend side becomes dominant, `sell` when the opposite state takes over, and optionally persist `neutral` or the prior state between transitions. Add configurable hysteresis, minimum distance, ATR/volume confirmation, and warm-up handling so the algorithm composes cleanly with other strategies.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Trend Following</td>
+<td><strong>Breakout (Donchian Channel)</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Buy on breakout above rolling high; sell on breakdown below rolling low.</td>
+<td>OHLCV high/low, lookback window</td>
+<td>Discrete breakout entries/exits</td>
+<td>Use your existing normalized input schema (OHLCV high/low, lookback window) and shared helpers, then implement the strategy rule described here: Buy on breakout above rolling high; sell on breakdown below rolling low. Build the relevant rolling highs/lows or session/channel boundaries with shared window helpers, then trigger entries only when price breaks the boundary by the required amount or for the required number of bars. Return the breakout band values, breakout direction, and a final normalized signal per bar. Include parameters for lookback length, breakout threshold, confirmation bars, stop logic, and optional volatility or volume filters because these materially affect false-break frequency.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Trend Following</td>
+<td><strong>Channel Breakout with Confirmation</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Breakout must persist for N bars or exceed threshold.</td>
+<td>OHLCV, lookback, confirmation bars/threshold</td>
+<td>Buy/sell with confirmation</td>
+<td>Use your existing normalized input schema (OHLCV, lookback, confirmation bars/threshold) and shared helpers, then implement the strategy rule described here: Breakout must persist for N bars or exceed threshold. Build the relevant rolling highs/lows or session/channel boundaries with shared window helpers, then trigger entries only when price breaks the boundary by the required amount or for the required number of bars. Return the breakout band values, breakout direction, and a final normalized signal per bar. Include parameters for lookback length, breakout threshold, confirmation bars, stop logic, and optional volatility or volume filters because these materially affect false-break frequency.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Trend Following</td>
+<td><strong>ADX Trend Filter</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Use ADX to trade only when trend strength exceeds threshold.</td>
+<td>OHLCV, ADX window, threshold</td>
+<td>Trend filter plus directional signal</td>
+<td>Use your existing normalized input schema (OHLCV, ADX window, threshold) and shared helpers, then implement the strategy rule described here: Use ADX to trade only when trend strength exceeds threshold. Compute +DI, -DI, and ADX from the standard directional-movement formula, then use ADX as a regime gate and the DI relationship as the directional component. The algorithm should be able to run in either filter-only mode or full signal mode. Return ADX, DI spread, regime classification, and final `buy`/`sell`/`neutral` output so other composite configs can reuse the trend-strength information directly.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Trend Following</td>
+<td><strong>Parabolic SAR Trend Following</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Enter/exit on Parabolic SAR flips.</td>
+<td>OHLCV, SAR step/max</td>
+<td>Buy/sell on SAR reversal</td>
+<td>Use your existing normalized input schema (OHLCV, SAR step/max) and shared helpers, then implement the strategy rule described here: Enter/exit on Parabolic SAR flips. Calculate the SAR path bar by bar using the configured acceleration step and max step, then detect flips when price crosses the SAR. Record the SAR value, current trend side, and flip events in the diagnostics payload. Because SAR can churn in sideways markets, include optional ADX or volatility filters and clear warm-up behavior before emitting final normalized signals.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td>Trend Following</td>
+<td><strong>SuperTrend</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Trend signal based on ATR bands and direction flips.</td>
+<td>OHLCV, ATR window, multiplier</td>
+<td>Buy/sell on band flips</td>
+<td>Use your existing normalized input schema (OHLCV, ATR window, multiplier) and shared helpers, then implement the strategy rule described here: Trend signal based on ATR bands and direction flips. Compute ATR, form upper and lower dynamic bands, then maintain the SuperTrend state with the usual band-carry-forward logic so the direction only flips when price crosses the active band. Return ATR, active band, trend direction, and flip events. Expose period and multiplier as parameters and make sure the final output conforms to your framework’s standard `buy`/`sell`/`neutral` encoding.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td>Trend Following</td>
+<td><strong>Ichimoku Trend Strategy</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Uses cloud, baseline, conversion line, and lagging span for trend regime.</td>
+<td>OHLCV, Ichimoku parameters</td>
+<td>Buy/sell plus regime confidence</td>
+<td>Use your existing normalized input schema (OHLCV, Ichimoku parameters) and shared helpers, then implement the strategy rule described here: Uses cloud, baseline, conversion line, and lagging span for trend regime. Compute conversion line, base line, leading spans, lagging span, and cloud state with your indicator helpers, then map the chosen rule set into a final signal. Keep each Ichimoku component in the report so the dashboard can visualize why a signal fired. Parameters should cover standard or custom windows, cloud confirmation rules, and whether the algorithm acts as a full entry/exit engine or only as a trend/regime filter.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>12</td>
+<td>Trend Following</td>
+<td><strong>MACD Trend Strategy</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Trade MACD line crossing signal line or zero line.</td>
+<td>OHLCV close, EMA params</td>
+<td>Buy/sell on crossovers</td>
+<td>Use your existing normalized input schema (OHLCV close, EMA params) and shared helpers, then implement the strategy rule described here: Trade MACD line crossing signal line or zero line. Compute the required moving-average series on close prices, keep the raw indicator values in the report payload, and derive a signed spread or ordered-state variable that changes only when the configured relationship flips. Emit `buy` when the fast/trend side becomes dominant, `sell` when the opposite state takes over, and optionally persist `neutral` or the prior state between transitions. Add configurable hysteresis, minimum distance, ATR/volume confirmation, and warm-up handling so the algorithm composes cleanly with other strategies.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>13</td>
+<td>Trend Following</td>
+<td><strong>Linear Regression Trend</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Use rolling regression slope/intercept to detect persistent trend.</td>
+<td>OHLCV close, window</td>
+<td>Trend-score converted to signal</td>
+<td>Use your existing normalized input schema (OHLCV close, window) and shared helpers, then implement the strategy rule described here: Use rolling regression slope/intercept to detect persistent trend. Fit a rolling linear regression on the chosen price series, expose slope, intercept, fitted value, residual, and optionally an R-squared or t-statistic, then map slope sign/strength into a trend signal. Add thresholds so small noisy slopes do not force trades. This implementation is especially useful as a reusable score-producing building block inside composite configurations.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>14</td>
+<td>Trend Following</td>
+<td><strong>Time-Series Momentum</strong></td>
+<td>No</td>
+<td>Swing / position trading</td>
+<td>1</td>
+<td>Trade an asset based on its own past return sign over a lookback window.</td>
+<td>Price returns, lookback, holding period</td>
+<td>Long/short or buy/sell based on own trailing return</td>
+<td>Use your existing normalized input schema (Price returns, lookback, holding period) and shared helpers, then implement the strategy rule described here: Trade an asset based on its own past return sign over a lookback window. Compute trailing returns over the configured lookback, optionally volatility-scale them, and map positive versus negative own-past return into long/short or buy/sell states. Support independent lookback and holding windows, rebalance frequency, and optional skip periods. Return raw trailing return, normalized score, and final signal so the same implementation can be used in both single-asset and diversified portfolio workflows.</td>
+<td><code>AQR-TSMOM</code></td>
+</tr>
+<tr>
+<td>15</td>
+<td>Momentum</td>
+<td><strong>Rate of Change Momentum</strong></td>
+<td>No</td>
+<td>Swing / short-term momentum</td>
+<td>1</td>
+<td>Buy when price ROC exceeds threshold; sell when below negative threshold.</td>
+<td>OHLCV close, ROC window, thresholds</td>
+<td>Momentum event signal</td>
+<td>Use your existing normalized input schema (OHLCV close, ROC window, thresholds) and shared helpers, then implement the strategy rule described here: Buy when price ROC exceeds threshold; sell when below negative threshold. Compute the selected momentum indicator or return transform, optionally smooth it, and convert it into a signal using thresholds, crossovers, or rank rules. Keep the raw momentum score in the output, add configurable entry and exit thresholds, and allow volume, volatility, or trend filters when relevant. The final output should include both the indicator state and the framework-standard `buy`/`sell`/`neutral` label.</td>
+<td><code>MSCI-MOM</code></td>
+</tr>
+<tr>
+<td>16</td>
+<td>Momentum</td>
+<td><strong>Cross-Sectional Momentum</strong></td>
+<td>Partial</td>
+<td>Medium-term portfolio rotation</td>
+<td>2</td>
+<td>Rank a universe by past returns; buy winners, sell losers.</td>
+<td>Universe price history, lookback, ranking size</td>
+<td>Portfolio selection / long-short signal</td>
+<td>Use your existing normalized input schema (Universe price history, lookback, ranking size) and shared helpers, then implement the strategy rule described here: Rank a universe by past returns; buy winners, sell losers. This is better implemented on a universe rather than a single series. Compute the chosen return or residual score over the configured formation window, rank the assets, and convert ranks into selections, weights, or long-only/long-short signals. Expose both the raw score and the rank position in the report, add rebalance cadence and universe filters, and ensure the final output can be reduced to a per-asset normalized state when the framework needs bar-level `buy`/`sell`/`neutral` labels.</td>
+<td><code>AQR-MOM</code></td>
+</tr>
+<tr>
+<td>17</td>
+<td>Momentum</td>
+<td><strong>Relative Strength Momentum</strong></td>
+<td>No</td>
+<td>Medium-term portfolio rotation</td>
+<td>2</td>
+<td>Trade instruments with strongest recent relative performance.</td>
+<td>Universe prices, lookback</td>
+<td>Rank-based buy preference</td>
+<td>Use your existing normalized input schema (Universe prices, lookback) and shared helpers, then implement the strategy rule described here: Trade instruments with strongest recent relative performance. This is better implemented on a universe rather than a single series. Compute the chosen return or residual score over the configured formation window, rank the assets, and convert ranks into selections, weights, or long-only/long-short signals. Expose both the raw score and the rank position in the report, add rebalance cadence and universe filters, and ensure the final output can be reduced to a per-asset normalized state when the framework needs bar-level `buy`/`sell`/`neutral` labels.</td>
+<td><code>AQR-MOM</code></td>
+</tr>
+<tr>
+<td>18</td>
+<td>Momentum</td>
+<td><strong>Dual Momentum</strong></td>
+<td>Partial</td>
+<td>Medium-term portfolio rotation</td>
+<td>2</td>
+<td>Combines absolute momentum and relative momentum.</td>
+<td>Universe prices, benchmark/cash proxy, lookbacks</td>
+<td>Asset selection and risk-off signals</td>
+<td>Use your existing normalized input schema (Universe prices, benchmark/cash proxy, lookbacks) and shared helpers, then implement the strategy rule described here: Combines absolute momentum and relative momentum. This is better implemented on a universe rather than a single series. Compute the chosen return or residual score over the configured formation window, rank the assets, and convert ranks into selections, weights, or long-only/long-short signals. Expose both the raw score and the rank position in the report, add rebalance cadence and universe filters, and ensure the final output can be reduced to a per-asset normalized state when the framework needs bar-level `buy`/`sell`/`neutral` labels.</td>
+<td><code>AQR-MOM</code></td>
+</tr>
+<tr>
+<td>19</td>
+<td>Momentum</td>
+<td><strong>Residual Momentum</strong></td>
+<td>Partial</td>
+<td>Medium-term portfolio rotation</td>
+<td>2</td>
+<td>Momentum after removing factor/market effects.</td>
+<td>Returns, factor model inputs</td>
+<td>Ranked momentum score</td>
+<td>Use your existing normalized input schema (Returns, factor model inputs) and shared helpers, then implement the strategy rule described here: Momentum after removing factor/market effects. This is better implemented on a universe rather than a single series. Compute the chosen return or residual score over the configured formation window, rank the assets, and convert ranks into selections, weights, or long-only/long-short signals. Expose both the raw score and the rank position in the report, add rebalance cadence and universe filters, and ensure the final output can be reduced to a per-asset normalized state when the framework needs bar-level `buy`/`sell`/`neutral` labels.</td>
+<td><code>AQR-MOM</code></td>
+</tr>
+<tr>
+<td>20</td>
+<td>Momentum</td>
+<td><strong>Accelerating Momentum</strong></td>
+<td>No</td>
+<td>Swing / short-term momentum</td>
+<td>1</td>
+<td>Trade when momentum itself is strengthening.</td>
+<td>Returns, multi-horizon ROC</td>
+<td>Momentum-strength signal</td>
+<td>Use your existing normalized input schema (Returns, multi-horizon ROC) and shared helpers, then implement the strategy rule described here: Trade when momentum itself is strengthening. Compute at least two momentum horizons, then measure whether momentum is strengthening rather than merely positive. A simple implementation is momentum(h1) minus momentum(h2), or a slope over several ROC windows. Return the component momentum series, the acceleration score, and the final thresholded signal so the dashboard can show whether the strategy is reacting to absolute momentum or increasing momentum.</td>
+<td><code>MSCI-MOM</code></td>
+</tr>
+<tr>
+<td>21</td>
+<td>Momentum</td>
+<td><strong>RSI Momentum Continuation</strong></td>
+<td>No</td>
+<td>Swing / short-term momentum</td>
+<td>1</td>
+<td>Use RSI in continuation mode rather than mean reversion mode.</td>
+<td>OHLCV close, RSI window, thresholds</td>
+<td>Buy in strong uptrends, sell in downtrends</td>
+<td>Use your existing normalized input schema (OHLCV close, RSI window, thresholds) and shared helpers, then implement the strategy rule described here: Use RSI in continuation mode rather than mean reversion mode. Compute the selected momentum indicator or return transform, optionally smooth it, and convert it into a signal using thresholds, crossovers, or rank rules. Keep the raw momentum score in the output, add configurable entry and exit thresholds, and allow volume, volatility, or trend filters when relevant. The final output should include both the indicator state and the framework-standard `buy`/`sell`/`neutral` label.</td>
+<td><code>MSCI-MOM</code></td>
+</tr>
+<tr>
+<td>22</td>
+<td>Momentum</td>
+<td><strong>Stochastic Momentum</strong></td>
+<td>No</td>
+<td>Swing / short-term momentum</td>
+<td>1</td>
+<td>Use stochastic oscillator strength/cross for continuation.</td>
+<td>OHLCV high/low/close, stoch params</td>
+<td>Buy/sell on momentum cross</td>
+<td>Use your existing normalized input schema (OHLCV high/low/close, stoch params) and shared helpers, then implement the strategy rule described here: Use stochastic oscillator strength/cross for continuation. Compute the selected momentum indicator or return transform, optionally smooth it, and convert it into a signal using thresholds, crossovers, or rank rules. Keep the raw momentum score in the output, add configurable entry and exit thresholds, and allow volume, volatility, or trend filters when relevant. The final output should include both the indicator state and the framework-standard `buy`/`sell`/`neutral` label.</td>
+<td><code>MSCI-MOM</code></td>
+</tr>
+<tr>
+<td>23</td>
+<td>Momentum</td>
+<td><strong>CCI Momentum</strong></td>
+<td>No</td>
+<td>Swing / short-term momentum</td>
+<td>1</td>
+<td>Commodity Channel Index used for continuation breakout style entries.</td>
+<td>OHLCV typical price, CCI window</td>
+<td>Buy/sell on threshold crossings</td>
+<td>Use your existing normalized input schema (OHLCV typical price, CCI window) and shared helpers, then implement the strategy rule described here: Commodity Channel Index used for continuation breakout style entries. Compute the selected momentum indicator or return transform, optionally smooth it, and convert it into a signal using thresholds, crossovers, or rank rules. Keep the raw momentum score in the output, add configurable entry and exit thresholds, and allow volume, volatility, or trend filters when relevant. The final output should include both the indicator state and the framework-standard `buy`/`sell`/`neutral` label.</td>
+<td><code>MSCI-MOM</code></td>
+</tr>
+<tr>
+<td>24</td>
+<td>Momentum</td>
+<td><strong>KST (Know Sure Thing)</strong></td>
+<td>No</td>
+<td>Swing / short-term momentum</td>
+<td>1</td>
+<td>Multi-horizon momentum oscillator strategy.</td>
+<td>OHLCV close, multiple ROC windows</td>
+<td>Buy/sell on KST/signal cross</td>
+<td>Use your existing normalized input schema (OHLCV close, multiple ROC windows) and shared helpers, then implement the strategy rule described here: Multi-horizon momentum oscillator strategy. Build the multiple rate-of-change components and their smoothing windows exactly once through shared helpers, then combine them into the KST oscillator and its signal line. Detect KST/signal crosses, zero-line state, or threshold extremes depending on the selected mode. Return each ROC component, the composite KST, signal line, and the final normalized state for easy debugging and visualization.</td>
+<td><code>MSCI-MOM</code></td>
+</tr>
+<tr>
+<td>25</td>
+<td>Momentum</td>
+<td><strong>Volume-Confirmed Momentum</strong></td>
+<td>No</td>
+<td>Swing / short-term momentum</td>
+<td>1</td>
+<td>Trade momentum only when supported by abnormal volume.</td>
+<td>OHLCV, volume filters</td>
+<td>Buy/sell with volume confirmation</td>
+<td>Use your existing normalized input schema (OHLCV, volume filters) and shared helpers, then implement the strategy rule described here: Trade momentum only when supported by abnormal volume. Compute the selected momentum indicator or return transform, optionally smooth it, and convert it into a signal using thresholds, crossovers, or rank rules. Keep the raw momentum score in the output, add configurable entry and exit thresholds, and allow volume, volatility, or trend filters when relevant. The final output should include both the indicator state and the framework-standard `buy`/`sell`/`neutral` label.</td>
+<td><code>MSCI-MOM</code></td>
+</tr>
+<tr>
+<td>26</td>
+<td>Mean Reversion</td>
+<td><strong>Z-Score Mean Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Buy when price/spread is far below rolling mean; sell when far above.</td>
+<td>Price or spread series, window, std threshold</td>
+<td>Reversion entries/exits</td>
+<td>Use your existing normalized input schema (Price or spread series, window, std threshold) and shared helpers, then implement the strategy rule described here: Buy when price/spread is far below rolling mean; sell when far above. Implement it by defining a mean anchor, a normalized distance-from-mean measure, and clear entry and exit logic. Entry should occur only when the deviation exceeds a configurable threshold, while exit should happen on partial or full reversion, timeout, or stop-loss. Return the mean series, deviation score, thresholds, and final state so the dashboard can display both the setup and the reversion path.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>27</td>
+<td>Mean Reversion</td>
+<td><strong>Bollinger Bands Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Fade moves outside Bollinger Bands back toward the mean.</td>
+<td>OHLCV close, MA window, std multiplier</td>
+<td>Buy low-band touches, sell high-band touches</td>
+<td>Use your existing normalized input schema (OHLCV close, MA window, std multiplier) and shared helpers, then implement the strategy rule described here: Fade moves outside Bollinger Bands back toward the mean. Implement it by defining a mean anchor, a normalized distance-from-mean measure, and clear entry and exit logic. Entry should occur only when the deviation exceeds a configurable threshold, while exit should happen on partial or full reversion, timeout, or stop-loss. Return the mean series, deviation score, thresholds, and final state so the dashboard can display both the setup and the reversion path.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>28</td>
+<td>Mean Reversion</td>
+<td><strong>RSI Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Buy oversold, sell overbought using RSI.</td>
+<td>OHLCV close, RSI window, thresholds</td>
+<td>Reversal entries</td>
+<td>Use your existing normalized input schema (OHLCV close, RSI window, thresholds) and shared helpers, then implement the strategy rule described here: Buy oversold, sell overbought using RSI. Implement it by defining a mean anchor, a normalized distance-from-mean measure, and clear entry and exit logic. Entry should occur only when the deviation exceeds a configurable threshold, while exit should happen on partial or full reversion, timeout, or stop-loss. Return the mean series, deviation score, thresholds, and final state so the dashboard can display both the setup and the reversion path.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>29</td>
+<td>Mean Reversion</td>
+<td><strong>Stochastic Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Use stochastic oscillator extremes for reversal.</td>
+<td>OHLCV high/low/close, params</td>
+<td>Buy/sell from extreme zones</td>
+<td>Use your existing normalized input schema (OHLCV high/low/close, params) and shared helpers, then implement the strategy rule described here: Use stochastic oscillator extremes for reversal. Implement it by defining a mean anchor, a normalized distance-from-mean measure, and clear entry and exit logic. Entry should occur only when the deviation exceeds a configurable threshold, while exit should happen on partial or full reversion, timeout, or stop-loss. Return the mean series, deviation score, thresholds, and final state so the dashboard can display both the setup and the reversion path.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>30</td>
+<td>Mean Reversion</td>
+<td><strong>CCI Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Fade extreme CCI readings back to neutral.</td>
+<td>OHLCV typical price, window, thresholds</td>
+<td>Buy/sell from extremes</td>
+<td>Use your existing normalized input schema (OHLCV typical price, window, thresholds) and shared helpers, then implement the strategy rule described here: Fade extreme CCI readings back to neutral. Implement it by defining a mean anchor, a normalized distance-from-mean measure, and clear entry and exit logic. Entry should occur only when the deviation exceeds a configurable threshold, while exit should happen on partial or full reversion, timeout, or stop-loss. Return the mean series, deviation score, thresholds, and final state so the dashboard can display both the setup and the reversion path.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>31</td>
+<td>Mean Reversion</td>
+<td><strong>Williams %R Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Mean reversion using Williams %R overbought/oversold zones.</td>
+<td>OHLCV high/low/close, window</td>
+<td>Buy/sell from extremes</td>
+<td>Use your existing normalized input schema (OHLCV high/low/close, window) and shared helpers, then implement the strategy rule described here: Mean reversion using Williams %R overbought/oversold zones. Implement it by defining a mean anchor, a normalized distance-from-mean measure, and clear entry and exit logic. Entry should occur only when the deviation exceeds a configurable threshold, while exit should happen on partial or full reversion, timeout, or stop-loss. Return the mean series, deviation score, thresholds, and final state so the dashboard can display both the setup and the reversion path.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>32</td>
+<td>Mean Reversion</td>
+<td><strong>Intraday VWAP Reversion</strong></td>
+<td>No</td>
+<td>Intraday / session trading</td>
+<td>1</td>
+<td>Fade price deviations away from session VWAP.</td>
+<td>Intraday OHLCV, VWAP state, thresholds</td>
+<td>Buy/sell toward VWAP</td>
+<td>Use your existing normalized input schema (Intraday OHLCV, VWAP state, thresholds) and shared helpers, then implement the strategy rule described here: Fade price deviations away from session VWAP. Build the intraday session VWAP and the deviation of price from VWAP, then signal reversion trades only when the distance exceeds configured thresholds and the session is still liquid enough for mean reversion to matter. Return VWAP, deviation, z-score or normalized distance, and final signal. Include session reset logic, lunch/close cutoffs, and optional volume filters.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>33</td>
+<td>Mean Reversion</td>
+<td><strong>Opening Gap Fade</strong></td>
+<td>No</td>
+<td>Intraday / session trading</td>
+<td>1</td>
+<td>Fade opening gaps that historically close intraday.</td>
+<td>Daily/intraday OHLCV, gap filters</td>
+<td>Buy/sell against gap direction</td>
+<td>Use your existing normalized input schema (Daily/intraday OHLCV, gap filters) and shared helpers, then implement the strategy rule described here: Fade opening gaps that historically close intraday. Detect the overnight or session opening gap relative to the chosen reference close, classify the gap size and direction, and then test whether the strategy fades that move back toward a fill level or another mean anchor. Return gap statistics, fill progress, stop conditions, and final signal. Because this is session-dependent, make market-open handling and bar alignment explicit.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>34</td>
+<td>Mean Reversion</td>
+<td><strong>Range Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Trade reversals inside identified range-bound regime.</td>
+<td>OHLCV, range detector, support/resistance bands</td>
+<td>Buy near support, sell near resistance</td>
+<td>Use your existing normalized input schema (OHLCV, range detector, support/resistance bands) and shared helpers, then implement the strategy rule described here: Trade reversals inside identified range-bound regime. First detect that the market is in a range regime, then define support and resistance or upper/lower distribution bounds and trade reversals back toward the center of the range. Return the range boundaries, current distance to each boundary, regime confidence, and final signal. Include a trend filter or breakout escape condition so the strategy does not keep fading a genuine trend.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>35</td>
+<td>Mean Reversion</td>
+<td><strong>Ornstein-Uhlenbeck Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Model spread or price as OU process and trade toward equilibrium.</td>
+<td>Price/spread series, OU params</td>
+<td>Probabilistic reversion signal</td>
+<td>Use your existing normalized input schema (Price/spread series, OU params) and shared helpers, then implement the strategy rule described here: Model spread or price as OU process and trade toward equilibrium. Estimate the mean-reverting process parameters on a rolling window, derive equilibrium level, speed of reversion, and normalized distance from equilibrium, then open trades when the process is sufficiently far from equilibrium and close as it reverts. Return the estimated OU parameters, the deviation score, and final signal. Because parameter instability is common, include refit cadence, parameter bounds, and volatility-aware safeguards.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>36</td>
+<td>Mean Reversion</td>
+<td><strong>Long-Horizon Reversal</strong></td>
+<td>No</td>
+<td>Long-term contrarian / reversal</td>
+<td>1</td>
+<td>Trade multi-month/long-term reversals rather than short-term mean reversion.</td>
+<td>Returns, long lookback</td>
+<td>Contrarian buy/sell</td>
+<td>Use your existing normalized input schema (Returns, long lookback) and shared helpers, then implement the strategy rule described here: Trade multi-month/long-term reversals rather than short-term mean reversion. Compute multi-month or multi-quarter relative underperformance and trade against extreme longer-run moves rather than short-term overbought/oversold readings. This should be implemented with slower rebalancing and wider thresholds than oscillator-based reversal systems. Return the long-horizon return metric, reversal score, and normalized signal, along with holding-period and rebalance settings.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>37</td>
+<td>Mean Reversion</td>
+<td><strong>Volatility-Adjusted Reversion</strong></td>
+<td>No</td>
+<td>Short-term / swing mean reversion</td>
+<td>1</td>
+<td>Thresholds scale with realized volatility or ATR.</td>
+<td>OHLCV, volatility estimator</td>
+<td>Normalized reversal signal</td>
+<td>Use your existing normalized input schema (OHLCV, volatility estimator) and shared helpers, then implement the strategy rule described here: Thresholds scale with realized volatility or ATR. Implement it by defining a mean anchor, a normalized distance-from-mean measure, and clear entry and exit logic. Entry should occur only when the deviation exceeds a configurable threshold, while exit should happen on partial or full reversion, timeout, or stop-loss. Return the mean series, deviation score, thresholds, and final state so the dashboard can display both the setup and the reversion path.</td>
+<td><code>INV-MR</code></td>
+</tr>
+<tr>
+<td>38</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Pairs Trading (Distance Method)</strong></td>
+<td>Partial</td>
+<td>Relative-value / intraday / swing</td>
+<td>2</td>
+<td>Trade divergence/convergence of historically correlated pair.</td>
+<td>Two price series, normalized spread, thresholds</td>
+<td>Long one / short the other</td>
+<td>Use your existing normalized input schema (Two price series, normalized spread, thresholds) and shared helpers, then implement the strategy rule described here: Trade divergence/convergence of historically correlated pair. Normalize the involved assets, estimate the hedge ratio or basket weights, compute the spread, and then trade the spread rather than the raw assets. The implementation should expose spread level, z-score, hedge ratio, entry threshold, exit threshold, and stop/timeout logic. For cointegration or Kalman versions, make the estimation step explicit and configurable, and output a final normalized signal plus the leg-level trade instructions required for execution.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>39</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Pairs Trading (Cointegration)</strong></td>
+<td>Partial</td>
+<td>Relative-value / intraday / swing</td>
+<td>2</td>
+<td>Trade pair spread when cointegrated relationship deviates from equilibrium.</td>
+<td>Two price series, cointegration / hedge ratio</td>
+<td>Spread reversion entries/exits</td>
+<td>Use your existing normalized input schema (Two price series, cointegration / hedge ratio) and shared helpers, then implement the strategy rule described here: Trade pair spread when cointegrated relationship deviates from equilibrium. Normalize the involved assets, estimate the hedge ratio or basket weights, compute the spread, and then trade the spread rather than the raw assets. The implementation should expose spread level, z-score, hedge ratio, entry threshold, exit threshold, and stop/timeout logic. For cointegration or Kalman versions, make the estimation step explicit and configurable, and output a final normalized signal plus the leg-level trade instructions required for execution.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>40</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Basket Statistical Arbitrage</strong></td>
+<td>Partial</td>
+<td>Relative-value / intraday / swing</td>
+<td>2</td>
+<td>Trade one asset against a basket or multiple related assets.</td>
+<td>Multi-asset prices, hedge weights, spread model</td>
+<td>Spread signal</td>
+<td>Use your existing normalized input schema (Multi-asset prices, hedge weights, spread model) and shared helpers, then implement the strategy rule described here: Trade one asset against a basket or multiple related assets. Normalize the involved assets, estimate the hedge ratio or basket weights, compute the spread, and then trade the spread rather than the raw assets. The implementation should expose spread level, z-score, hedge ratio, entry threshold, exit threshold, and stop/timeout logic. For cointegration or Kalman versions, make the estimation step explicit and configurable, and output a final normalized signal plus the leg-level trade instructions required for execution.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>41</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Kalman Filter Pairs Trading</strong></td>
+<td>Partial</td>
+<td>Relative-value / intraday / swing</td>
+<td>2</td>
+<td>Dynamically estimate hedge ratio and spread using Kalman filter.</td>
+<td>Two price series, Kalman parameters</td>
+<td>Adaptive spread signal</td>
+<td>Use your existing normalized input schema (Two price series, Kalman parameters) and shared helpers, then implement the strategy rule described here: Dynamically estimate hedge ratio and spread using Kalman filter. Normalize the involved assets, estimate the hedge ratio or basket weights, compute the spread, and then trade the spread rather than the raw assets. The implementation should expose spread level, z-score, hedge ratio, entry threshold, exit threshold, and stop/timeout logic. For cointegration or Kalman versions, make the estimation step explicit and configurable, and output a final normalized signal plus the leg-level trade instructions required for execution.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>42</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Index Arbitrage</strong></td>
+<td>Yes</td>
+<td>Very short-term arbitrage</td>
+<td>3</td>
+<td>Trade mispricing between index future/ETF and underlying basket.</td>
+<td>Index, futures/ETF, basket prices, carry costs</td>
+<td>Arbitrage buy/sell</td>
+<td>Use your existing normalized input schema (Index, futures/ETF, basket prices, carry costs) and shared helpers, then implement the strategy rule described here: Trade mispricing between index future/ETF and underlying basket. Compute a fair-value proxy for the traded instrument using the related basket, index, ADR, or cross-listed security, then measure instantaneous or short-window mispricing after fees, FX adjustments, and financing assumptions. Emit a signal only when the deviation exceeds a realistic execution threshold. Return both the raw mispricing estimate and a boolean tradable/not-tradable diagnostic because theoretical edge often disappears after costs.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>43</td>
+<td>Statistical Arbitrage</td>
+<td><strong>ETF-NAV Arbitrage</strong></td>
+<td>Yes</td>
+<td>Very short-term arbitrage</td>
+<td>3</td>
+<td>Trade ETF price deviations versus indicative NAV or fair value proxy.</td>
+<td>ETF price, basket/NAV proxy</td>
+<td>Arbitrage spread signal</td>
+<td>Use your existing normalized input schema (ETF price, basket/NAV proxy) and shared helpers, then implement the strategy rule described here: Trade ETF price deviations versus indicative NAV or fair value proxy. Compute a fair-value proxy for the traded instrument using the related basket, index, ADR, or cross-listed security, then measure instantaneous or short-window mispricing after fees, FX adjustments, and financing assumptions. Emit a signal only when the deviation exceeds a realistic execution threshold. Return both the raw mispricing estimate and a boolean tradable/not-tradable diagnostic because theoretical edge often disappears after costs.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>44</td>
+<td>Statistical Arbitrage</td>
+<td><strong>ADR Dual-Listing Arbitrage</strong></td>
+<td>Yes</td>
+<td>Very short-term arbitrage</td>
+<td>3</td>
+<td>Exploit price mismatch between dual-listed securities/ADRs.</td>
+<td>Two market prices, FX, fees</td>
+<td>Arbitrage entries</td>
+<td>Use your existing normalized input schema (Two market prices, FX, fees) and shared helpers, then implement the strategy rule described here: Exploit price mismatch between dual-listed securities/ADRs. Compute a fair-value proxy for the traded instrument using the related basket, index, ADR, or cross-listed security, then measure instantaneous or short-window mispricing after fees, FX adjustments, and financing assumptions. Emit a signal only when the deviation exceeds a realistic execution threshold. Return both the raw mispricing estimate and a boolean tradable/not-tradable diagnostic because theoretical edge often disappears after costs.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>45</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Convertible Arbitrage</strong></td>
+<td>Yes</td>
+<td>Event-driven / relative value</td>
+<td>3</td>
+<td>Trade convertibles versus equity/credit/vol components.</td>
+<td>Convertible data, equity price, rates, vol estimates</td>
+<td>Relative value signal</td>
+<td>Use your existing normalized input schema (Convertible data, equity price, rates, vol estimates) and shared helpers, then implement the strategy rule described here: Trade convertibles versus equity/credit/vol components. This should be structured as a relative-value engine that combines convertible pricing inputs, credit/rate assumptions, and underlying-equity sensitivity. Compute theoretical richness/cheapness, delta exposure, and hedge ratios, then convert those into a tradable signal only after financing and borrow assumptions are included. Return the valuation gap and hedge diagnostics even if the final signal is sparse.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>46</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Merger Arbitrage</strong></td>
+<td>Partial</td>
+<td>Event-driven / relative value</td>
+<td>3</td>
+<td>Trade target/acquirer spread around announced deals.</td>
+<td>Deal terms, stock prices, probabilities, dates</td>
+<td>Event-driven spread signal</td>
+<td>Use your existing normalized input schema (Deal terms, stock prices, probabilities, dates) and shared helpers, then implement the strategy rule described here: Trade target/acquirer spread around announced deals. Model the deal spread relative to the announced terms, merger timeline, and deal-completion probability assumptions, then express the expected return and risk of the spread as it evolves. Return spread, implied annualized return, date-to-close estimate, and final signal. Because this is event-driven, the implementation should allow manual or data-feed updates to key event parameters instead of assuming purely price-based logic.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>47</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Futures Cash-and-Carry Arbitrage</strong></td>
+<td>Partial</td>
+<td>Relative-value / intraday / swing</td>
+<td>2</td>
+<td>Exploit mispricing between spot and futures net of carry.</td>
+<td>Spot, futures, rates, storage/dividend/carry</td>
+<td>Arbitrage buy/sell</td>
+<td>Use your existing normalized input schema (Spot, futures, rates, storage/dividend/carry) and shared helpers, then implement the strategy rule described here: Exploit mispricing between spot and futures net of carry. Build the fair-value relationship explicitly using spot, futures or perpetual prices, carry/funding, and remaining time to expiry where relevant, then compute the basis or excess basis after fees. Return basis, fair value, annualized carry, and tradable edge metrics, and only emit entries when the net edge exceeds configured thresholds. The implementation should support both signal-only mode and a leg-construction mode for paired execution.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>48</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Reverse Cash-and-Carry Arbitrage</strong></td>
+<td>Partial</td>
+<td>Relative-value / intraday / swing</td>
+<td>2</td>
+<td>Opposite of cash-and-carry when futures underpriced.</td>
+<td>Spot, futures, carry inputs</td>
+<td>Arbitrage buy/sell</td>
+<td>Use your existing normalized input schema (Spot, futures, carry inputs) and shared helpers, then implement the strategy rule described here: Opposite of cash-and-carry when futures underpriced. Build the fair-value relationship explicitly using spot, futures or perpetual prices, carry/funding, and remaining time to expiry where relevant, then compute the basis or excess basis after fees. Return basis, fair value, annualized carry, and tradable edge metrics, and only emit entries when the net edge exceeds configured thresholds. The implementation should support both signal-only mode and a leg-construction mode for paired execution.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>49</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Triangular Arbitrage (FX/Crypto)</strong></td>
+<td>Yes</td>
+<td>Very short-term arbitrage</td>
+<td>3</td>
+<td>Exploit inconsistent cross-rates among three pairs.</td>
+<td>Three quoted exchange rates, fees</td>
+<td>Instant arbitrage signal</td>
+<td>Use your existing normalized input schema (Three quoted exchange rates, fees) and shared helpers, then implement the strategy rule described here: Exploit inconsistent cross-rates among three pairs. Treat this as an execution-sensitive strategy rather than a slow bar-based signal. Ingest synchronized venue quotes, normalize symbols and fees, compute implied cross-rates or venue-to-venue price differences in real time, and emit a signal only when the edge remains positive after fees and estimated slippage. The implementation should expose edge-before-cost, edge-after-cost, and timing diagnostics because competitiveness dominates the outcome.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>50</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Latency / Exchange Arbitrage</strong></td>
+<td>Yes</td>
+<td>Very short-term arbitrage</td>
+<td>3</td>
+<td>Exploit temporary price differences across venues.</td>
+<td>Multi-venue quotes, latency data, fees</td>
+<td>Very short-lived arbitrage signal</td>
+<td>Use your existing normalized input schema (Multi-venue quotes, latency data, fees) and shared helpers, then implement the strategy rule described here: Exploit temporary price differences across venues. Treat this as an execution-sensitive strategy rather than a slow bar-based signal. Ingest synchronized venue quotes, normalize symbols and fees, compute implied cross-rates or venue-to-venue price differences in real time, and emit a signal only when the edge remains positive after fees and estimated slippage. The implementation should expose edge-before-cost, edge-after-cost, and timing diagnostics because competitiveness dominates the outcome.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>51</td>
+<td>Statistical Arbitrage</td>
+<td><strong>Funding/Basis Arbitrage</strong></td>
+<td>Partial</td>
+<td>Relative-value / intraday / swing</td>
+<td>2</td>
+<td>Trade spot-perp or spot-futures basis and funding differentials.</td>
+<td>Spot, perp/futures prices, funding/basis</td>
+<td>Carry/arbitrage signal</td>
+<td>Use your existing normalized input schema (Spot, perp/futures prices, funding/basis) and shared helpers, then implement the strategy rule described here: Trade spot-perp or spot-futures basis and funding differentials. Build the fair-value relationship explicitly using spot, futures or perpetual prices, carry/funding, and remaining time to expiry where relevant, then compute the basis or excess basis after fees. Return basis, fair value, annualized carry, and tradable edge metrics, and only emit entries when the net edge exceeds configured thresholds. The implementation should support both signal-only mode and a leg-construction mode for paired execution.</td>
+<td><code>INV-ALGO</code></td>
+</tr>
+<tr>
+<td>52</td>
+<td>Volatility / Options</td>
+<td><strong>Volatility Breakout</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Trade price breakout when volatility expands from compression.</td>
+<td>OHLCV, ATR/volatility compression metrics</td>
+<td>Buy/sell breakout signal</td>
+<td>Use your existing normalized input schema (OHLCV, ATR/volatility compression metrics) and shared helpers, then implement the strategy rule described here: Trade price breakout when volatility expands from compression. Implement it by computing the required volatility estimate or ATR-based band, then turning volatility expansion or compression into a signal. Return the raw volatility series, thresholds, and breakout/reversion events, and allow optional confirmation from volume, trend direction, or event windows.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>53</td>
+<td>Volatility / Options</td>
+<td><strong>ATR Channel Breakout</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Breakout using ATR-based dynamic bands.</td>
+<td>OHLCV, ATR window, multiplier</td>
+<td>Buy/sell on ATR-band break</td>
+<td>Use your existing normalized input schema (OHLCV, ATR window, multiplier) and shared helpers, then implement the strategy rule described here: Breakout using ATR-based dynamic bands. Implement it by computing the required volatility estimate or ATR-based band, then turning volatility expansion or compression into a signal. Return the raw volatility series, thresholds, and breakout/reversion events, and allow optional confirmation from volume, trend direction, or event windows.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>54</td>
+<td>Volatility / Options</td>
+<td><strong>Volatility Mean Reversion</strong></td>
+<td>No</td>
+<td>Swing / breakout / volatility timing</td>
+<td>1</td>
+<td>Fade unusually high/low realized or implied volatility.</td>
+<td>Volatility series, thresholds</td>
+<td>Volatility reversion signal</td>
+<td>Use your existing normalized input schema (Volatility series, thresholds) and shared helpers, then implement the strategy rule described here: Fade unusually high/low realized or implied volatility. Estimate realized or implied volatility on the chosen horizon, normalize the current value against its own history, and enter only when the volatility measure is materially extreme. Return the volatility estimate, rolling mean, z-score or percentile, and final signal. Because volatility clusters, support delayed entries, persistence filters, and clear exit logic rather than assuming immediate reversion.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>55</td>
+<td>Volatility / Options</td>
+<td><strong>Delta-Neutral Volatility Trading</strong></td>
+<td>Yes</td>
+<td>Options / volatility / event trading</td>
+<td>2</td>
+<td>Trade volatility while hedging directional delta.</td>
+<td>Option chain, underlying price, greeks</td>
+<td>Volatility entry/exit signal</td>
+<td>Use your existing normalized input schema (Option chain, underlying price, greeks) and shared helpers, then implement the strategy rule described here: Trade volatility while hedging directional delta. This strategy should be coded around option-chain data, implied volatility, realized volatility, and where needed the relevant Greeks. Separate the signal layer from the position-construction layer: first compute whether volatility, skew, dispersion, or term structure looks rich/cheap; then build the option structure or hedge instructions needed to express that view. Return the raw vol metrics, Greeks or surface diagnostics, event/context fields, and a final signal indicating whether the strategy wants long vol, short vol, or no trade.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>56</td>
+<td>Volatility / Options</td>
+<td><strong>Gamma Scalping</strong></td>
+<td>Yes</td>
+<td>Options / volatility / event trading</td>
+<td>3</td>
+<td>Maintain delta-neutral option position and scalp underlying around volatility.</td>
+<td>Options greeks, underlying ticks</td>
+<td>Hedging/trading actions</td>
+<td>Use your existing normalized input schema (Options greeks, underlying ticks) and shared helpers, then implement the strategy rule described here: Maintain delta-neutral option position and scalp underlying around volatility. This strategy should be coded around option-chain data, implied volatility, realized volatility, and where needed the relevant Greeks. Separate the signal layer from the position-construction layer: first compute whether volatility, skew, dispersion, or term structure looks rich/cheap; then build the option structure or hedge instructions needed to express that view. Return the raw vol metrics, Greeks or surface diagnostics, event/context fields, and a final signal indicating whether the strategy wants long vol, short vol, or no trade.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>57</td>
+<td>Volatility / Options</td>
+<td><strong>Volatility Risk Premium Capture</strong></td>
+<td>Yes</td>
+<td>Options / volatility / event trading</td>
+<td>2</td>
+<td>Systematically short or long implied vs realized volatility spread.</td>
+<td>Options IV, realized vol estimates</td>
+<td>Carry/vol signal</td>
+<td>Use your existing normalized input schema (Options IV, realized vol estimates) and shared helpers, then implement the strategy rule described here: Systematically short or long implied vs realized volatility spread. This strategy should be coded around option-chain data, implied volatility, realized volatility, and where needed the relevant Greeks. Separate the signal layer from the position-construction layer: first compute whether volatility, skew, dispersion, or term structure looks rich/cheap; then build the option structure or hedge instructions needed to express that view. Return the raw vol metrics, Greeks or surface diagnostics, event/context fields, and a final signal indicating whether the strategy wants long vol, short vol, or no trade.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>58</td>
+<td>Volatility / Options</td>
+<td><strong>Dispersion Trading</strong></td>
+<td>Yes</td>
+<td>Options / volatility / event trading</td>
+<td>3</td>
+<td>Trade index options versus constituent options to isolate correlation/dispersion.</td>
+<td>Index and constituent option vols</td>
+<td>Relative value signal</td>
+<td>Use your existing normalized input schema (Index and constituent option vols) and shared helpers, then implement the strategy rule described here: Trade index options versus constituent options to isolate correlation/dispersion. This strategy should be coded around option-chain data, implied volatility, realized volatility, and where needed the relevant Greeks. Separate the signal layer from the position-construction layer: first compute whether volatility, skew, dispersion, or term structure looks rich/cheap; then build the option structure or hedge instructions needed to express that view. Return the raw vol metrics, Greeks or surface diagnostics, event/context fields, and a final signal indicating whether the strategy wants long vol, short vol, or no trade.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>59</td>
+<td>Volatility / Options</td>
+<td><strong>Skew Trading</strong></td>
+<td>Yes</td>
+<td>Options / volatility / event trading</td>
+<td>3</td>
+<td>Trade relative richness/cheapness of downside vs upside implied vols.</td>
+<td>Option surface/skew metrics</td>
+<td>Options relative value signal</td>
+<td>Use your existing normalized input schema (Option surface/skew metrics) and shared helpers, then implement the strategy rule described here: Trade relative richness/cheapness of downside vs upside implied vols. This strategy should be coded around option-chain data, implied volatility, realized volatility, and where needed the relevant Greeks. Separate the signal layer from the position-construction layer: first compute whether volatility, skew, dispersion, or term structure looks rich/cheap; then build the option structure or hedge instructions needed to express that view. Return the raw vol metrics, Greeks or surface diagnostics, event/context fields, and a final signal indicating whether the strategy wants long vol, short vol, or no trade.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>60</td>
+<td>Volatility / Options</td>
+<td><strong>Term Structure Trading</strong></td>
+<td>Yes</td>
+<td>Options / volatility / event trading</td>
+<td>2</td>
+<td>Trade implied volatility across maturities.</td>
+<td>Option/futures term structure</td>
+<td>Relative value signal</td>
+<td>Use your existing normalized input schema (Option/futures term structure) and shared helpers, then implement the strategy rule described here: Trade implied volatility across maturities. This strategy should be coded around option-chain data, implied volatility, realized volatility, and where needed the relevant Greeks. Separate the signal layer from the position-construction layer: first compute whether volatility, skew, dispersion, or term structure looks rich/cheap; then build the option structure or hedge instructions needed to express that view. Return the raw vol metrics, Greeks or surface diagnostics, event/context fields, and a final signal indicating whether the strategy wants long vol, short vol, or no trade.</td>
+<td><code>CME-TERM</code></td>
+</tr>
+<tr>
+<td>61</td>
+<td>Volatility / Options</td>
+<td><strong>Straddle Breakout Timing</strong></td>
+<td>Partial</td>
+<td>Options / volatility / event trading</td>
+<td>2</td>
+<td>Enter long-vol structures ahead of expected large move or realized-vol expansion.</td>
+<td>Options IV/RV, event calendar</td>
+<td>Volatility timing signal</td>
+<td>Use your existing normalized input schema (Options IV/RV, event calendar) and shared helpers, then implement the strategy rule described here: Enter long-vol structures ahead of expected large move or realized-vol expansion. This strategy should be coded around option-chain data, implied volatility, realized volatility, and where needed the relevant Greeks. Separate the signal layer from the position-construction layer: first compute whether volatility, skew, dispersion, or term structure looks rich/cheap; then build the option structure or hedge instructions needed to express that view. Return the raw vol metrics, Greeks or surface diagnostics, event/context fields, and a final signal indicating whether the strategy wants long vol, short vol, or no trade.</td>
+<td><code>CME-OPT</code></td>
+</tr>
+<tr>
+<td>62</td>
+<td>Microstructure / HFT / Market Making</td>
+<td><strong>Bid-Ask Market Making</strong></td>
+<td>Yes</td>
+<td>Intraday / sub-second / market making</td>
+<td>3</td>
+<td>Post both sides, capture spread, manage inventory.</td>
+<td>Best bid/ask, order book, inventory, fees</td>
+<td>Continuous quoting actions</td>
+<td>Use your existing normalized input schema (Best bid/ask, order book, inventory, fees) and shared helpers, then implement the strategy rule described here: Post both sides, capture spread, manage inventory. This must be implemented on event-driven or very fine-grained order-book data rather than ordinary OHLCV bars. Keep a clear internal state for inventory, outstanding orders, queue position, realized fills, and fees/rebates, then compute the strategy-specific signal from order-book imbalance, microprice, auction data, or spread capture logic. Return microstructure diagnostics, inventory state, and quote/action recommendations separately from any simplified `buy`/`sell` label, because execution state is part of the strategy itself.</td>
+<td><code>INV-HFT</code></td>
+</tr>
+<tr>
+<td>63</td>
+<td>Microstructure / HFT / Market Making</td>
+<td><strong>Inventory-Skewed Market Making</strong></td>
+<td>Yes</td>
+<td>Intraday / sub-second / market making</td>
+<td>3</td>
+<td>Adjust quotes based on inventory to stay balanced.</td>
+<td>Order book, inventory target</td>
+<td>Quote placement signals</td>
+<td>Use your existing normalized input schema (Order book, inventory target) and shared helpers, then implement the strategy rule described here: Adjust quotes based on inventory to stay balanced. This must be implemented on event-driven or very fine-grained order-book data rather than ordinary OHLCV bars. Keep a clear internal state for inventory, outstanding orders, queue position, realized fills, and fees/rebates, then compute the strategy-specific signal from order-book imbalance, microprice, auction data, or spread capture logic. Return microstructure diagnostics, inventory state, and quote/action recommendations separately from any simplified `buy`/`sell` label, because execution state is part of the strategy itself.</td>
+<td><code>INV-HFT</code></td>
+</tr>
+<tr>
+<td>64</td>
+<td>Microstructure / HFT / Market Making</td>
+<td><strong>Order Book Imbalance Strategy</strong></td>
+<td>Yes</td>
+<td>Intraday / sub-second / market making</td>
+<td>3</td>
+<td>Trade short-term moves from depth imbalance.</td>
+<td>Level 2 book, imbalance metrics</td>
+<td>Short-horizon buy/sell</td>
+<td>Use your existing normalized input schema (Level 2 book, imbalance metrics) and shared helpers, then implement the strategy rule described here: Trade short-term moves from depth imbalance. This must be implemented on event-driven or very fine-grained order-book data rather than ordinary OHLCV bars. Keep a clear internal state for inventory, outstanding orders, queue position, realized fills, and fees/rebates, then compute the strategy-specific signal from order-book imbalance, microprice, auction data, or spread capture logic. Return microstructure diagnostics, inventory state, and quote/action recommendations separately from any simplified `buy`/`sell` label, because execution state is part of the strategy itself.</td>
+<td><code>INV-HFT</code></td>
+</tr>
+<tr>
+<td>65</td>
+<td>Microstructure / HFT / Market Making</td>
+<td><strong>Microprice Strategy</strong></td>
+<td>Yes</td>
+<td>Intraday / sub-second / market making</td>
+<td>3</td>
+<td>Use weighted bid/ask microprice to predict near-term direction.</td>
+<td>Top-of-book prices and sizes</td>
+<td>Short-horizon directional signal</td>
+<td>Use your existing normalized input schema (Top-of-book prices and sizes) and shared helpers, then implement the strategy rule described here: Use weighted bid/ask microprice to predict near-term direction. This must be implemented on event-driven or very fine-grained order-book data rather than ordinary OHLCV bars. Keep a clear internal state for inventory, outstanding orders, queue position, realized fills, and fees/rebates, then compute the strategy-specific signal from order-book imbalance, microprice, auction data, or spread capture logic. Return microstructure diagnostics, inventory state, and quote/action recommendations separately from any simplified `buy`/`sell` label, because execution state is part of the strategy itself.</td>
+<td><code>INV-HFT</code></td>
+</tr>
+<tr>
+<td>66</td>
+<td>Microstructure / HFT / Market Making</td>
+<td><strong>Queue Position Strategy</strong></td>
+<td>Yes</td>
+<td>Intraday / sub-second / market making</td>
+<td>3</td>
+<td>Manage passive orders based on queue rank and fill probability.</td>
+<td>Order book + own order state</td>
+<td>Order amend/cancel actions</td>
+<td>Use your existing normalized input schema (Order book + own order state) and shared helpers, then implement the strategy rule described here: Manage passive orders based on queue rank and fill probability. This must be implemented on event-driven or very fine-grained order-book data rather than ordinary OHLCV bars. Keep a clear internal state for inventory, outstanding orders, queue position, realized fills, and fees/rebates, then compute the strategy-specific signal from order-book imbalance, microprice, auction data, or spread capture logic. Return microstructure diagnostics, inventory state, and quote/action recommendations separately from any simplified `buy`/`sell` label, because execution state is part of the strategy itself.</td>
+<td><code>INV-HFT</code></td>
+</tr>
+<tr>
+<td>67</td>
+<td>Microstructure / HFT / Market Making</td>
+<td><strong>Liquidity Rebate Capture</strong></td>
+<td>Yes</td>
+<td>Intraday / sub-second / market making</td>
+<td>3</td>
+<td>Seek maker rebates while controlling adverse selection.</td>
+<td>Fee schedule, book data, inventory</td>
+<td>Quoting/actions</td>
+<td>Use your existing normalized input schema (Fee schedule, book data, inventory) and shared helpers, then implement the strategy rule described here: Seek maker rebates while controlling adverse selection. This must be implemented on event-driven or very fine-grained order-book data rather than ordinary OHLCV bars. Keep a clear internal state for inventory, outstanding orders, queue position, realized fills, and fees/rebates, then compute the strategy-specific signal from order-book imbalance, microprice, auction data, or spread capture logic. Return microstructure diagnostics, inventory state, and quote/action recommendations separately from any simplified `buy`/`sell` label, because execution state is part of the strategy itself.</td>
+<td><code>INV-HFT</code></td>
+</tr>
+<tr>
+<td>68</td>
+<td>Microstructure / HFT / Market Making</td>
+<td><strong>Opening Auction Strategy</strong></td>
+<td>Yes</td>
+<td>Intraday / session trading</td>
+<td>3</td>
+<td>Trade around auction imbalance or expected open price.</td>
+<td>Auction imbalance/feed, pre-open prices</td>
+<td>Auction participation signal</td>
+<td>Use your existing normalized input schema (Auction imbalance/feed, pre-open prices) and shared helpers, then implement the strategy rule described here: Trade around auction imbalance or expected open price. This must be implemented on event-driven or very fine-grained order-book data rather than ordinary OHLCV bars. Keep a clear internal state for inventory, outstanding orders, queue position, realized fills, and fees/rebates, then compute the strategy-specific signal from order-book imbalance, microprice, auction data, or spread capture logic. Return microstructure diagnostics, inventory state, and quote/action recommendations separately from any simplified `buy`/`sell` label, because execution state is part of the strategy itself.</td>
+<td><code>INV-HFT</code></td>
+</tr>
+<tr>
+<td>69</td>
+<td>Microstructure / HFT / Market Making</td>
+<td><strong>Closing Auction Strategy</strong></td>
+<td>Yes</td>
+<td>Intraday / session trading</td>
+<td>3</td>
+<td>Trade close auction flows or MOC imbalances.</td>
+<td>Auction feed, near-close data</td>
+<td>Auction participation signal</td>
+<td>Use your existing normalized input schema (Auction feed, near-close data) and shared helpers, then implement the strategy rule described here: Trade close auction flows or MOC imbalances. This must be implemented on event-driven or very fine-grained order-book data rather than ordinary OHLCV bars. Keep a clear internal state for inventory, outstanding orders, queue position, realized fills, and fees/rebates, then compute the strategy-specific signal from order-book imbalance, microprice, auction data, or spread capture logic. Return microstructure diagnostics, inventory state, and quote/action recommendations separately from any simplified `buy`/`sell` label, because execution state is part of the strategy itself.</td>
+<td><code>INV-HFT</code></td>
+</tr>
+<tr>
+<td>70</td>
+<td>Pattern / Price Action</td>
+<td><strong>Support and Resistance Bounce</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Buy at support, sell at resistance with tolerance bands.</td>
+<td>OHLCV, detected levels</td>
+<td>Reversal entries/exits</td>
+<td>Use your existing normalized input schema (OHLCV, detected levels) and shared helpers, then implement the strategy rule described here: Buy at support, sell at resistance with tolerance bands. Implement this by first extracting the relevant structural object from price data—session range, pivot level, trendline, pattern candle, support/resistance zone, or squeeze regime—then defining explicit confirmation and invalidation rules. Return the detected levels/pattern metadata, the confirmation state, and the final normalized signal. Avoid discretionary ambiguity by making every pattern rule deterministic and parameterized so the coder can backtest it reliably.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>71</td>
+<td>Pattern / Price Action</td>
+<td><strong>Breakout Retest</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Enter after breakout and successful retest of broken level.</td>
+<td>OHLCV, levels, retest logic</td>
+<td>Buy/sell after confirmation</td>
+<td>Use your existing normalized input schema (OHLCV, levels, retest logic) and shared helpers, then implement the strategy rule described here: Enter after breakout and successful retest of broken level. Implement this by first extracting the relevant structural object from price data—session range, pivot level, trendline, pattern candle, support/resistance zone, or squeeze regime—then defining explicit confirmation and invalidation rules. Return the detected levels/pattern metadata, the confirmation state, and the final normalized signal. Avoid discretionary ambiguity by making every pattern rule deterministic and parameterized so the coder can backtest it reliably.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>72</td>
+<td>Pattern / Price Action</td>
+<td><strong>Pivot Point Strategy</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Trade around daily/weekly pivot levels.</td>
+<td>OHLCV, pivot formulas</td>
+<td>Buy/sell near pivot interactions</td>
+<td>Use your existing normalized input schema (OHLCV, pivot formulas) and shared helpers, then implement the strategy rule described here: Trade around daily/weekly pivot levels. Implement this by first extracting the relevant structural object from price data—session range, pivot level, trendline, pattern candle, support/resistance zone, or squeeze regime—then defining explicit confirmation and invalidation rules. Return the detected levels/pattern metadata, the confirmation state, and the final normalized signal. Avoid discretionary ambiguity by making every pattern rule deterministic and parameterized so the coder can backtest it reliably.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>73</td>
+<td>Pattern / Price Action</td>
+<td><strong>Opening Range Breakout</strong></td>
+<td>No</td>
+<td>Intraday / session trading</td>
+<td>1</td>
+<td>Trade break of initial session range.</td>
+<td>Intraday OHLCV, opening range duration</td>
+<td>Buy/sell breakout signal</td>
+<td>Use your existing normalized input schema (Intraday OHLCV, opening range duration) and shared helpers, then implement the strategy rule described here: Trade break of initial session range. Implement this by first extracting the relevant structural object from price data—session range, pivot level, trendline, pattern candle, support/resistance zone, or squeeze regime—then defining explicit confirmation and invalidation rules. Return the detected levels/pattern metadata, the confirmation state, and the final normalized signal. Avoid discretionary ambiguity by making every pattern rule deterministic and parameterized so the coder can backtest it reliably.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>74</td>
+<td>Pattern / Price Action</td>
+<td><strong>Inside Bar Breakout</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Trade break of an inside-bar pattern.</td>
+<td>OHLCV candle patterns</td>
+<td>Pattern breakout signal</td>
+<td>Use your existing normalized input schema (OHLCV candle patterns) and shared helpers, then implement the strategy rule described here: Trade break of an inside-bar pattern. Implement this by first extracting the relevant structural object from price data—session range, pivot level, trendline, pattern candle, support/resistance zone, or squeeze regime—then defining explicit confirmation and invalidation rules. Return the detected levels/pattern metadata, the confirmation state, and the final normalized signal. Avoid discretionary ambiguity by making every pattern rule deterministic and parameterized so the coder can backtest it reliably.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>75</td>
+<td>Pattern / Price Action</td>
+<td><strong>Gap-and-Go</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Trade in direction of significant opening gap with continuation filters.</td>
+<td>Daily/intraday OHLCV, volume</td>
+<td>Momentum continuation signal</td>
+<td>Use your existing normalized input schema (Daily/intraday OHLCV, volume) and shared helpers, then implement the strategy rule described here: Trade in direction of significant opening gap with continuation filters. Implement this by first extracting the relevant structural object from price data—session range, pivot level, trendline, pattern candle, support/resistance zone, or squeeze regime—then defining explicit confirmation and invalidation rules. Return the detected levels/pattern metadata, the confirmation state, and the final normalized signal. Avoid discretionary ambiguity by making every pattern rule deterministic and parameterized so the coder can backtest it reliably.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>76</td>
+<td>Pattern / Price Action</td>
+<td><strong>Trendline Break Strategy</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Trade breaks of fitted trendlines/channels.</td>
+<td>OHLCV, swing points, regression lines</td>
+<td>Buy/sell on line break</td>
+<td>Use your existing normalized input schema (OHLCV, swing points, regression lines) and shared helpers, then implement the strategy rule described here: Trade breaks of fitted trendlines/channels. Implement this by first extracting the relevant structural object from price data—session range, pivot level, trendline, pattern candle, support/resistance zone, or squeeze regime—then defining explicit confirmation and invalidation rules. Return the detected levels/pattern metadata, the confirmation state, and the final normalized signal. Avoid discretionary ambiguity by making every pattern rule deterministic and parameterized so the coder can backtest it reliably.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>77</td>
+<td>Pattern / Price Action</td>
+<td><strong>Volatility Squeeze Breakout</strong></td>
+<td>No</td>
+<td>Short-term / intraday / swing</td>
+<td>1</td>
+<td>Trade expansion after Bollinger/Keltner squeeze.</td>
+<td>OHLCV, BB/KC params</td>
+<td>Breakout signal</td>
+<td>Use your existing normalized input schema (OHLCV, BB/KC params) and shared helpers, then implement the strategy rule described here: Trade expansion after Bollinger/Keltner squeeze. Implement this by first extracting the relevant structural object from price data—session range, pivot level, trendline, pattern candle, support/resistance zone, or squeeze regime—then defining explicit confirmation and invalidation rules. Return the detected levels/pattern metadata, the confirmation state, and the final normalized signal. Avoid discretionary ambiguity by making every pattern rule deterministic and parameterized so the coder can backtest it reliably.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>78</td>
+<td>Cross-Asset / Macro / Carry</td>
+<td><strong>Carry Trade (FX/Rates)</strong></td>
+<td>Partial</td>
+<td>Swing / medium-term macro / carry</td>
+<td>2</td>
+<td>Go long higher carry assets and short lower carry assets.</td>
+<td>Rates/yields, FX forwards/spot</td>
+<td>Long/short carry signal</td>
+<td>Use your existing normalized input schema (Rates/yields, FX forwards/spot) and shared helpers, then implement the strategy rule described here: Go long higher carry assets and short lower carry assets. This category is best implemented as a multi-instrument or regime-based signal engine. Compute the relevant carry, curve, regime, or intermarket feature set on a scheduled cadence, normalize the result, and convert it into a tactical allocation or directional signal. Return both the raw feature values and the final state so SmartTrade can use the strategy either directly or as a top-level filter.</td>
+<td><code>AQR-ARP</code></td>
+</tr>
+<tr>
+<td>79</td>
+<td>Cross-Asset / Macro / Carry</td>
+<td><strong>Yield Curve Steepener/Flattener</strong></td>
+<td>Partial</td>
+<td>Swing / medium-term macro / carry</td>
+<td>2</td>
+<td>Trade changes in slope of rates curve.</td>
+<td>Multi-maturity yields/futures</td>
+<td>Relative value signal</td>
+<td>Use your existing normalized input schema (Multi-maturity yields/futures) and shared helpers, then implement the strategy rule described here: Trade changes in slope of rates curve. This category is best implemented as a multi-instrument or regime-based signal engine. Compute the relevant carry, curve, regime, or intermarket feature set on a scheduled cadence, normalize the result, and convert it into a tactical allocation or directional signal. Return both the raw feature values and the final state so SmartTrade can use the strategy either directly or as a top-level filter.</td>
+<td><code>AQR-ARP</code></td>
+</tr>
+<tr>
+<td>80</td>
+<td>Cross-Asset / Macro / Carry</td>
+<td><strong>Curve Roll-Down Strategy</strong></td>
+<td>Partial</td>
+<td>Swing / medium-term macro / carry</td>
+<td>2</td>
+<td>Harvest roll along the term structure.</td>
+<td>Yield/futures curves, carry metrics</td>
+<td>Carry/relative value signal</td>
+<td>Use your existing normalized input schema (Yield/futures curves, carry metrics) and shared helpers, then implement the strategy rule described here: Harvest roll along the term structure. This category is best implemented as a multi-instrument or regime-based signal engine. Compute the relevant carry, curve, regime, or intermarket feature set on a scheduled cadence, normalize the result, and convert it into a tactical allocation or directional signal. Return both the raw feature values and the final state so SmartTrade can use the strategy either directly or as a top-level filter.</td>
+<td><code>AQR-ARP</code></td>
+</tr>
+<tr>
+<td>81</td>
+<td>Cross-Asset / Macro / Carry</td>
+<td><strong>Commodity Term Structure / Roll Yield</strong></td>
+<td>Partial</td>
+<td>Swing / medium-term macro / carry</td>
+<td>2</td>
+<td>Trade backwardation/contango effects.</td>
+<td>Futures curve data</td>
+<td>Carry signal</td>
+<td>Use your existing normalized input schema (Futures curve data) and shared helpers, then implement the strategy rule described here: Trade backwardation/contango effects. This category is best implemented as a multi-instrument or regime-based signal engine. Compute the relevant carry, curve, regime, or intermarket feature set on a scheduled cadence, normalize the result, and convert it into a tactical allocation or directional signal. Return both the raw feature values and the final state so SmartTrade can use the strategy either directly or as a top-level filter.</td>
+<td><code>AQR-ARP</code></td>
+</tr>
+<tr>
+<td>82</td>
+<td>Cross-Asset / Macro / Carry</td>
+<td><strong>Risk-On / Risk-Off Regime</strong></td>
+<td>No</td>
+<td>Swing / medium-term macro / carry</td>
+<td>2</td>
+<td>Allocate based on macro or cross-asset regime state.</td>
+<td>Cross-asset returns/vol/macro inputs</td>
+<td>Regime signal</td>
+<td>Use your existing normalized input schema (Cross-asset returns/vol/macro inputs) and shared helpers, then implement the strategy rule described here: Allocate based on macro or cross-asset regime state. This category is best implemented as a multi-instrument or regime-based signal engine. Compute the relevant carry, curve, regime, or intermarket feature set on a scheduled cadence, normalize the result, and convert it into a tactical allocation or directional signal. Return both the raw feature values and the final state so SmartTrade can use the strategy either directly or as a top-level filter.</td>
+<td><code>AQR-MULTI</code></td>
+</tr>
+<tr>
+<td>83</td>
+<td>Cross-Asset / Macro / Carry</td>
+<td><strong>Intermarket Confirmation</strong></td>
+<td>No</td>
+<td>Swing / medium-term macro / carry</td>
+<td>2</td>
+<td>Trade one asset using signals from correlated assets (e.g., bonds, dollar, sector ETF).</td>
+<td>Multiple asset time series</td>
+<td>Confirmation-filtered signal</td>
+<td>Use your existing normalized input schema (Multiple asset time series) and shared helpers, then implement the strategy rule described here: Trade one asset using signals from correlated assets (e.g., bonds, dollar, sector ETF). This category is best implemented as a multi-instrument or regime-based signal engine. Compute the relevant carry, curve, regime, or intermarket feature set on a scheduled cadence, normalize the result, and convert it into a tactical allocation or directional signal. Return both the raw feature values and the final state so SmartTrade can use the strategy either directly or as a top-level filter.</td>
+<td><code>AQR-MULTI</code></td>
+</tr>
+<tr>
+<td>84</td>
+<td>Cross-Asset / Macro / Carry</td>
+<td><strong>Seasonality / Calendar Effects</strong></td>
+<td>No</td>
+<td>Calendar-driven swing / long-only or tactical</td>
+<td>2</td>
+<td>Trade recurring calendar anomalies (month-end, turn-of-month, day-of-week, holiday).</td>
+<td>Calendar + returns history</td>
+<td>Scheduled buy/sell windows</td>
+<td>Use your existing normalized input schema (Calendar + returns history) and shared helpers, then implement the strategy rule described here: Trade recurring calendar anomalies (month-end, turn-of-month, day-of-week, holiday). Build the calendar or seasonal classifier explicitly—day-of-month, month-end, holiday proximity, contract seasonality, or similar—then backtest only the rule windows being targeted. Return calendar tags, average seasonal edge estimate, current window state, and final signal. Because these effects are often weak and can decay, include easy switches for markets, sample periods, and transaction-cost assumptions.</td>
+<td><code>QPEDIA-CAL</code></td>
+</tr>
+<tr>
+<td>85</td>
+<td>Cross-Asset / Macro / Carry</td>
+<td><strong>Earnings Drift / Post-Event Momentum</strong></td>
+<td>No</td>
+<td>Event-driven swing</td>
+<td>2</td>
+<td>Trade persistent drift after earnings or scheduled events.</td>
+<td>Event calendar, surprise data, prices</td>
+<td>Event-driven momentum signal</td>
+<td>Use your existing normalized input schema (Event calendar, surprise data, prices) and shared helpers, then implement the strategy rule described here: Trade persistent drift after earnings or scheduled events. Join price data with an event calendar or surprise dataset, then compute the post-event window and measure whether the event should trigger a continuation trade. Return event metadata, elapsed bars since event, surprise or trigger magnitude if available, and the final signal. The implementation should make it easy to swap in higher-quality event data later without changing the output contract.</td>
+<td><code>CFA-PEAD</code></td>
+</tr>
+<tr>
+<td>86</td>
+<td>Fundamental / ML / Composite</td>
+<td><strong>Value Strategy</strong></td>
+<td>No</td>
+<td>Long-term investing / rebalancing</td>
+<td>2</td>
+<td>Buy relatively cheap assets by valuation, sell expensive ones.</td>
+<td>Fundamental factors / ratios</td>
+<td>Ranked buy/sell signal</td>
+<td>Use your existing normalized input schema (Fundamental factors / ratios) and shared helpers, then implement the strategy rule described here: Buy relatively cheap assets by valuation, sell expensive ones. Implement it as a score-producing model first and a trading rule second. Compute the factor, fundamental score, sentiment score, or composite score on a fixed schedule, normalize it if needed, then map score thresholds or rankings into signals. Return the raw score, the standardized score, and the final signal so it can be compared side by side with purely technical strategies.</td>
+<td><code>MSCI-VALUE</code></td>
+</tr>
+<tr>
+<td>87</td>
+<td>Fundamental / ML / Composite</td>
+<td><strong>Quality Strategy</strong></td>
+<td>No</td>
+<td>Long-term investing / rebalancing</td>
+<td>2</td>
+<td>Use profitability, balance-sheet, earnings-quality metrics.</td>
+<td>Fundamental data</td>
+<td>Ranked signal</td>
+<td>Use your existing normalized input schema (Fundamental data) and shared helpers, then implement the strategy rule described here: Use profitability, balance-sheet, earnings-quality metrics. Implement it as a score-producing model first and a trading rule second. Compute the factor, fundamental score, sentiment score, or composite score on a fixed schedule, normalize it if needed, then map score thresholds or rankings into signals. Return the raw score, the standardized score, and the final signal so it can be compared side by side with purely technical strategies.</td>
+<td><code>MSCI-QUALITY</code></td>
+</tr>
+<tr>
+<td>88</td>
+<td>Fundamental / ML / Composite</td>
+<td><strong>Multi-Factor Composite</strong></td>
+<td>No</td>
+<td>Medium- to long-term portfolio construction</td>
+<td>2</td>
+<td>Combine value, momentum, quality, low-volatility, carry, etc.</td>
+<td>Factor inputs and weights</td>
+<td>Composite score + signal</td>
+<td>Use your existing normalized input schema (Factor inputs and weights) and shared helpers, then implement the strategy rule described here: Combine value, momentum, quality, low-volatility, carry, etc. Implement it as a score-producing model first and a trading rule second. Compute the factor, fundamental score, sentiment score, or composite score on a fixed schedule, normalize it if needed, then map score thresholds or rankings into signals. Return the raw score, the standardized score, and the final signal so it can be compared side by side with purely technical strategies.</td>
+<td><code>AQR-MULTI</code></td>
+</tr>
+<tr>
+<td>89</td>
+<td>Fundamental / ML / Composite</td>
+<td><strong>Sentiment Strategy</strong></td>
+<td>No</td>
+<td>Short- to medium-term event/sentiment trading</td>
+<td>1</td>
+<td>Trade news, analyst, social, or options sentiment signals.</td>
+<td>Sentiment feed + price data</td>
+<td>Directional signal</td>
+<td>Use your existing normalized input schema (Sentiment feed + price data) and shared helpers, then implement the strategy rule described here: Trade news, analyst, social, or options sentiment signals. Implement it as a score-producing model first and a trading rule second. Compute the factor, fundamental score, sentiment score, or composite score on a fixed schedule, normalize it if needed, then map score thresholds or rankings into signals. Return the raw score, the standardized score, and the final signal so it can be compared side by side with purely technical strategies.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>90</td>
+<td>Fundamental / ML / Composite</td>
+<td><strong>Machine Learning Classifier</strong></td>
+<td>Partial</td>
+<td>Any horizon; depends on feature set</td>
+<td>2</td>
+<td>Model probability of next move/state and convert to trade signal.</td>
+<td>Feature matrix, labels, model params</td>
+<td>Probability/score + buy/sell</td>
+<td>Use your existing normalized input schema (Feature matrix, labels, model params) and shared helpers, then implement the strategy rule described here: Model probability of next move/state and convert to trade signal. Build a formal feature pipeline using your normalized data sources, create labels or targets on a rolling training window, fit the model on the training slice only, and store the out-of-sample prediction as the core signal object. Return prediction, feature snapshot, model version, and final thresholded trade state. The implementation should keep training, inference, and signal-threshold logic separate so the framework can compare models cleanly.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>91</td>
+<td>Fundamental / ML / Composite</td>
+<td><strong>Machine Learning Regressor</strong></td>
+<td>Partial</td>
+<td>Any horizon; depends on feature set</td>
+<td>2</td>
+<td>Predict future return or target and threshold into actions.</td>
+<td>Feature matrix, regression target</td>
+<td>Predicted return + signal</td>
+<td>Use your existing normalized input schema (Feature matrix, regression target) and shared helpers, then implement the strategy rule described here: Predict future return or target and threshold into actions. Build a formal feature pipeline using your normalized data sources, create labels or targets on a rolling training window, fit the model on the training slice only, and store the out-of-sample prediction as the core signal object. Return prediction, feature snapshot, model version, and final thresholded trade state. The implementation should keep training, inference, and signal-threshold logic separate so the framework can compare models cleanly.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>92</td>
+<td>Fundamental / ML / Composite</td>
+<td><strong>Regime-Switching Strategy</strong></td>
+<td>Partial</td>
+<td>Any horizon; depends on feature set</td>
+<td>2</td>
+<td>Use HMM or similar to detect regime and switch sub-strategies.</td>
+<td>Returns, vol, macro features</td>
+<td>Regime label plus delegated signal</td>
+<td>Use your existing normalized input schema (Returns, vol, macro features) and shared helpers, then implement the strategy rule described here: Use HMM or similar to detect regime and switch sub-strategies. Estimate a latent or explicit regime variable—such as trend/range, high/low volatility, risk-on/risk-off, or HMM state—then route control to different sub-rules depending on the detected regime. Return regime probabilities or labels, delegated child-signal diagnostics, and the final aggregated state. This is especially useful in your framework because it can act both as a standalone strategy and as a meta-controller for other algorithms.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>93</td>
+<td>Fundamental / ML / Composite</td>
+<td><strong>Ensemble / Voting Strategy</strong></td>
+<td>No</td>
+<td>Any horizon; depends on feature set</td>
+<td>1</td>
+<td>Combine outputs of multiple sub-strategies via voting or weighting.</td>
+<td>Child strategy outputs, weights/rules</td>
+<td>Composite final signal</td>
+<td>Use your existing normalized input schema (Child strategy outputs, weights/rules) and shared helpers, then implement the strategy rule described here: Combine outputs of multiple sub-strategies via voting or weighting. Treat child strategies as inputs, not hard-coded internals. Collect standardized child outputs, combine them through majority voting, weighted voting, score averaging, or rule precedence, and then emit a final aggregated signal. Return each child contribution plus the aggregate vote so the dashboard can explain exactly why the ensemble chose `buy`, `sell`, or `neutral`.</td>
+<td><code>QINSTI-ADV</code></td>
+</tr>
+<tr>
+<td>94</td>
+<td>Execution Algorithms</td>
+<td><strong>TWAP</strong></td>
+<td>No</td>
+<td>Order execution only (not alpha)</td>
+<td>1</td>
+<td>Split order evenly across time between start and end.</td>
+<td>Parent order size, start/end time</td>
+<td>Execution slices / schedule</td>
+<td>Use your existing normalized input schema (Parent order size, start/end time) and shared helpers, then implement the strategy rule described here: Split order evenly across time between start and end. Treat this as an execution scheduler rather than an alpha model. The input should include parent order size, time window, urgency settings, venue/broker constraints, and live market context; the output should include child-order instructions, pacing state, fills, slippage metrics, and benchmark tracking. Keep the schedule logic deterministic and separately report benchmark quality—such as achieved VWAP or implementation shortfall—because execution quality, not directional correctness, is the key result.</td>
+<td><code>IBKR-ALGOS</code></td>
+</tr>
+<tr>
+<td>95</td>
+<td>Execution Algorithms</td>
+<td><strong>VWAP</strong></td>
+<td>No</td>
+<td>Order execution only (not alpha)</td>
+<td>1</td>
+<td>Schedule slices against expected volume curve to track VWAP.</td>
+<td>Parent order, historical/real-time volume curve</td>
+<td>Execution schedule</td>
+<td>Use your existing normalized input schema (Parent order, historical/real-time volume curve) and shared helpers, then implement the strategy rule described here: Schedule slices against expected volume curve to track VWAP. Treat this as an execution scheduler rather than an alpha model. The input should include parent order size, time window, urgency settings, venue/broker constraints, and live market context; the output should include child-order instructions, pacing state, fills, slippage metrics, and benchmark tracking. Keep the schedule logic deterministic and separately report benchmark quality—such as achieved VWAP or implementation shortfall—because execution quality, not directional correctness, is the key result.</td>
+<td><code>IBKR-ALGOS</code></td>
+</tr>
+<tr>
+<td>96</td>
+<td>Execution Algorithms</td>
+<td><strong>POV / Participation Rate</strong></td>
+<td>No</td>
+<td>Order execution only (not alpha)</td>
+<td>2</td>
+<td>Trade as a fixed percentage of market volume.</td>
+<td>Parent order, target participation, market volume</td>
+<td>Dynamic child orders</td>
+<td>Use your existing normalized input schema (Parent order, target participation, market volume) and shared helpers, then implement the strategy rule described here: Trade as a fixed percentage of market volume. Treat this as an execution scheduler rather than an alpha model. The input should include parent order size, time window, urgency settings, venue/broker constraints, and live market context; the output should include child-order instructions, pacing state, fills, slippage metrics, and benchmark tracking. Keep the schedule logic deterministic and separately report benchmark quality—such as achieved VWAP or implementation shortfall—because execution quality, not directional correctness, is the key result.</td>
+<td><code>IBKR-ALGOS</code></td>
+</tr>
+<tr>
+<td>97</td>
+<td>Execution Algorithms</td>
+<td><strong>Implementation Shortfall / Arrival Price</strong></td>
+<td>Partial</td>
+<td>Order execution only (not alpha)</td>
+<td>2</td>
+<td>Optimize execution versus decision price while balancing impact and risk.</td>
+<td>Parent order, urgency/risk settings, market data</td>
+<td>Adaptive execution schedule</td>
+<td>Use your existing normalized input schema (Parent order, urgency/risk settings, market data) and shared helpers, then implement the strategy rule described here: Optimize execution versus decision price while balancing impact and risk. Treat this as an execution scheduler rather than an alpha model. The input should include parent order size, time window, urgency settings, venue/broker constraints, and live market context; the output should include child-order instructions, pacing state, fills, slippage metrics, and benchmark tracking. Keep the schedule logic deterministic and separately report benchmark quality—such as achieved VWAP or implementation shortfall—because execution quality, not directional correctness, is the key result.</td>
+<td><code>IBKR-ALGOS</code></td>
+</tr>
+<tr>
+<td>98</td>
+<td>Execution Algorithms</td>
+<td><strong>Iceberg / Hidden Size</strong></td>
+<td>Partial</td>
+<td>Order execution only (not alpha)</td>
+<td>2</td>
+<td>Expose partial displayed size while retaining larger hidden quantity.</td>
+<td>Parent order, clip size</td>
+<td>Order placement actions</td>
+<td>Use your existing normalized input schema (Parent order, clip size) and shared helpers, then implement the strategy rule described here: Expose partial displayed size while retaining larger hidden quantity. Treat this as an execution scheduler rather than an alpha model. The input should include parent order size, time window, urgency settings, venue/broker constraints, and live market context; the output should include child-order instructions, pacing state, fills, slippage metrics, and benchmark tracking. Keep the schedule logic deterministic and separately report benchmark quality—such as achieved VWAP or implementation shortfall—because execution quality, not directional correctness, is the key result.</td>
+<td><code>IBKR-ALGOS</code></td>
+</tr>
+<tr>
+<td>99</td>
+<td>Execution Algorithms</td>
+<td><strong>Sniper / Opportunistic Execution</strong></td>
+<td>Partial</td>
+<td>Order execution only (not alpha)</td>
+<td>2</td>
+<td>Trade aggressively only when liquidity or price conditions are favorable.</td>
+<td>Liquidity and spread conditions</td>
+<td>Adaptive execution actions</td>
+<td>Use your existing normalized input schema (Liquidity and spread conditions) and shared helpers, then implement the strategy rule described here: Trade aggressively only when liquidity or price conditions are favorable. Treat this as an execution scheduler rather than an alpha model. The input should include parent order size, time window, urgency settings, venue/broker constraints, and live market context; the output should include child-order instructions, pacing state, fills, slippage metrics, and benchmark tracking. Keep the schedule logic deterministic and separately report benchmark quality—such as achieved VWAP or implementation shortfall—because execution quality, not directional correctness, is the key result.</td>
+<td><code>IBKR-ALGOS</code></td>
+</tr>
+</tbody>
+</table>
+
+## Implementation guidance for the coder
+
+1. **Reuse-first:** inspect the already-implemented algorithms and identify the exact base class/interface, indicator helpers, report builders, parameter validation pattern, and registration/discovery mechanism. New algorithms should fit that same architecture.
+2. **Parameter schema:** expose a machine-readable parameter schema for every algorithm so the dashboard can generate forms, validate input, save configs, and compose algorithms.
+3. **Output normalization:** even when internal math differs, algorithms should emit normalized outputs so they can be combined by AND / OR / pipeline / voting logic.
+4. **Composition readiness:** wherever reasonable, let the algorithm produce both a hard signal and an optional soft score so it can be reused inside composite strategies.
+5. **Backtest transparency:** always expose intermediate series used by the signal so the dashboard can explain why a trade was triggered.
+
+## Reference directory
+
+- **`INV-ALGO`** — Investopedia — Basics of Algorithmic Trading: Concepts and Examples  
+  URL: `https://www.investopedia.com/articles/active-trading/101014/basics-algorithmic-trading-concepts-and-examples.asp`  
+  Why used: Broad overview of common algo families including trend following, arbitrage, VWAP, TWAP, and mean reversion.
+
+- **`INV-MR`** — Investopedia — What Is Mean Reversion, and How Do Investors Use It?  
+  URL: `https://www.investopedia.com/terms/m/meanreversion.asp`  
+  Why used: Mean-reversion overview and common tools such as moving averages, RSI, and Bollinger Bands.
+
+- **`INV-HFT`** — Investopedia — The World of High-Frequency Algorithmic Trading  
+  URL: `https://www.investopedia.com/articles/investing/091615/world-high-frequency-algorithmic-trading.asp`  
+  Why used: Overview of HFT and infrastructure-heavy strategies.
+
+- **`AQR-TSMOM`** — AQR — Time Series Momentum  
+  URL: `https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum`  
+  Why used: Canonical reference for time-series momentum.
+
+- **`AQR-TREND`** — AQR — A Century of Evidence on Trend-Following Investing  
+  URL: `https://images.aqr.com/-/media/AQR/Documents/Insights/Journal-Article/AQR-JPM-Fall-2017.pdf`  
+  Why used: Broad evidence base for trend-following and relation to linear trend filters.
+
+- **`AQR-MOM`** — AQR — Fact, Fiction, and Momentum Investing  
+  URL: `https://www.aqr.com/-/media/AQR/Documents/Journal-Articles/JPM-Fact-Fiction-and-Momentum-Investing.pdf`  
+  Why used: Broad practitioner/academic overview of momentum variants.
+
+- **`MSCI-MOM`** — MSCI — Momentum Indexes Methodology  
+  URL: `https://www.msci.com/index/methodology/latest/Momentum`  
+  Why used: Rules-based implementation view of momentum as a factor.
+
+- **`MSCI-VALUE`** — MSCI — Factor Focus: Value  
+  URL: `https://www.msci.com/documents/1296102/8473352/Value-brochure.pdf`  
+  Why used: Rules-based overview of value factor construction.
+
+- **`MSCI-QUALITY`** — MSCI — Quality Time: Understanding Factor Investing  
+  URL: `https://www.msci.com/documents/10199/4c5bd381-5b29-453e-ad73-6df24290a172`  
+  Why used: Overview of quality factor construction and use.
+
+- **`AQR-MULTI`** — AQR Funds — Understanding Factor Investing  
+  URL: `https://funds.aqr.com/Insights/Strategies/Understanding-Factor-Investing`  
+  Why used: Overview of multi-factor investing and combining value, momentum, and quality.
+
+- **`IBKR-ALGOS`** — IBKR Campus — Advanced Desktop Order Types and Algorithms / Order Types  
+  URL: `https://www.interactivebrokers.com/campus/trading-course/advanced-desktop-order-types-and-algorithms/`  
+  Why used: Practical broker-side descriptions of TWAP, VWAP, arrival price, POV, and related execution algos.
+
+- **`QINSTI-ADV`** — QuantInsti/Quantra — Advanced Algorithmic Trading Strategies  
+  URL: `https://quantra.quantinsti.com/learning-track/advanced-algorithmic-trading-strategies`  
+  Why used: Broad practitioner track covering pairs trading, cointegration, momentum, timing, chart patterns, and strategy execution.
+
+- **`QPEDIA-CAL`** — Quantpedia — Turn of the Month in Equity Indexes  
+  URL: `https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes`  
+  Why used: Representative seasonality/calendar-effect reference.
+
+- **`CFA-PEAD`** — CFA Institute Research — The Many Facets of Stock Momentum / PEAD-related material  
+  URL: `https://rpc.cfainstitute.org/research/in-practice-briefs/2026/in-practice-brief-many-facets-stock-momentum`  
+  Why used: Useful entry point for earnings-related momentum / post-event drift.
+
+- **`CME-OPT`** — CME Group — Options education: gamma scalping, skew, term structure, event volatility  
+  URL: `https://www.cmegroup.com/education/courses/curriculum-all-about-options`  
+  Why used: Starting point for options-volatility concepts including skew, term structure, greeks, and event volatility.
+
+- **`CME-TERM`** — CME Group — Volatility Term Structure Tool / Event Volatility Calculator  
+  URL: `https://www.cmegroup.com/tools-information/quikstrike/volatility-term-structure.html`  
+  Why used: Term-structure oriented options-volatility reference.
+
+- **`AQR-ARP`** — AQR — Understanding Alternative Risk Premia  
+  URL: `https://www.aqr.com/-/media/AQR/Documents/Whitepapers/Understand-Alternative-Risk-Premia.pdf`  
+  Why used: Includes discussion of carry and alternative systematic premia.
+
+Total catalog size: **99 algorithms / strategy templates**.
