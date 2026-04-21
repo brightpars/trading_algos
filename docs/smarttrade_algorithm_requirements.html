@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SmartTrade & Algorithm Designer - New Requirements</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.55;
+      margin: 0;
+      padding: 0;
+      background: #f5f7fb;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 32px auto;
+      background: white;
+      padding: 36px 44px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      border-radius: 14px;
+    }
+    h1, h2, h3 {
+      color: #0f172a;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 30px;
+      border-bottom: 3px solid #e5e7eb;
+      padding-bottom: 12px;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    h3 {
+      margin-top: 24px;
+    }
+    p, li {
+      font-size: 15px;
+    }
+    .meta {
+      background: #eef4ff;
+      border-left: 5px solid #3b82f6;
+      padding: 14px 16px;
+      margin: 18px 0 24px 0;
+      border-radius: 8px;
+    }
+    .section-note {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 14px 16px;
+      border-radius: 8px;
+      margin: 14px 0;
+    }
+    .prompt {
+      background: #0f172a;
+      color: #e5eefc;
+      padding: 16px;
+      border-radius: 10px;
+      white-space: pre-wrap;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 14px;
+      overflow-x: auto;
+    }
+    ul, ol {
+      margin-top: 6px;
+    }
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 5px;
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+    @media (max-width: 800px) {
+      .container {
+        margin: 12px;
+        padding: 20px;
+      }
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f4f6;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>New Requirements for SmartTrade and Algorithm Designer</h1>
+
+    <div class="meta">
+      <strong>Purpose:</strong> This document summarizes the new functional and architectural requirements discussed for two separate applications:
+      <ol>
+        <li><strong>SmartTrade</strong> - the runtime application used by end users to select algorithms/configurations and run trading/backtesting workflows.</li>
+        <li><strong>Algorithm Designer Dashboard</strong> - the developer-focused application used to create, test, visualize, compare, and publish algorithm configurations.</li>
+      </ol>
+      <strong>Main goal:</strong> Keep algorithm implementation development separate from SmartTrade, while allowing user-defined algorithm configurations to be published dynamically and consumed by SmartTrade without requiring a full Git push + SmartTrade redeployment for every configuration-level change.
+    </div>
+
+    <h2>1. High-Level Product Intent</h2>
+    <ul>
+      <li>The algorithm implementation code itself remains independent from SmartTrade and continues to live in a Python package / Git-based development workflow.</li>
+      <li>SmartTrade should not need knowledge of how algorithms are internally developed.</li>
+      <li>The Algorithm Designer Dashboard should remain primarily focused on algorithm evaluation, visualization, comparison, and configuration design.</li>
+      <li>A new concept of <strong>publishable algorithm configuration</strong> must be introduced.</li>
+      <li>These published configurations must become visible and selectable in SmartTrade dynamically.</li>
+      <li>Configuration publication should not require redeploying SmartTrade, as long as the underlying algorithm code already exists in the installed package version available to SmartTrade.</li>
+    </ul>
+
+    <h2>2. Core Domain Concepts</h2>
+    <table>
+      <tr>
+        <th>Concept</th>
+        <th>Description</th>
+      </tr>
+      <tr>
+        <td>Algorithm</td>
+        <td>A Python-implemented trading logic unit that reads market data and emits signals such as buy / sell / neutral.</td>
+      </tr>
+      <tr>
+        <td>Algorithm Parameters</td>
+        <td>Tunable inputs specific to an algorithm instance, for example thresholds, window sizes, coefficients, or strategy flags.</td>
+      </tr>
+      <tr>
+        <td>Algorithm Configuration</td>
+        <td>A named, reusable definition that selects one or more existing algorithms, assigns parameters to them, and optionally combines them using logical/compositional rules such as AND / OR / chaining / cascade.</td>
+      </tr>
+      <tr>
+        <td>Published Configuration</td>
+        <td>A configuration that has been validated and persisted into SmartTrade-owned storage so it becomes available to runtime users.</td>
+      </tr>
+      <tr>
+        <td>Run Result / Evaluation Result</td>
+        <td>The stored output of executing an algorithm or configuration on historical data, including metrics, visualizations, and metadata.</td>
+      </tr>
+    </table>
+
+    <h2>3. Architectural Direction</h2>
+    <div class="section-note">
+      <strong>Recommended direction:</strong> Keep the source of truth for published runtime configurations inside <strong>SmartTrade's domain</strong>, most likely in SmartTrade's database and behind SmartTrade-owned APIs.
+    </div>
+    <ul>
+      <li>The Algorithm Designer Dashboard may have its own local database for experiment history, previous runs, and developer-side metadata.</li>
+      <li>However, the final published configuration repository should be owned by SmartTrade.</li>
+      <li>The Algorithm Designer Dashboard should publish configurations to SmartTrade through a dedicated API.</li>
+      <li>SmartTrade should expose APIs to list, validate, create, update, activate/deactivate, and retrieve configuration details.</li>
+      <li>This approach keeps SmartTrade as the runtime authority while preserving separation of concerns.</li>
+    </ul>
+
+    <h2>4. Detailed Requirements - Algorithm Designer Dashboard</h2>
+
+    <h3>4.1 Usability and Developer Workflow</h3>
+    <ul>
+      <li>The dashboard shall provide a developer-friendly interface to browse existing algorithms available in the installed Python package.</li>
+      <li>The dashboard shall let the developer inspect each algorithm's metadata, expected parameters, defaults, and signal behavior.</li>
+      <li>The dashboard shall support selecting an algorithm and running it on historical data without manually editing raw JSON files.</li>
+      <li>The dashboard should still support JSON import/export for advanced users, debugging, and reproducibility.</li>
+      <li>The dashboard shall allow the user to save draft configurations locally before publication.</li>
+    </ul>
+
+    <h3>4.2 Configuration Builder</h3>
+    <ul>
+      <li>The dashboard shall introduce a first-class visual concept called <strong>Configuration Builder</strong>.</li>
+      <li>The builder shall allow the developer to create a reusable named configuration from one or more algorithms.</li>
+      <li>The developer shall be able to:
+        <ul>
+          <li>Choose one algorithm or multiple algorithms.</li>
+          <li>Assign parameters to each algorithm instance.</li>
+          <li>Create multiple instances of the same algorithm with different parameter sets.</li>
+          <li>Arrange algorithms into a logical/composite structure.</li>
+        </ul>
+      </li>
+      <li>The configuration shall support at least the following logical relationships:
+        <ul>
+          <li><strong>AND</strong>: emit a buy/sell decision only when all required child conditions agree.</li>
+          <li><strong>OR</strong>: emit a buy/sell decision when at least one child condition matches.</li>
+          <li><strong>Cascade / Pipeline</strong>: run one algorithm or decision stage after another.</li>
+          <li><strong>Parallel composition</strong>: evaluate multiple algorithms on the same data and combine outcomes.</li>
+        </ul>
+      </li>
+      <li>The model should be extensible later for NOT, weighted voting, majority voting, precedence rules, and custom combiners.</li>
+      <li>The builder shall allow naming each configuration clearly and adding description fields, tags, notes, and intended use cases.</li>
+      <li>The builder shall generate a machine-readable configuration payload suitable for publication to SmartTrade.</li>
+    </ul>
+
+    <h3>4.3 Visualization of Composite Configurations</h3>
+    <ul>
+      <li>The dashboard shall visualize not only individual algorithm outputs but also composite configuration structure.</li>
+      <li>The user should be able to see a graph, tree, or pipeline representation of how algorithms are combined.</li>
+      <li>The dashboard shall clearly indicate where AND / OR / sequential nodes exist in the configuration.</li>
+      <li>The user should be able to inspect the signal produced by:
+        <ul>
+          <li>each individual child algorithm, and</li>
+          <li>the final combined configuration output.</li>
+        </ul>
+      </li>
+      <li>The dashboard shall visualize buy / sell / neutral points over market data as it already does, but also distinguish source signals versus final decision signals.</li>
+    </ul>
+
+    <h3>4.4 Evaluation and Performance Analysis</h3>
+    <ul>
+      <li>The dashboard shall support running a configuration or algorithm against historical data for a specified date/time range.</li>
+      <li>The dashboard shall store previous run results and make them searchable in a run catalog.</li>
+      <li>Each stored run should contain:
+        <ul>
+          <li>algorithm/configuration name,</li>
+          <li>exact parameter values,</li>
+          <li>algorithm package version,</li>
+          <li>time range used,</li>
+          <li>market/instrument used,</li>
+          <li>execution timestamp,</li>
+          <li>performance metrics,</li>
+          <li>optional notes from developer.</li>
+        </ul>
+      </li>
+      <li>The dashboard should display performance metrics beyond the visual signal markers, such as:
+        <ul>
+          <li>profit/loss,</li>
+          <li>return percentage,</li>
+          <li>win rate,</li>
+          <li>drawdown,</li>
+          <li>number of trades,</li>
+          <li>signal count,</li>
+          <li>buy/sell distribution,</li>
+          <li>stability across time windows.</li>
+        </ul>
+      </li>
+      <li>The dashboard should support running the same algorithm/configuration over multiple periods or datasets for comparison.</li>
+      <li>The dashboard should support side-by-side comparison of:
+        <ul>
+          <li>two or more algorithms,</li>
+          <li>two or more parameter sets,</li>
+          <li>an individual algorithm versus a composite configuration.</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h3>4.5 Comparison and Experiment Tracking</h3>
+    <ul>
+      <li>The dashboard shall provide a comparison mode where developers can compare run results visually and numerically.</li>
+      <li>The dashboard shall make it easy to answer questions like:
+        <ul>
+          <li>Which parameter set performed better?</li>
+          <li>Did combining A AND B improve precision or reduce false positives?</li>
+          <li>How stable is this config across different periods?</li>
+        </ul>
+      </li>
+      <li>The dashboard should allow pinning important runs as baselines.</li>
+      <li>The dashboard should allow promoting a successful draft configuration to a publishable version.</li>
+      <li>The dashboard should maintain a local revision history of configuration edits.</li>
+    </ul>
+
+    <h3>4.6 Validation Before Publication</h3>
+    <ul>
+      <li>Before publication, the dashboard shall validate that:
+        <ul>
+          <li>all referenced algorithms exist in the known algorithm package,</li>
+          <li>all required parameters are supplied,</li>
+          <li>parameter types are valid,</li>
+          <li>the configuration structure is logically valid,</li>
+          <li>the config has a unique or explicitly versioned publish name,</li>
+          <li>the target SmartTrade environment is compatible.</li>
+        </ul>
+      </li>
+      <li>The dashboard should warn the developer if the configuration depends on algorithm code that is not yet available in the SmartTrade deployment environment.</li>
+    </ul>
+
+    <h3>4.7 Publication Workflow</h3>
+    <ul>
+      <li>The dashboard shall support an explicit <strong>Publish Configuration</strong> action.</li>
+      <li>Publication shall send the configuration payload to SmartTrade via API.</li>
+      <li>The publish flow should support:
+        <ul>
+          <li>creating a new published config,</li>
+          <li>updating an existing published config,</li>
+          <li>creating a new version of an existing config,</li>
+          <li>saving as draft only,</li>
+          <li>optional activation/deactivation request.</li>
+        </ul>
+      </li>
+      <li>After publication, the dashboard should display the publication result, returned config ID/version, and current publish status.</li>
+    </ul>
+
+    <h3>4.8 Non-Functional Expectations for the Dashboard</h3>
+    <ul>
+      <li>The UI should be significantly easier than editing configuration manually through raw JSON.</li>
+      <li>Advanced operations should remain inspectable and exportable as JSON for transparency.</li>
+      <li>The system should be modular enough to add future composition types and future metrics.</li>
+      <li>The run history and comparison features should remain performant as stored experiments grow.</li>
+    </ul>
+
+    <h2>5. Detailed Requirements - SmartTrade</h2>
+
+    <h3>5.1 Configuration Repository Ownership</h3>
+    <ul>
+      <li>SmartTrade shall become the owner of the runtime-published configuration repository.</li>
+      <li>SmartTrade shall persist published configurations in its own database.</li>
+      <li>The repository shall store:
+        <ul>
+          <li>configuration name,</li>
+          <li>version,</li>
+          <li>description,</li>
+          <li>payload/definition,</li>
+          <li>status (draft/published/active/inactive/deprecated),</li>
+          <li>created by,</li>
+          <li>created at,</li>
+          <li>updated at,</li>
+          <li>compatibility metadata,</li>
+          <li>algorithm references used inside the config.</li>
+        </ul>
+      </li>
+    </ul>
+
+    <h3>5.2 SmartTrade API for External Publication</h3>
+    <ul>
+      <li>SmartTrade shall expose API endpoints for the Algorithm Designer Dashboard to publish and manage configurations.</li>
+      <li>These APIs should support:
+        <ul>
+          <li>publish new config,</li>
+          <li>update config,</li>
+          <li>create new version,</li>
+          <li>list configs,</li>
+          <li>retrieve config details,</li>
+          <li>activate/deactivate config,</li>
+          <li>validate compatibility,</li>
+          <li>optional soft delete/deprecation.</li>
+        </ul>
+      </li>
+      <li>These APIs should be protected by authentication and authorization.</li>
+    </ul>
+
+    <h3>5.3 Runtime Discovery of Configurations</h3>
+    <ul>
+      <li>When a SmartTrade user opens the relevant runtime dashboard, SmartTrade shall dynamically load the current list of available published configurations.</li>
+      <li>The list shall not require a SmartTrade redeploy if only configuration data has changed.</li>
+      <li>The runtime UI shall clearly distinguish between:
+        <ul>
+          <li>raw algorithms directly available in the package, and</li>
+          <li>published composite/user-defined configurations.</li>
+        </ul>
+      </li>
+      <li>The user shall be able to pick a published configuration by name.</li>
+      <li>The user should be able to inspect a summary of what that configuration contains.</li>
+    </ul>
+
+    <h3>5.4 Runtime Use of Published Configurations</h3>
+    <ul>
+      <li>SmartTrade shall be able to execute a published configuration exactly as defined by the payload stored in its repository.</li>
+      <li>SmartTrade shall resolve all referenced algorithms from its installed algorithm package.</li>
+      <li>If a published configuration references algorithms unavailable in the current environment, SmartTrade shall reject execution with a clear error message.</li>
+      <li>SmartTrade should allow the runtime user to:
+        <ul>
+          <li>use the published configuration as-is, or</li>
+          <li>start from that configuration as a preset/template and override selected runtime-adjustable parameters.</li>
+        </ul>
+      </li>
+      <li>It should be configurable which parameters are locked versus runtime-editable.</li>
+    </ul>
+
+    <h3>5.5 Versioning and Compatibility</h3>
+    <ul>
+      <li>SmartTrade shall version published configurations.</li>
+      <li>SmartTrade shall store which algorithm package version(s) a configuration expects.</li>
+      <li>SmartTrade should be able to mark a configuration as:
+        <ul>
+          <li>compatible,</li>
+          <li>warning, or</li>
+          <li>incompatible</li>
+        </ul>
+        with the currently installed algorithm package.
+      </li>
+      <li>SmartTrade should avoid silent failures caused by configuration/code mismatch.</li>
+    </ul>
+
+    <h3>5.6 Governance and Lifecycle</h3>
+    <ul>
+      <li>SmartTrade shall support status transitions such as draft, published, active, inactive, and deprecated.</li>
+      <li>Only active/published configurations should be shown by default to runtime end users.</li>
+      <li>Deprecated or incompatible configurations should either be hidden or visibly marked.</li>
+      <li>SmartTrade should keep an audit trail of who published or modified each configuration.</li>
+    </ul>
+
+    <h3>5.7 Non-Functional Expectations for SmartTrade</h3>
+    <ul>
+      <li>Configuration retrieval should be fast enough for interactive dashboard usage.</li>
+      <li>The schema must be extensible for future combinational logic and metadata.</li>
+      <li>The publication API should be stable and documented because it becomes a contract between the two applications.</li>
+    </ul>
+
+    <h2>6. Suggested API / Data Contract Direction</h2>
+    <div class="section-note">
+      This is not a strict implementation, but a recommended direction so the coder has a clearer target.
+    </div>
+    <ul>
+      <li>A published configuration payload should include:
+        <ul>
+          <li>config name and version,</li>
+          <li>human-readable description,</li>
+          <li>list of nodes,</li>
+          <li>node types (algorithm / AND / OR / pipeline stage),</li>
+          <li>algorithm references,</li>
+          <li>parameter sets per algorithm instance,</li>
+          <li>composition graph or tree,</li>
+          <li>optional runtime-overridable parameters,</li>
+          <li>compatibility metadata.</li>
+        </ul>
+      </li>
+      <li>The schema should be explicit enough so SmartTrade can reconstruct and execute the config reliably.</li>
+      <li>Prefer a declarative config schema rather than executable code inside the configuration itself.</li>
+    </ul>
+
+    <h2>7. Out of Scope / Separation of Concerns</h2>
+    <ul>
+      <li>Creating brand-new algorithm source code from scratch is still a Git/package development concern, not a runtime SmartTrade concern.</li>
+      <li>Publishing a configuration must not be treated as publishing arbitrary Python code.</li>
+      <li>Only configurations built from already-supported algorithm implementations should be publishable dynamically.</li>
+      <li>The Algorithm Designer Dashboard may remain independent from SmartTrade except for the publishing/discovery API integration.</li>
+    </ul>
+
+    <h2>8. Implementation Priorities</h2>
+    <ol>
+      <li><strong>Phase 1:</strong> Introduce configuration domain model and schema.</li>
+      <li><strong>Phase 2:</strong> Build visual configuration builder in the Algorithm Designer Dashboard.</li>
+      <li><strong>Phase 3:</strong> Add local save, run, compare, and history features for configurations.</li>
+      <li><strong>Phase 4:</strong> Add SmartTrade database tables and publication APIs.</li>
+      <li><strong>Phase 5:</strong> Add SmartTrade runtime config discovery and execution.</li>
+      <li><strong>Phase 6:</strong> Add versioning, compatibility checks, lifecycle management, and stronger UX polish.</li>
+    </ol>
+
+    <h2>9. Acceptance Criteria Summary</h2>
+    <ul>
+      <li>A developer can create a named composite configuration from existing algorithms without editing raw JSON manually.</li>
+      <li>A developer can compare the new configuration against other algorithms/configurations using stored historical runs and metrics.</li>
+      <li>A developer can publish that configuration to SmartTrade through an API.</li>
+      <li>SmartTrade stores the published configuration in its own database.</li>
+      <li>A SmartTrade user can later see the published configuration in the runtime dashboard without redeploying SmartTrade.</li>
+      <li>A SmartTrade user can select and execute the published configuration.</li>
+      <li>Configuration publication does not require changing SmartTrade code as long as the referenced algorithm implementation already exists in the installed package.</li>
+    </ul>
+</div>
+</body>
+</html>
