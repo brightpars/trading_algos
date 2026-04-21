@@ -6,7 +6,10 @@ from typing import Any
 from trading_algos.configuration.executor import evaluate_configuration_graph
 from trading_algos.configuration.executor import build_configuration_normalized_output
 from trading_algos.evaluation import evaluate_alert_algorithm_output
-from trading_algos.reporting import build_configuration_report
+from trading_algos.reporting import (
+    build_configuration_report,
+    build_persisted_report_payload,
+)
 
 
 def run_configuration_payload(
@@ -80,6 +83,7 @@ def run_configuration_payload(
             for item in evaluation["node_results"]
         ],
     )
+    persisted_report = build_persisted_report_payload(report)
     return {
         "input_kind": "configuration",
         "config_key": evaluation["configuration"].config_key,
@@ -109,5 +113,5 @@ def run_configuration_payload(
         "eval_dict": {},
         "normalized_output": normalized_output.to_dict(),
         "evaluator_outputs": [result.to_dict() for result in evaluation_results],
-        "report": report.to_dict(),
+        "report": persisted_report,
     }

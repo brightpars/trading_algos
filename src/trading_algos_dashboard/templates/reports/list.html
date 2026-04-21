@@ -4,7 +4,13 @@
 <ul class="list-group">
   {% for report in reports %}
   <li class="list-group-item d-flex justify-content-between align-items-center">
-    <span><strong>{{ report.report.algorithm_summary.algorithm_name if report.report else (report.alg_name or report.config_name) }}</strong> — {{ report.experiment_id }}</span>
+    <span>
+      <strong>{{ report.report.algorithm_summary.algorithm_name if report.report else (report.alg_name or report.config_name) }}</strong>
+      — {{ report.experiment_id }}
+      {% if report.report %}
+      <span class="text-muted">(report={{ report.report.report_version }} schema={{ report.report.schema_version or '1.0' }})</span>
+      {% endif %}
+    </span>
     <a href="{{ url_for('reports.report_detail', experiment_id=report.experiment_id) }}">Open</a>
   </li>
   {% endfor %}

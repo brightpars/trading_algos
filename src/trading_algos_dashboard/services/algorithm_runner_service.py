@@ -5,7 +5,10 @@ from typing import Any
 
 from trading_algos.alertgen import create_alertgen_algorithm
 from trading_algos.evaluation import evaluate_alert_algorithm_output
-from trading_algos.reporting import build_alert_algorithm_report
+from trading_algos.reporting import (
+    build_alert_algorithm_report,
+    build_persisted_report_payload,
+)
 
 from trading_algos_dashboard.services.chart_service import (
     normalize_interactive_payloads,
@@ -69,8 +72,14 @@ def run_alert_algorithm(
         algorithm_chart_payload=default_chart,
         diagnostics={
             "interactive_payloads": interactive_payloads,
+            "report_refs": {
+                "report_path": algorithm.report_path,
+                "report_data_path": f"{algorithm.report_path}/{algorithm.data_name}.dict",
+                "figure_path": f"{algorithm.report_path}/{algorithm.data_name}.png",
+            },
         },
     )
+    persisted_report = build_persisted_report_payload(report)
 
     return {
         "input_kind": "single_algorithm",
@@ -99,5 +108,5 @@ def run_alert_algorithm(
         "interactive_payloads": interactive_payloads,
         "chart_payload": default_chart,
         "normalized_output": normalized_output.to_dict(),
-        "report": report.to_dict(),
+        "report": persisted_report,
     }

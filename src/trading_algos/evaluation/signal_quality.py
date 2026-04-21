@@ -18,4 +18,6 @@ def evaluate_signal_quality(
         applies=True,
         metrics=dict(metrics),
         warnings=(),
+        applicability_status="applicable",
+        notes=("Current implementation wraps the existing alert evaluation metrics.",),
     )

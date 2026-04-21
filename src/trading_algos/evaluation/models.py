@@ -12,6 +12,8 @@ class EvaluationResult:
     applies: bool
     metrics: dict[str, Any] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
+    applicability_status: str = "applicable"
+    notes: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

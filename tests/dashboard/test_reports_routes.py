@@ -58,3 +58,4 @@ def test_reports_page_renders(monkeypatch):
     client = app.test_client()
     response = client.get("/reports")
     assert response.status_code == 200
+    assert b"report=1.0 schema=1.0" in response.data

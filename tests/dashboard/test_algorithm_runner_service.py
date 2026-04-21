@@ -32,8 +32,10 @@ def test_run_alert_algorithm_returns_dashboard_payload(tmp_path):
     assert "eval_dict" in result
     assert "chart_payload" in result
     assert result["report"]["report_version"] == "1.0"
+    assert result["report"]["schema_version"] == "1.0"
     assert result["report"]["charts"]
     assert result["evaluator_outputs"]
+    assert result["report"]["diagnostics"]
 
 
 def test_run_alert_algorithm_handles_short_input_history(tmp_path):
@@ -52,3 +54,6 @@ def test_run_alert_algorithm_handles_short_input_history(tmp_path):
     assert result["signal_summary"]["total_rows"] == 3
     assert result["eval_dict"]["correct_predictions"] >= 0
     assert result["report"]["evaluation_summary"]["metric_groups"]
+    assert any(
+        chart["chart_id"] == "core_indicators" for chart in result["report"]["charts"]
+    )

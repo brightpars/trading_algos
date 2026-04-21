@@ -164,6 +164,10 @@
         </ul>
       </div>
       {% endif %}
+      <div class="mt-3">
+        <h4 class="h6">Diagnostics</h4>
+        <pre class="small bg-light p-3 rounded">{{ report.diagnostics or {} }}</pre>
+      </div>
       {% else %}
       <pre class="small bg-light p-3 rounded">{{ result.eval_dict }}</pre>
       <div class="chart-container" data-chart='{{ result.chart_payload|tojson if result.chart_payload else "null" }}'></div>

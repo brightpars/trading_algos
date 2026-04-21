@@ -168,10 +168,12 @@ def build_configuration_normalized_output(
             "close": [item.get("Close") for item in rows],
             "buy_signal": [bool(item.get("buy_SIGNAL")) for item in rows],
             "sell_signal": [bool(item.get("sell_SIGNAL")) for item in rows],
+            "gt_trend": [item.get("gt_trend") for item in rows],
         },
         summary_metrics=dict(root_result.get("eval_dict") or {}),
         metadata={
             "algorithm_name": root_result.get("node_name", "configuration"),
+            "family": "configuration",
             "runtime_kind": "configuration",
         },
     )

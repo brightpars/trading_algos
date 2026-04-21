@@ -315,7 +315,26 @@ class BaseAlertAlgorithm(ABC):
             "close": self._close_values(),
             "buy_signal": [bool(item.get("buy_SIGNAL")) for item in self.data_list],
             "sell_signal": [bool(item.get("sell_SIGNAL")) for item in self.data_list],
+            "gt_trend": [item.get("gt_trend") for item in self.data_list],
         }
+        for key in self.data_list[-1].keys() if self.data_list else []:
+            if key in {
+                "ts",
+                "Open",
+                "High",
+                "Low",
+                "Close",
+                "buy_SIGNAL",
+                "sell_SIGNAL",
+                "no_SIGNAL",
+                "trend_confidence",
+                "gt_trend",
+                "gt_up",
+                "gt_down",
+                "gt_nn",
+            }:
+                continue
+            derived_series[key] = [item.get(key) for item in self.data_list]
         return AlertAlgorithmOutput(
             algorithm_key=self.alg_name,
             points=tuple(points),
@@ -323,6 +342,7 @@ class BaseAlertAlgorithm(ABC):
             summary_metrics=dict(self.eval_dict),
             metadata={
                 "algorithm_name": self.alg_name,
+                "family": "trend",
                 "symbol": self.symbol,
                 "warmup_period": self.minimum_history(),
                 "evaluate_window_len": self.evaluate_window_len,

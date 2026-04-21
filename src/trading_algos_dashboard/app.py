@@ -45,6 +45,7 @@ from trading_algos_dashboard.services.configuration_publish_service import (
     ConfigurationPublishService,
 )
 from trading_algos_dashboard.services.experiment_service import ExperimentService
+from trading_algos_dashboard.services.report_service import ReportService
 
 
 def create_app(config: DashboardConfig | None = None) -> Flask:
@@ -90,6 +91,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         data_source_service=data_source_service,
         report_base_path=cfg.report_base_path,
     )
+    report_service = ReportService(result_repository=result_repository)
     configuration_builder_service = ConfigurationBuilderService(
         draft_repository=configuration_draft_repository,
         revision_repository=configuration_revision_repository,
@@ -114,6 +116,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["data_source_settings_service"] = data_source_settings_service
     app.extensions["data_source_service"] = data_source_service
     app.extensions["experiment_service"] = experiment_service
+    app.extensions["report_service"] = report_service
     app.extensions["configuration_builder_service"] = configuration_builder_service
     app.extensions["configuration_publish_service"] = configuration_publish_service
     app.extensions["algorithm_catalog_service"] = list_algorithm_catalog

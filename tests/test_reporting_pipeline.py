@@ -48,7 +48,11 @@ def test_reporting_pipeline_builds_standardized_report() -> None:
     assert payload["charts"]
     assert payload["tables"]
     assert payload["analysis_blocks"]
+    assert payload["diagnostics"]["notes"]
+    assert payload["artifacts"]["trade_returns"] is not None
     assert payload["evaluation_summary"]["metric_groups"] == [
         "signal_quality",
         "trading_backtest",
+        "robustness",
+        "family_specific",
     ]

@@ -34,6 +34,7 @@ def evaluate_baseline_backtest(output: AlertAlgorithmOutput) -> EvaluationResult
     in_position = False
     entry_price = 0.0
     exposure_bars = 0
+    turnover_events = 0
 
     for index, point in enumerate(output.points[:-1]):
         next_price = close_series[index + 1]
@@ -46,11 +47,13 @@ def evaluate_baseline_backtest(output: AlertAlgorithmOutput) -> EvaluationResult
         if point.signal_label == "buy" and not in_position:
             in_position = True
             entry_price = next_price
+            turnover_events += 1
         elif point.signal_label == "sell" and in_position:
             trade_return = (next_price / entry_price) - 1.0 if entry_price > 0 else 0.0
             trade_returns.append(trade_return)
             in_position = False
             entry_price = 0.0
+            turnover_events += 1
 
         bar_return = 0.0
         if in_position:
@@ -74,7 +77,11 @@ def evaluate_baseline_backtest(output: AlertAlgorithmOutput) -> EvaluationResult
 
     win_count = sum(1 for value in trade_returns if value > 0)
     loss_count = sum(1 for value in trade_returns if value < 0)
+    gross_profit = sum(value for value in trade_returns if value > 0)
+    gross_loss = abs(sum(value for value in trade_returns if value < 0))
     total_bars = max(len(close_series) - 1, 1)
+    cumulative_return = equity_curve[-1] - 1.0
+    max_drawdown = min(drawdowns) if drawdowns else 0.0
     metrics = {
         "assumptions": {
             "entry_rule": "enter next bar close after buy signal",
@@ -89,12 +96,19 @@ def evaluate_baseline_backtest(output: AlertAlgorithmOutput) -> EvaluationResult
             sum(trade_returns) / len(trade_returns) if trade_returns else 0.0
         ),
         "median_return_per_trade": median(trade_returns) if trade_returns else 0.0,
-        "cumulative_return": equity_curve[-1] - 1.0,
-        "max_drawdown": min(drawdowns) if drawdowns else 0.0,
+        "cumulative_return": cumulative_return,
+        "max_drawdown": max_drawdown,
         "average_holding_duration_bars": (
             exposure_bars / len(trade_returns) if trade_returns else 0.0
         ),
         "exposure_ratio": exposure_bars / total_bars,
+        "turnover_estimate": turnover_events / total_bars,
+        "profit_factor": (gross_profit / gross_loss) if gross_loss > 0 else None,
+        "recovery_factor": (
+            cumulative_return / abs(max_drawdown)
+            if max_drawdown not in (0, None)
+            else None
+        ),
         "equity_curve": equity_curve,
         "drawdown_curve": drawdowns,
         "trade_returns": trade_returns,
@@ -106,4 +120,6 @@ def evaluate_baseline_backtest(output: AlertAlgorithmOutput) -> EvaluationResult
         applies=True,
         metrics=metrics,
         warnings=(),
+        applicability_status="applicable",
+        notes=("Uses baseline next-bar-close entry and exit assumptions.",),
     )

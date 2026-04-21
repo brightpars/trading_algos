@@ -8,6 +8,7 @@
       <h2 class="h5">{{ report.algorithm_summary.algorithm_name if report else (result.alg_name or result.config_name) }}</h2>
       {% if report %}
       <p><strong>Report version:</strong> {{ report.report_version }}</p>
+      <p><strong>Schema version:</strong> {{ report.schema_version or '1.0' }}</p>
       <div class="row g-3 mb-3">
         {% for card in report.summary_cards %}
         <div class="col-md-3">
@@ -43,6 +44,10 @@
         <li><strong>{{ block.title }}:</strong> {{ block.body }}</li>
         {% endfor %}
       </ul>
+      {% if report.diagnostics %}
+      <h3 class="h6 mt-3">Diagnostics</h3>
+      <pre class="small bg-light p-3 rounded">{{ report.diagnostics }}</pre>
+      {% endif %}
       {% else %}
       <p><strong>Report path:</strong> <code>{{ result.report_refs.report_data_path }}</code></p>
       <p><strong>Figure path:</strong> <code>{{ result.report_refs.figure_path }}</code></p>

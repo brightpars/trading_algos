@@ -581,6 +581,7 @@ def test_experiment_detail_renders_standardized_report_sections(monkeypatch):
     assert b"Win rate" in response.data
     assert b"Overall behavior summary" in response.data
     assert b"Parameters" in response.data
+    assert b"Diagnostics" in response.data
 
 
 def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
