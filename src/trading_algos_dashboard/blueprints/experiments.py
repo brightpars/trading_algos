@@ -101,18 +101,55 @@ def _serialize_recent_experiment(experiment: dict[str, object]) -> dict[str, str
 
 
 def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
+    selected_algorithms = experiment.get("selected_algorithms")
+    if isinstance(selected_algorithms, list) and len(selected_algorithms) > 0:
+        normalized_algorithms = []
+        for algorithm in selected_algorithms:
+            if isinstance(algorithm, dict) and isinstance(algorithm.get("alg_key"), str):
+                normalized_algorithms.append(
+                    {
+                        "alg_key": algorithm.get("alg_key"),
+                        "alg_param": algorithm.get("alg_param", {}),
+                    }
+                )
+                continue
+            if isinstance(algorithm, str):
+                normalized_algorithms.append({"legacy_alg_key": algorithm})
+        if normalized_algorithms:
+            return json.dumps(
+                {"input_kind": "single_algorithm", "algorithms": normalized_algorithms},
+                sort_keys=True,
+            )
+
     input_kind = experiment.get("input_kind")
     input_snapshot = experiment.get("input_snapshot")
 
     if input_kind == "configuration" and isinstance(input_snapshot, dict):
-        return json.dumps(input_snapshot, sort_keys=True)
-
-    selected_algorithms = experiment.get("selected_algorithms")
-    if isinstance(selected_algorithms, list) and len(selected_algorithms) > 0:
-        return json.dumps(selected_algorithms, sort_keys=True)
+        return json.dumps(
+            {"input_kind": "configuration", "configuration": input_snapshot},
+            sort_keys=True,
+        )
 
     if input_kind == "single_algorithm" and isinstance(input_snapshot, dict):
-        return json.dumps(input_snapshot, sort_keys=True)
+        algorithms = input_snapshot.get("algorithms")
+        if isinstance(algorithms, list) and len(algorithms) > 0:
+            normalized_algorithms = [
+                {
+                    "alg_key": algorithm.get("alg_key"),
+                    "alg_param": algorithm.get("alg_param", {}),
+                }
+                for algorithm in algorithms
+                if isinstance(algorithm, dict)
+                and isinstance(algorithm.get("alg_key"), str)
+            ]
+            if normalized_algorithms:
+                return json.dumps(
+                    {
+                        "input_kind": "single_algorithm",
+                        "algorithms": normalized_algorithms,
+                    },
+                    sort_keys=True,
+                )
 
     return None
 
