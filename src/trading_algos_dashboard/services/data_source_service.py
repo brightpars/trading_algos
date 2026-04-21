@@ -13,6 +13,9 @@ from trading_algos_dashboard.services.data_source_settings_service import (
 )
 
 
+DEFAULT_CONNECTION_CHECK_TIMEOUT_SECONDS = 2.0
+
+
 class DataSourceUnavailableError(RuntimeError):
     """Raised when the smarttrade data source cannot be accessed."""
 
@@ -32,6 +35,17 @@ class SmarttradeDataSourceService:
         self.smarttrade_path = smarttrade_path
         self.user_id = user_id
         self.endpoint_resolver = endpoint_resolver
+
+    def _is_proxy_server_up(
+        self,
+        proxy: Any,
+        *,
+        timeout_seconds: float = DEFAULT_CONNECTION_CHECK_TIMEOUT_SECONDS,
+    ) -> bool:
+        ping_with_timeout = getattr(proxy, "ping_with_timeout", None)
+        if callable(ping_with_timeout):
+            return ping_with_timeout(timeout_seconds) == "pong"
+        return bool(proxy.is_server_up())
 
     def _resolved_endpoint_override(self) -> tuple[str, int] | None:
         if self.endpoint_resolver is None:
@@ -119,7 +133,7 @@ class SmarttradeDataSourceService:
             else:
                 ip, port = override
                 proxy = self._create_proxy(ip=ip, port=port)
-            if not proxy.is_server_up():
+            if not self._is_proxy_server_up(proxy):
                 raise DataSourceUnavailableError(self._format_unavailable_message())
             return proxy
         except ModuleNotFoundError as exc:
@@ -133,11 +147,11 @@ class SmarttradeDataSourceService:
             ) from exc
 
     def check_connection(self) -> dict[str, Any]:
-        proxy = self._data_proxy()
+        self._data_proxy()
         return {
             "status": "ok",
             "endpoint": self._data_server_endpoint_label(),
-            "server_up": bool(proxy.is_server_up()),
+            "server_up": True,
         }
 
     def fetch_candles(
