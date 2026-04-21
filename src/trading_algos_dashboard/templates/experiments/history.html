@@ -15,7 +15,14 @@
       <td>{{ item.duration_seconds if item.duration_seconds is not none else '—' }}</td>
       <td><code>{{ item.repo_revision or 'unknown' }}</code></td>
       <td>{{ item.dataset_source.endpoint if item.dataset_source else '—' }}</td>
-      <td><a href="{{ url_for('experiments.detail', experiment_id=item.experiment_id) }}">Open</a></td>
+      <td>
+        <div class="d-flex gap-3 align-items-center">
+          <a href="{{ url_for('experiments.detail', experiment_id=item.experiment_id) }}">Open</a>
+          <form method="post" action="{{ url_for('experiments.delete_experiment', experiment_id=item.experiment_id) }}" onsubmit="return confirm('Delete this experiment?');" class="d-inline">
+            <button class="btn btn-link p-0 align-baseline text-danger" type="submit">Delete</button>
+          </form>
+        </div>
+      </td>
     </tr>
     {% endfor %}
   </tbody>

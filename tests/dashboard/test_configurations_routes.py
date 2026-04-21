@@ -197,6 +197,25 @@ def test_edit_configuration_updates_draft_and_creates_revision(monkeypatch):
     assert len(detail["revisions"]) == 2
 
 
+def test_delete_configuration_removes_draft_from_list_flow(monkeypatch):
+    app = _build_app(monkeypatch)
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        _sample_configuration_payload()
+    )
+
+    response = app.test_client().post(
+        f"/configurations/{draft_id}/delete",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/configurations")
+    assert (
+        app.extensions["configuration_builder_service"].get_draft_detail(draft_id)
+        is None
+    )
+
+
 def test_edit_configuration_preserves_state_on_validation_error(monkeypatch):
     app = _build_app(monkeypatch)
     draft_id = app.extensions["configuration_builder_service"].create_draft(

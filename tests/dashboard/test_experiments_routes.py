@@ -15,6 +15,10 @@ class _Collection:
     def __init__(self):
         self.docs = []
 
+    class _DeleteResult:
+        def __init__(self, deleted_count):
+            self.deleted_count = deleted_count
+
     def find(self, *_args, **_kwargs):
         return self
 
@@ -37,6 +41,22 @@ class _Collection:
         if "$set" in update and isinstance(update["$set"], dict):
             doc.update(update["$set"])
         return None
+
+    def delete_one(self, query):
+        for index, doc in enumerate(self.docs):
+            if all(doc.get(k) == v for k, v in query.items()):
+                del self.docs[index]
+                return self._DeleteResult(1)
+        return self._DeleteResult(0)
+
+    def delete_many(self, query):
+        original_count = len(self.docs)
+        self.docs = [
+            doc
+            for doc in self.docs
+            if not all(doc.get(k) == v for k, v in query.items())
+        ]
+        return self._DeleteResult(original_count - len(self.docs))
 
     def __iter__(self):
         return iter(self.docs)
@@ -108,6 +128,64 @@ def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypa
     assert b"Combo Breakout" in response.data
     assert draft_id.encode() in response.data
     assert b"close_high_channel_breakout" in response.data
+
+
+def test_experiment_history_allows_deleting_one_experiment(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_keep",
+            "created_at": datetime(2024, 2, 1, 12, 0, tzinfo=timezone.utc),
+            "updated_at": datetime(2024, 2, 1, 12, 0, tzinfo=timezone.utc),
+            "status": "completed",
+            "symbol": "AAPL",
+            "time_range": {
+                "start": "2024-01-01 09:30:00",
+                "end": "2024-01-02 16:00:00",
+            },
+        }
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_delete",
+            "created_at": datetime(2024, 2, 2, 12, 0, tzinfo=timezone.utc),
+            "updated_at": datetime(2024, 2, 2, 12, 0, tzinfo=timezone.utc),
+            "status": "completed",
+            "symbol": "MSFT",
+            "time_range": {
+                "start": "2024-01-03 09:30:00",
+                "end": "2024-01-04 16:00:00",
+            },
+        }
+    )
+    app.extensions["result_repository"].insert_result(
+        {
+            "experiment_id": "exp_delete",
+            "alg_key": "alg_a",
+            "alg_name": "Algorithm A",
+        }
+    )
+
+    response = app.test_client().post(
+        "/experiments/exp_delete/delete",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/experiments")
+    assert app.extensions["experiment_repository"].get_experiment("exp_delete") is None
+    assert (
+        app.extensions["experiment_repository"].get_experiment("exp_keep") is not None
+    )
+    assert (
+        app.extensions["result_repository"].list_results_for_experiment("exp_delete")
+        == []
+    )
 
 
 def test_configuration_detail_offers_run_link(monkeypatch):

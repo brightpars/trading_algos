@@ -167,6 +167,14 @@ class ExperimentService:
                 )
         return experiment_id
 
+    def delete_experiment(self, experiment_id: str) -> bool:
+        experiment = self.experiment_repository.get_experiment(experiment_id)
+        if experiment is None:
+            return False
+        self.result_repository.delete_results_for_experiment(experiment_id)
+        self.experiment_repository.delete_experiment(experiment_id)
+        return True
+
     def _run_experiment_job(
         self,
         *,

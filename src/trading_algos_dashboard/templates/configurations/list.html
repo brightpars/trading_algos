@@ -14,7 +14,14 @@
       <td>{{ draft.name }}</td>
       <td>{{ draft.status }}</td>
       <td>{{ draft.updated_at }}</td>
-      <td><a href="{{ url_for('configurations.detail_configuration', draft_id=draft.draft_id) }}">Open</a></td>
+      <td>
+        <div class="d-flex gap-3 align-items-center">
+          <a href="{{ url_for('configurations.detail_configuration', draft_id=draft.draft_id) }}">Open</a>
+          <form method="post" action="{{ url_for('configurations.delete_configuration', draft_id=draft.draft_id) }}" onsubmit="return confirm('Delete this configuration draft?');" class="d-inline">
+            <button class="btn btn-link p-0 align-baseline text-danger" type="submit">Delete</button>
+          </form>
+        </div>
+      </td>
     </tr>
     {% endfor %}
   </tbody>

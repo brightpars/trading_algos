@@ -66,5 +66,9 @@ class ExperimentRepository(MongoRepository):
     def count_experiments(self) -> int:
         return self._count_documents()
 
+    def delete_experiment(self, experiment_id: str) -> bool:
+        result = self.collection.delete_one({"experiment_id": experiment_id})
+        return bool(getattr(result, "deleted_count", 0))
+
     def delete_all_experiments(self) -> int:
         return self._delete_many()

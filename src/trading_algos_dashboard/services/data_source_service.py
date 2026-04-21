@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import logging
 import sys
+from collections.abc import Iterable
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -162,6 +163,24 @@ class SmarttradeDataSourceService:
     ) -> list[dict[str, Any]]:
         started_at_perf = perf_counter()
         proxy = self._data_proxy()
+        get_candles = getattr(proxy, "get_candles", None)
+        if callable(get_candles):
+            raw_rows = get_candles(symbol, start, end)
+            if not isinstance(raw_rows, Iterable):
+                raise TypeError(
+                    "dataserver get_candles returned a non-iterable payload"
+                )
+            bulk_result = [self._normalize_candle_row(row) for row in raw_rows]
+            logger.info(
+                "data_source: proxy_bulk_candle_fetch_completed; symbol=%s start=%s end=%s candle_count=%s duration_seconds=%.6f",
+                symbol,
+                start.isoformat(sep=" "),
+                end.isoformat(sep=" "),
+                len(bulk_result),
+                perf_counter() - started_at_perf,
+            )
+            return bulk_result
+
         result: list[dict[str, Any]] = []
         missing_count = 0
         request_count = 0
@@ -239,7 +258,7 @@ class SmarttradeDataSourceService:
             raise ValueError("End datetime must be after start datetime")
 
         logger.info(
-            "data_source: candle_fetch_mode_selected; mode=proxy_minute_rpc symbol=%s start=%s end=%s",
+            "data_source: candle_fetch_mode_selected; mode=dataserver_bulk_rpc_with_proxy_fallback symbol=%s start=%s end=%s",
             symbol,
             start.isoformat(sep=" "),
             end.isoformat(sep=" "),

@@ -313,6 +313,17 @@ def cancel_experiment(experiment_id: str):
     return redirect(url_for("experiments.detail", experiment_id=experiment_id))
 
 
+@bp.post("/<experiment_id>/delete")
+def delete_experiment(experiment_id: str):
+    deleted = current_app.extensions["experiment_service"].delete_experiment(
+        experiment_id
+    )
+    if not deleted:
+        abort(404)
+    flash(f"Experiment deleted; experiment_id={experiment_id}", "success")
+    return redirect(url_for("experiments.history"))
+
+
 @bp.post("")
 def create_experiment():
     submitted_form_data = {

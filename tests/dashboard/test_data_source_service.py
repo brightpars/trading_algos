@@ -170,6 +170,55 @@ def test_fetch_candles_reads_via_proxy_minute_by_minute(monkeypatch):
     assert seen_minutes == [30, 31, 32]
 
 
+def test_fetch_candles_prefers_bulk_candles_proxy_method_when_available(monkeypatch):
+    service = SmarttradeDataSourceService(
+        smarttrade_path="/tmp/smarttrade",
+        user_id=1,
+    )
+
+    class _Proxy:
+        def get_candles(self, _symbol, start, end):
+            assert start == datetime.fromisoformat("2024-01-01T09:30")
+            assert end == datetime.fromisoformat("2024-01-01T09:32")
+            return [
+                {
+                    "_id": "mongo-id-1",
+                    "ts": "2024-01-01 09:30:00",
+                    "Open": 10,
+                    "High": 11,
+                    "Low": 9,
+                    "Close": 10.5,
+                },
+                {
+                    "_id": "mongo-id-2",
+                    "ts": "2024-01-01 09:32:00",
+                    "Open": 12,
+                    "High": 13,
+                    "Low": 11,
+                    "Close": 12.5,
+                },
+            ]
+
+        def get_data(self, _symbol, _ts):
+            raise AssertionError(
+                "minute fallback should not be used when get_candles exists"
+            )
+
+    monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
+
+    candles = service.fetch_candles(
+        symbol="AAPL",
+        start=datetime.fromisoformat("2024-01-01T09:30"),
+        end=datetime.fromisoformat("2024-01-01T09:32"),
+    )
+
+    assert [item["ts"] for item in candles] == [
+        "2024-01-01 09:30:00",
+        "2024-01-01 09:32:00",
+    ]
+    assert all("_id" not in item for item in candles)
+
+
 def test_fetch_candles_raises_market_data_unavailable_when_all_proxy_rows_missing(
     monkeypatch,
 ):
@@ -226,7 +275,10 @@ def test_fetch_candles_logs_selected_proxy_mode(monkeypatch, caplog):
         )
 
     assert len(candles) == 1
-    assert "candle_fetch_mode_selected; mode=proxy_minute_rpc" in caplog.text
+    assert (
+        "candle_fetch_mode_selected; mode=dataserver_bulk_rpc_with_proxy_fallback"
+        in caplog.text
+    )
 
 
 def test_fetch_candles_logs_proxy_completion(monkeypatch, caplog):
@@ -257,3 +309,26 @@ def test_fetch_candles_logs_proxy_completion(monkeypatch, caplog):
 
     assert len(candles) == 1
     assert "proxy_fetch_completed" in caplog.text
+
+
+def test_fetch_candles_logs_bulk_proxy_completion(monkeypatch, caplog):
+    service = SmarttradeDataSourceService(
+        smarttrade_path="/tmp/smarttrade",
+        user_id=1,
+    )
+
+    class _Proxy:
+        def get_candles(self, _symbol, _start, _end):
+            return [{"ts": "2024-01-01 09:30:00", "Close": 10.5}]
+
+    monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
+
+    with caplog.at_level("INFO"):
+        candles = service.fetch_candles(
+            symbol="AAPL",
+            start=datetime.fromisoformat("2024-01-01T09:30"),
+            end=datetime.fromisoformat("2024-01-01T09:30"),
+        )
+
+    assert len(candles) == 1
+    assert "proxy_bulk_candle_fetch_completed" in caplog.text
