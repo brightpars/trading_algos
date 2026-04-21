@@ -69,20 +69,32 @@ class SmarttradeDataSourceService:
             sys.path.insert(0, path)
 
     def _data_server_endpoint_label(self) -> str:
+        endpoint = self._resolved_endpoint()
+        return f"{endpoint[0]}:{endpoint[1]}"
+
+    def _resolved_endpoint(self) -> tuple[str, int]:
         override = self._resolved_endpoint_override()
         if override is not None:
-            ip, port = override
-            return f"{ip}:{port}"
+            return override
         self._prepare_imports()
         try:
             config_service_module = importlib.import_module("config.service")
             get_config_service = getattr(config_service_module, "get_config_service")
             config_service = get_config_service()
-            ip = config_service.get_effective_value("DATA_SERVER_IP")
-            port = config_service.get_effective_value("DATA_SERVER_PORT")
-            return f"{ip}:{port}"
+            ip = str(config_service.get_effective_value("DATA_SERVER_IP"))
+            port = int(config_service.get_effective_value("DATA_SERVER_PORT"))
+            return ip, port
         except Exception:
-            return f"{DEFAULT_DATA_SERVER_IP}:{DEFAULT_DATA_SERVER_PORT}"
+            return DEFAULT_DATA_SERVER_IP, DEFAULT_DATA_SERVER_PORT
+
+    def get_market_data_server_details(self) -> dict[str, Any]:
+        ip, port = self._resolved_endpoint()
+        return {
+            "kind": "smarttrade_dataserver",
+            "ip": ip,
+            "port": port,
+            "endpoint": f"{ip}:{port}",
+        }
 
     def _create_proxy(self, *, ip: str, port: int) -> Any:
         self._prepare_imports()

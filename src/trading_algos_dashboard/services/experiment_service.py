@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -51,6 +52,7 @@ class ExperimentService:
     ) -> str:
         experiment_id = f"exp_{uuid4().hex[:12]}"
         created_at = datetime.now(timezone.utc)
+        started_at = created_at
 
         if configuration_payload is None and (
             not isinstance(algorithms, list) or len(algorithms) == 0
@@ -81,6 +83,8 @@ class ExperimentService:
             end_date,
             end_time,
         )
+        dataset_source = self.data_source_service.get_market_data_server_details()
+        repo_revision = self._repo_revision()
         candles = self.data_source_service.fetch_candles(
             symbol=symbol,
             start=start_dt,
@@ -89,14 +93,46 @@ class ExperimentService:
         report_dir = Path(self.report_base_path) / experiment_id
         report_dir.mkdir(parents=True, exist_ok=True)
 
+        if configuration_payload is not None:
+            result = run_configuration_payload(
+                payload=configuration_payload,
+                symbol=symbol,
+                report_base_path=str(report_dir),
+                candles=candles,
+            )
+            self.result_repository.insert_result(
+                {"experiment_id": experiment_id, "created_at": created_at, **result}
+            )
+        else:
+            for sensor_config in normalized_algorithms:
+                result = run_alert_algorithm(
+                    sensor_config=sensor_config,
+                    report_base_path=str(report_dir),
+                    candles=candles,
+                )
+                self.result_repository.insert_result(
+                    {
+                        "experiment_id": experiment_id,
+                        "created_at": created_at,
+                        **result,
+                    }
+                )
+
+        finished_at = datetime.now(timezone.utc)
+        duration_seconds = (finished_at - started_at).total_seconds()
+
         self.experiment_repository.create_experiment(
             {
                 "experiment_id": experiment_id,
                 "created_at": created_at,
-                "updated_at": created_at,
+                "updated_at": finished_at,
                 "status": "completed",
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "duration_seconds": duration_seconds,
+                "repo_revision": repo_revision,
                 "symbol": symbol,
-                "dataset_source": {"kind": "smarttrade_dataserver"},
+                "dataset_source": dataset_source,
                 "time_range": {"start": start_dt, "end": end_dt},
                 "candle_count": len(candles),
                 "input_kind": "configuration"
@@ -124,32 +160,21 @@ class ExperimentService:
                 "report_base_path": str(report_dir),
             }
         )
-
-        if configuration_payload is not None:
-            result = run_configuration_payload(
-                payload=configuration_payload,
-                symbol=symbol,
-                report_base_path=str(report_dir),
-                candles=candles,
-            )
-            self.result_repository.insert_result(
-                {"experiment_id": experiment_id, "created_at": created_at, **result}
-            )
-        else:
-            for sensor_config in normalized_algorithms:
-                result = run_alert_algorithm(
-                    sensor_config=sensor_config,
-                    report_base_path=str(report_dir),
-                    candles=candles,
-                )
-                self.result_repository.insert_result(
-                    {
-                        "experiment_id": experiment_id,
-                        "created_at": created_at,
-                        **result,
-                    }
-                )
         return experiment_id
+
+    @staticmethod
+    def _repo_revision() -> str | None:
+        try:
+            completed = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            return None
+        revision = completed.stdout.strip()
+        return revision or None
 
     @staticmethod
     def _require_algorithm_config(algorithm: Any, *, index: int) -> dict[str, Any]:

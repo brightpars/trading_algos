@@ -124,3 +124,36 @@ def test_validate_configuration_api_returns_normalized_configuration(monkeypatch
     payload = response.get_json()
     assert payload["ok"] is True
     assert payload["configuration"]["config_key"] == "demo"
+
+
+def test_experiment_api_returns_runtime_metadata(monkeypatch):
+    app = _build_app(monkeypatch)
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_meta",
+            "created_at": "2024-02-03T12:00:00Z",
+            "started_at": "2024-02-03T12:00:00Z",
+            "finished_at": "2024-02-03T12:05:00Z",
+            "duration_seconds": 300.0,
+            "repo_revision": "abc123",
+            "status": "completed",
+            "symbol": "AAPL",
+            "dataset_source": {
+                "kind": "smarttrade_dataserver",
+                "ip": "127.0.0.1",
+                "port": 7003,
+                "endpoint": "127.0.0.1:7003",
+            },
+            "candle_count": 42,
+        }
+    )
+
+    response = app.test_client().get("/api/experiments/exp_meta")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["experiment"]["started_at"] == "2024-02-03T12:00:00Z"
+    assert payload["experiment"]["finished_at"] == "2024-02-03T12:05:00Z"
+    assert payload["experiment"]["duration_seconds"] == 300.0
+    assert payload["experiment"]["repo_revision"] == "abc123"
+    assert payload["experiment"]["dataset_source"]["endpoint"] == "127.0.0.1:7003"

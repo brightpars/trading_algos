@@ -6,6 +6,13 @@
 </div>
 <p><strong>Symbol:</strong> {{ experiment.symbol }} | <strong>Candles:</strong> {{ experiment.candle_count }}</p>
 <p><strong>Input kind:</strong> {{ experiment.input_kind or 'single_algorithm' }}</p>
+<div class="mb-4">
+  <p class="mb-1"><strong>Started:</strong> {{ experiment.started_at or experiment.created_at }}</p>
+  <p class="mb-1"><strong>Finished:</strong> {{ experiment.finished_at or '—' }}</p>
+  <p class="mb-1"><strong>Duration (seconds):</strong> {{ experiment.duration_seconds if experiment.duration_seconds is not none else '—' }}</p>
+  <p class="mb-1"><strong>Git revision:</strong> <code>{{ experiment.repo_revision or 'unknown' }}</code></p>
+  <p class="mb-0"><strong>Market data server:</strong> {{ experiment.dataset_source.endpoint if experiment.dataset_source else '—' }}</p>
+</div>
 {% for result in results %}
   <div class="card mb-4">
     <div class="card-body">

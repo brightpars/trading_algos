@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 from xmlrpc.client import Fault
 
 from trading_algos_dashboard.app import create_app
@@ -362,6 +363,21 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
             },
         ],
     )
+    monkeypatch.setattr(
+        app.extensions["data_source_service"],
+        "get_market_data_server_details",
+        lambda: {
+            "kind": "smarttrade_dataserver",
+            "ip": "10.0.0.5",
+            "port": 7003,
+            "endpoint": "10.0.0.5:7003",
+        },
+    )
+    monkeypatch.setattr(
+        app.extensions["experiment_service"],
+        "_repo_revision",
+        lambda: "abc123def456",
+    )
 
     client = app.test_client()
     response = client.post(
@@ -389,6 +405,62 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
     assert stored_experiments[0]["selected_algorithms"] == [
         {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
     ]
+    assert stored_experiments[0]["dataset_source"] == {
+        "kind": "smarttrade_dataserver",
+        "ip": "10.0.0.5",
+        "port": 7003,
+        "endpoint": "10.0.0.5:7003",
+    }
+    assert stored_experiments[0]["repo_revision"] == "abc123def456"
+    assert isinstance(stored_experiments[0]["started_at"], datetime)
+    assert isinstance(stored_experiments[0]["finished_at"], datetime)
+    assert stored_experiments[0]["finished_at"] >= stored_experiments[0]["started_at"]
+    assert stored_experiments[0]["duration_seconds"] >= 0
+    assert Path(stored_experiments[0]["report_base_path"]).exists()
+
+
+def test_experiment_detail_shows_runtime_metadata(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_runtime",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "started_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "finished_at": datetime(2024, 2, 3, 12, 5, tzinfo=timezone.utc),
+            "duration_seconds": 300.0,
+            "repo_revision": "accfd73bac055e1555c2d6f8f031cea7095ff35d",
+            "symbol": "AAPL",
+            "status": "completed",
+            "dataset_source": {
+                "kind": "smarttrade_dataserver",
+                "ip": "127.0.0.1",
+                "port": 7003,
+                "endpoint": "127.0.0.1:7003",
+            },
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [],
+            "notes": "runtime payload",
+            "candle_count": 42,
+        }
+    )
+
+    response = app.test_client().get("/experiments/exp_runtime")
+
+    assert response.status_code == 200
+    assert b"Started:" in response.data
+    assert b"Finished:" in response.data
+    assert b"Duration (seconds):" in response.data
+    assert b"Git revision:" in response.data
+    assert b"127.0.0.1:7003" in response.data
+    assert b"accfd73bac055e1555c2d6f8f031cea7095ff35d" in response.data
 
 
 def test_create_experiment_returns_400_when_data_fetch_fault_occurs(

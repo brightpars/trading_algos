@@ -2,7 +2,7 @@
 {% block content %}
 <h1>Experiment history</h1>
 <table class="table table-striped">
-  <thead><tr><th>ID</th><th>Symbol</th><th>Input</th><th>Status</th><th>Candles</th><th>Created</th><th></th></tr></thead>
+  <thead><tr><th>ID</th><th>Symbol</th><th>Input</th><th>Status</th><th>Candles</th><th>Started</th><th>Duration (s)</th><th>Git</th><th>Data server</th><th></th></tr></thead>
   <tbody>
     {% for item in experiments %}
     <tr>
@@ -11,7 +11,10 @@
       <td>{{ item.input_kind or 'single_algorithm' }}</td>
       <td>{{ item.status }}</td>
       <td>{{ item.candle_count }}</td>
-      <td>{{ item.created_at }}</td>
+      <td>{{ item.started_at or item.created_at }}</td>
+      <td>{{ item.duration_seconds if item.duration_seconds is not none else '—' }}</td>
+      <td><code>{{ item.repo_revision or 'unknown' }}</code></td>
+      <td>{{ item.dataset_source.endpoint if item.dataset_source else '—' }}</td>
       <td><a href="{{ url_for('experiments.detail', experiment_id=item.experiment_id) }}">Open</a></td>
     </tr>
     {% endfor %}
