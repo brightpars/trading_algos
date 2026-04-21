@@ -3,12 +3,19 @@ from trading_algos_dashboard.config import DashboardConfig
 
 
 def test_create_app_registers_core_routes(monkeypatch):
+    class _DeleteResult:
+        def __init__(self, deleted_count):
+            self.deleted_count = deleted_count
+
     class _Cursor:
         def __init__(self, docs):
             self.docs = docs
 
         def sort(self, *_args, **_kwargs):
             return self.docs
+
+        def __iter__(self):
+            return iter(self.docs)
 
     class _Collection:
         def __init__(self):
@@ -38,6 +45,20 @@ def test_create_app_registers_core_routes(monkeypatch):
                     payload.update(update["$set"])
                 self.docs.append(payload)
             return None
+
+        def delete_many(self, query):
+            original_count = len(self.docs)
+            self.docs = [
+                doc
+                for doc in self.docs
+                if not all(doc.get(k) == v for k, v in query.items())
+            ]
+            return _DeleteResult(original_count - len(self.docs))
+
+        def count_documents(self, query):
+            return sum(
+                1 for doc in self.docs if all(doc.get(k) == v for k, v in query.items())
+            )
 
     class _Db(dict):
         def __getitem__(self, key):
@@ -72,6 +93,7 @@ def test_create_app_registers_core_routes(monkeypatch):
     assert client.get("/").status_code == 200
     assert client.get("/health").status_code == 200
     assert client.get("/algorithms").status_code == 200
+    assert client.get("/administration").status_code == 200
     response = client.get("/")
     assert b"Market data server" in response.data
     assert b'value="127.0.0.2"' in response.data

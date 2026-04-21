@@ -62,3 +62,9 @@ class ExperimentRepository(MongoRepository):
             self._without_id(doc) or {}
             for doc in self.collection.find(query).sort("created_at", -1)
         ]
+
+    def count_experiments(self) -> int:
+        return self._count_documents()
+
+    def delete_all_experiments(self) -> int:
+        return self._delete_many()

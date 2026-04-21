@@ -28,3 +28,12 @@ class ResultRepository(MongoRepository):
                 {"experiment_id": experiment_id, "alg_key": alg_key}
             )
         )
+
+    def count_results(self) -> int:
+        return self._count_documents()
+
+    def delete_all_results(self) -> int:
+        return self._delete_many()
+
+    def delete_results_for_experiment(self, experiment_id: str) -> int:
+        return self._delete_many({"experiment_id": experiment_id})
