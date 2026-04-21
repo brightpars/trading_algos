@@ -56,7 +56,9 @@ class ConfigurationPublishService:
             return {}
         parsed = json.loads(response_payload)
         if not isinstance(parsed, dict):
-            raise SmartTradePublishError("SmartTrade API returned a non-object response")
+            raise SmartTradePublishError(
+                "SmartTrade API returned a non-object response"
+            )
         return parsed
 
     def validate_remote(self, payload: dict[str, Any]) -> dict[str, Any]:

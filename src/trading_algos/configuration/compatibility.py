@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
+from itertools import zip_longest
 from typing import Any
 from typing import cast
 
@@ -18,6 +19,42 @@ def _installed_package_version() -> str:
         return version("trading_algos")
     except PackageNotFoundError:
         return "0"
+
+
+def _parse_version_parts(raw_version: str) -> tuple[int, ...]:
+    normalized = str(raw_version).strip()
+    if normalized == "":
+        return ()
+    parts: list[int] = []
+    for part in normalized.split("."):
+        digits = "".join(character for character in part if character.isdigit())
+        if digits == "":
+            parts.append(0)
+            continue
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def _version_is_less_than(left: str, right: str) -> bool:
+    left_parts = _parse_version_parts(left)
+    right_parts = _parse_version_parts(right)
+    for left_part, right_part in zip_longest(left_parts, right_parts, fillvalue=0):
+        if left_part < right_part:
+            return True
+        if left_part > right_part:
+            return False
+    return False
+
+
+def _version_is_greater_than(left: str, right: str) -> bool:
+    left_parts = _parse_version_parts(left)
+    right_parts = _parse_version_parts(right)
+    for left_part, right_part in zip_longest(left_parts, right_parts, fillvalue=0):
+        if left_part > right_part:
+            return True
+        if left_part < right_part:
+            return False
+    return False
 
 
 def evaluate_configuration_compatibility(
@@ -45,12 +82,12 @@ def evaluate_configuration_compatibility(
             f"expected package version {expected_version} does not match installed {installed_version}"
         )
         state = "warning"
-    if minimum_version and installed_version < minimum_version:
+    if minimum_version and _version_is_less_than(installed_version, minimum_version):
         messages.append(
             f"installed package version {installed_version} is below minimum {minimum_version}"
         )
         state = "incompatible"
-    if maximum_version and installed_version > maximum_version:
+    if maximum_version and _version_is_greater_than(installed_version, maximum_version):
         messages.append(
             f"installed package version {installed_version} is above maximum {maximum_version}"
         )

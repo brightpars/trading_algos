@@ -125,13 +125,17 @@ def normalize_alertgen_sensor_config(
     )
     if normalized.get("configuration_payload") is not None:
         from trading_algos.configuration.serialization import configuration_from_dict
-        from trading_algos.configuration.validation import validate_configuration_payload
+        from trading_algos.configuration.validation import (
+            validate_configuration_payload,
+        )
 
         raw_configuration_payload = normalized["configuration_payload"]
         if isinstance(raw_configuration_payload, str):
             raw_configuration_payload = json.loads(raw_configuration_payload)
         if not isinstance(raw_configuration_payload, dict):
-            raise ValueError(f"{label} configuration_payload must be a dict/JSON object")
+            raise ValueError(
+                f"{label} configuration_payload must be a dict/JSON object"
+            )
         configuration = validate_configuration_payload(
             configuration_from_dict(raw_configuration_payload)
         )

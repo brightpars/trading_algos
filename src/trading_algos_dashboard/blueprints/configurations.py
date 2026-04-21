@@ -66,9 +66,9 @@ def validate_configuration_remote(draft_id: str):
     if payload is None:
         abort(404)
     try:
-        result = current_app.extensions["configuration_publish_service"].validate_remote(
-            payload["draft"]["payload"]
-        )
+        result = current_app.extensions[
+            "configuration_publish_service"
+        ].validate_remote(payload["draft"]["payload"])
     except Exception as exc:
         flash(f"Remote validation failed: {exc}", "danger")
     else:

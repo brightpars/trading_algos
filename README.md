@@ -56,6 +56,96 @@ The library-level config contract is intentionally limited to per-algorithm exec
 
 This keeps extension work localized and avoids editing a growing `if/elif` factory by hand.
 
+## Configuration graphs
+
+`trading_algos.configuration` provides a declarative graph model for reusable algorithm configurations.
+
+Supported node types:
+- `algorithm`
+- `and`
+- `or`
+- `pipeline`
+
+Current limitation:
+- `pipeline` is supported in the schema and validation layer, but runtime execution is intentionally not implemented yet.
+
+Primary entry points:
+- `configuration_from_dict()`
+- `configuration_to_dict()`
+- `validate_configuration_payload()`
+- `evaluate_configuration_compatibility()`
+- `run_configuration_graph()`
+- `evaluate_configuration_graph()`
+
+Minimal example:
+
+```python
+from trading_algos.configuration import run_configuration_graph
+
+configuration = {
+    "config_key": "close-high-basic",
+    "version": "1.0.0",
+    "name": "Close High Basic",
+    "root_node_id": "alg-1",
+    "nodes": [
+        {
+            "node_id": "alg-1",
+            "node_type": "algorithm",
+            "alg_key": "close_high_channel_breakout",
+            "alg_param": {"window": 20},
+            "buy_enabled": True,
+            "sell_enabled": True,
+        }
+    ],
+}
+
+result = run_configuration_graph(
+    configuration=configuration,
+    symbol="AAPL",
+    report_base_path="/tmp/trading_algos_reports",
+    candles=[
+        {"ts": "2026-01-01 10:00:00", "Open": 10, "High": 11, "Low": 9, "Close": 10.5},
+        {"ts": "2026-01-01 10:01:00", "Open": 10.5, "High": 11.5, "Low": 10, "Close": 11},
+    ],
+)
+```
+
+Composite AND example:
+
+```python
+configuration = {
+    "config_key": "breakout-confirmed",
+    "version": "1.0.0",
+    "name": "Breakout Confirmed",
+    "root_node_id": "group-1",
+    "nodes": [
+        {
+            "node_id": "alg-1",
+            "node_type": "algorithm",
+            "alg_key": "close_high_channel_breakout",
+            "alg_param": {"window": 20},
+            "buy_enabled": True,
+            "sell_enabled": True,
+        },
+        {
+            "node_id": "alg-2",
+            "node_type": "algorithm",
+            "alg_key": "low_anchored_boundary_breakout",
+            "alg_param": {"period": 5},
+            "buy_enabled": True,
+            "sell_enabled": True,
+        },
+        {
+            "node_id": "group-1",
+            "node_type": "and",
+            "children": ["alg-1", "alg-2"],
+        },
+    ],
+}
+```
+
+Compatibility metadata can optionally declare package expectations such as `expected_package_version`, `minimum_supported_version`, `maximum_supported_version`, and referenced algorithms.
+
 ### Testing expectations for algorithms
 
 The test suite now covers a reusable baseline contract for registered alert algorithms:

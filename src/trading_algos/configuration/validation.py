@@ -45,9 +45,12 @@ def validate_configuration_payload(
 ) -> AlgorithmConfiguration:
     if isinstance(payload, str):
         payload = json.loads(payload)
+    raw_nodes: list[object] | None = None
     if isinstance(payload, AlgorithmConfiguration):
         configuration = payload
     elif isinstance(payload, Mapping):
+        raw_nodes_value = payload.get("nodes")
+        raw_nodes = list(raw_nodes_value) if isinstance(raw_nodes_value, list) else []
         configuration = configuration_from_dict(dict(payload))
     else:
         raise ValueError("configuration payload must be a dict/JSON object")
@@ -73,10 +76,21 @@ def validate_configuration_payload(
     if configuration.root_node_id not in nodes_by_id:
         raise ValueError("root_node_id must reference an existing node")
 
+    raw_children_by_node_id: dict[str, tuple[object, ...]] = {}
+    for raw_node in raw_nodes or []:
+        if not isinstance(raw_node, Mapping):
+            continue
+        raw_node_id = raw_node.get("node_id")
+        if not isinstance(raw_node_id, str):
+            continue
+        raw_children = raw_node.get("children")
+        if isinstance(raw_children, list | tuple):
+            raw_children_by_node_id[raw_node_id] = tuple(raw_children)
+
     for node in configuration.nodes:
         if isinstance(node, AlgorithmNode):
             _require_non_empty_string(node.alg_key, f"node {node.node_id} alg_key")
-            node_children = getattr(node, "children", ())
+            node_children = raw_children_by_node_id.get(node.node_id, ())
             if node_children:
                 raise ValueError("algorithm nodes must not declare children")
             if node.buy_enabled is False and node.sell_enabled is False:
@@ -88,6 +102,17 @@ def validate_configuration_payload(
                 raw_alg_param=node.alg_param,
                 label=f"node {node.node_id} alg_param",
             )
+            invalid_runtime_editable_keys = [
+                key
+                for key in node.runtime_editable_param_keys
+                if key not in node.alg_param
+            ]
+            if invalid_runtime_editable_keys:
+                invalid_keys = ", ".join(sorted(invalid_runtime_editable_keys))
+                raise ValueError(
+                    "node "
+                    f"{node.node_id} runtime_editable_param_keys must be present in alg_param: {invalid_keys}"
+                )
         elif isinstance(node, CompositeNode):
             min_children = 2
             if len(node.children) < min_children:
