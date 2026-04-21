@@ -1,6 +1,7 @@
 import logging
 
 from trading_algos.alertgen.core.base import BaseAlertAlgorithm
+from trading_algos.configuration.executor import run_configuration_graph
 from trading_algos.alertgen.shared_utils.common import TREND
 from trading_algos.alertgen.shared_utils.plotting import (
     PLOT,
@@ -203,3 +204,45 @@ class agreegate_algs(BaseAlertAlgorithm):
 
 
 AggregateAlertAlgorithm = agreegate_algs
+
+
+class ConfigBackedAlertAlgorithm(BaseAlertAlgorithm):
+    def __init__(self, symbol, report_base_path, configuration, date_str=""):
+        self.configuration = configuration
+        self._latest_execution = None
+        super().__init__(
+            alg_name=f"config_{configuration.config_key}_v{configuration.version}",
+            symbol=symbol,
+            date_str=date_str,
+            evaluate_window_len=5,
+            report_base_path=report_base_path,
+        )
+
+    def trend_prediction_logic(self):
+        self._latest_execution = run_configuration_graph(
+            configuration=self.configuration,
+            symbol=self.symbol,
+            report_base_path=self.report_path,
+            candles=self.data_list,
+        )
+        latest = self._latest_execution["root_result"]["decisions"][-1]
+        if latest["sell_signal"]:
+            self.latest_predicted_trend = TREND.DOWN
+        elif latest["buy_signal"]:
+            self.latest_predicted_trend = TREND.UP
+        else:
+            self.latest_predicted_trend = TREND.UNKNOWN
+        self.latest_predicted_trend_confidence = latest["confidence"]
+
+    def interactive_report_payloads(self):
+        payloads = []
+        if not self._latest_execution:
+            return payloads
+        for item in self._latest_execution["node_results"]:
+            chart_payload = item.get("chart_payload")
+            if chart_payload:
+                payloads.append((chart_payload, item.get("node_name", item["node_id"])))
+        payload = self._build_default_signal_chart_payload(title=self.alg_name)
+        if payload:
+            payloads.append((payload, self.alg_name))
+        return payloads

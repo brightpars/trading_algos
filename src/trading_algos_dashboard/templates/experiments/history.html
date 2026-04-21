@@ -2,12 +2,13 @@
 {% block content %}
 <h1>Experiment history</h1>
 <table class="table table-striped">
-  <thead><tr><th>ID</th><th>Symbol</th><th>Status</th><th>Candles</th><th>Created</th><th></th></tr></thead>
+  <thead><tr><th>ID</th><th>Symbol</th><th>Input</th><th>Status</th><th>Candles</th><th>Created</th><th></th></tr></thead>
   <tbody>
     {% for item in experiments %}
     <tr>
       <td><code>{{ item.experiment_id }}</code></td>
       <td>{{ item.symbol }}</td>
+      <td>{{ item.input_kind or 'single_algorithm' }}</td>
       <td>{{ item.status }}</td>
       <td>{{ item.candle_count }}</td>
       <td>{{ item.created_at }}</td>

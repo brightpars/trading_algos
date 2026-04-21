@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>New configuration draft</h1>
+<form method="post" action="{{ url_for('configurations.create_configuration') }}">
+  <div class="mb-3">
+    <label class="form-label">Configuration JSON</label>
+    <textarea class="form-control" name="payload" rows="20">{{ form_data.payload }}</textarea>
+  </div>
+  <button class="btn btn-success" type="submit">Save draft</button>
+</form>
+{% endblock %}

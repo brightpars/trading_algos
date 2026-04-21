@@ -115,9 +115,7 @@ def normalize_alertgen_sensor_config(
     if not isinstance(sensor_config, dict):
         raise ValueError(f"{label} must be a dict/JSON object")
     normalized = dict(sensor_config)
-    _validate_required_keys(
-        normalized, ["buy", "sell", "symbol", "alg_param", "alg_key"], label
-    )
+    _validate_required_keys(normalized, ["buy", "sell", "symbol"], label)
     normalized["buy"] = _normalize_bool_like(normalized["buy"], f"{label} buy")
     normalized["sell"] = _normalize_bool_like(normalized["sell"], f"{label} sell")
     if normalized["buy"] is False and normalized["sell"] is False:
@@ -125,6 +123,23 @@ def normalize_alertgen_sensor_config(
     normalized["symbol"] = _require_non_empty_string(
         normalized["symbol"], f"{label} symbol", reject_random_name=True
     )
+    if normalized.get("configuration_payload") is not None:
+        from trading_algos.configuration.serialization import configuration_from_dict
+        from trading_algos.configuration.validation import validate_configuration_payload
+
+        raw_configuration_payload = normalized["configuration_payload"]
+        if isinstance(raw_configuration_payload, str):
+            raw_configuration_payload = json.loads(raw_configuration_payload)
+        if not isinstance(raw_configuration_payload, dict):
+            raise ValueError(f"{label} configuration_payload must be a dict/JSON object")
+        configuration = validate_configuration_payload(
+            configuration_from_dict(raw_configuration_payload)
+        )
+        normalized["configuration_payload"] = configuration.to_dict()
+        normalized["alg_key"] = f"config:{configuration.config_key}"
+        normalized["alg_param"] = {"version": configuration.version}
+        return normalized
+    _validate_required_keys(normalized, ["alg_param", "alg_key"], label)
     normalized["alg_key"] = _require_non_empty_string(
         normalized["alg_key"], f"{label} alg_key"
     )

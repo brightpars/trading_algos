@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Configuration {{ draft.draft_id }}</h1>
+<p><strong>Config key:</strong> {{ draft.config_key }}</p>
+<p><strong>Name:</strong> {{ draft.name }}</p>
+<div class="d-flex gap-2 mb-3">
+  <form method="post" action="{{ url_for('configurations.validate_configuration_remote', draft_id=draft.draft_id) }}">
+    <button class="btn btn-outline-primary" type="submit">Validate in SmartTrade</button>
+  </form>
+  <form method="post" action="{{ url_for('configurations.publish_configuration', draft_id=draft.draft_id) }}">
+    <button class="btn btn-success" type="submit">Publish to SmartTrade</button>
+  </form>
+</div>
+<pre class="bg-light p-3 rounded small">{{ draft.payload|tojson(indent=2) }}</pre>
+<h2 class="h4 mt-4">Revision history</h2>
+<ul>
+  {% for revision in revisions %}
+  <li>Revision {{ revision.revision_no }} — {{ revision.created_at }}</li>
+  {% endfor %}
+</ul>
+<h2 class="h4 mt-4">Publish history</h2>
+<ul>
+  {% for record in publication_records %}
+  <li>{{ record.created_at }} — remote_config_id={{ record.remote_config_id or 'unknown' }} — {{ record.remote_status or 'unknown' }}</li>
+  {% else %}
+  <li>No publish records yet.</li>
+  {% endfor %}
+</ul>
+{% endblock %}

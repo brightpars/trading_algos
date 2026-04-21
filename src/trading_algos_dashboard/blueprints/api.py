@@ -18,3 +18,16 @@ def experiment(experiment_id: str):
     if payload is None:
         return jsonify({"error": "not found"}), 404
     return jsonify(payload)
+
+
+@bp.get("/configurations/<draft_id>")
+def configuration(draft_id: str):
+    payload = current_app.extensions["configuration_builder_service"].get_draft_detail(
+        draft_id
+    )
+    if payload is None:
+        return jsonify({"error": "not found"}), 404
+    payload["publication_records"] = current_app.extensions[
+        "configuration_publish_service"
+    ].list_records_for_draft(draft_id)
+    return jsonify(payload)

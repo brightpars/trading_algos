@@ -55,6 +55,7 @@ def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str
         "end_date": "",
         "end_time": "16:00",
         "algorithms_json": default_algorithms,
+        "configuration_json": "",
         "notes": "",
     }
 
@@ -236,10 +237,16 @@ def create_experiment():
         "end_time": request.form.get("end_time", ""),
         "algorithms_json": request.form.get("algorithms_json", "[]"),
         "notes": request.form.get("notes", ""),
+        "configuration_json": request.form.get("configuration_json", ""),
     }
     service = current_app.extensions["experiment_service"]
     try:
         algorithms = json.loads(submitted_form_data["algorithms_json"])
+        configuration_payload = None
+        if submitted_form_data["configuration_json"].strip():
+            configuration_payload = json.loads(
+                submitted_form_data["configuration_json"]
+            )
         experiment_id = service.create_experiment(
             symbol=submitted_form_data["symbol"],
             start_date=submitted_form_data["start_date"],
@@ -247,6 +254,7 @@ def create_experiment():
             end_date=submitted_form_data["end_date"],
             end_time=submitted_form_data["end_time"],
             algorithms=algorithms,
+            configuration_payload=configuration_payload,
             notes=submitted_form_data["notes"],
         )
     except JSONDecodeError:

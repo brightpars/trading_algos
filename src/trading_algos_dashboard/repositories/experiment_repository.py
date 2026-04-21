@@ -40,6 +40,14 @@ class ExperimentRepository(MongoRepository):
             self.collection.find_one({"experiment_id": experiment_id})
         )
 
+    def update_input_snapshot(
+        self, experiment_id: str, *, input_kind: str, input_snapshot: dict[str, Any]
+    ) -> None:
+        self.collection.update_one(
+            {"experiment_id": experiment_id},
+            {"$set": {"input_kind": input_kind, "input_snapshot": input_snapshot}},
+        )
+
     def list_experiments(
         self, filters: Mapping[str, Any] | None = None
     ) -> list[dict[str, Any]]:

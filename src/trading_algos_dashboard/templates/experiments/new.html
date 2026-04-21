@@ -70,6 +70,11 @@
     <div class="form-text">Example: [{"alg_key":"close_high_channel_breakout","alg_param":{"window":20}}]</div>
   </div>
   <div class="col-12">
+    <label class="form-label">Configuration JSON</label>
+    <textarea class="form-control" rows="8" name="configuration_json">{{ form_data.configuration_json }}</textarea>
+    <div class="form-text">Optional declarative configuration payload. When provided, the run executes the configuration graph.</div>
+  </div>
+  <div class="col-12">
     <label class="form-label">Notes</label>
     <textarea class="form-control" rows="3" name="notes">{{ form_data.notes }}</textarea>
   </div>

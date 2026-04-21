@@ -12,6 +12,9 @@ class DashboardConfig:
     report_base_path: str
     smarttrade_path: str
     smarttrade_user_id: int
+    smarttrade_api_base_url: str = "http://127.0.0.1:5000"
+    smarttrade_api_token: str = ""
+    smarttrade_api_timeout_secs: int = 10
 
     @classmethod
     def from_env(cls) -> "DashboardConfig":
@@ -31,5 +34,18 @@ class DashboardConfig:
             ),
             smarttrade_user_id=int(
                 os.environ.get("TRADING_ALGOS_DASHBOARD_SMARTTRADE_USER_ID", "1")
+            ),
+            smarttrade_api_base_url=os.environ.get(
+                "TRADING_ALGOS_DASHBOARD_SMARTTRADE_API_BASE_URL",
+                "http://127.0.0.1:5000",
+            ),
+            smarttrade_api_token=os.environ.get(
+                "TRADING_ALGOS_DASHBOARD_SMARTTRADE_API_TOKEN",
+                "",
+            ),
+            smarttrade_api_timeout_secs=int(
+                os.environ.get(
+                    "TRADING_ALGOS_DASHBOARD_SMARTTRADE_API_TIMEOUT_SECS", "10"
+                )
             ),
         )

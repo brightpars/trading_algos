@@ -42,6 +42,7 @@ def run_alert_algorithm(
     }
 
     return {
+        "input_kind": "single_algorithm",
         "alg_key": sensor_config["alg_key"],
         "alg_name": algorithm.alg_name,
         "alg_param": alg_param,

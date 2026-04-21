@@ -14,6 +14,9 @@ from trading_algos_dashboard.repositories.result_repository import ResultReposit
 from trading_algos_dashboard.services.algorithm_runner_service import (
     run_alert_algorithm,
 )
+from trading_algos_dashboard.services.configuration_run_service import (
+    run_configuration_payload,
+)
 from trading_algos_dashboard.services.data_source_service import (
     SmarttradeDataSourceService,
     parse_date_range,
@@ -43,28 +46,34 @@ class ExperimentService:
         end_date: str,
         end_time: str,
         algorithms: list[dict[str, Any]],
+        configuration_payload: dict[str, Any] | None = None,
         notes: str = "",
     ) -> str:
         experiment_id = f"exp_{uuid4().hex[:12]}"
         created_at = datetime.now(timezone.utc)
 
-        if not isinstance(algorithms, list) or len(algorithms) == 0:
+        if configuration_payload is None and (
+            not isinstance(algorithms, list) or len(algorithms) == 0
+        ):
             raise ValueError("Algorithms must be a non-empty JSON array of objects")
 
         normalized_algorithms = []
-        for index, algorithm in enumerate(algorithms, start=1):
-            algorithm_config = self._require_algorithm_config(algorithm, index=index)
-            normalized_algorithms.append(
-                normalize_alertgen_sensor_config(
-                    {
-                        "symbol": symbol,
-                        "alg_key": algorithm_config["alg_key"],
-                        "alg_param": algorithm_config["alg_param"],
-                        "buy": algorithm_config.get("buy", True),
-                        "sell": algorithm_config.get("sell", True),
-                    }
+        if configuration_payload is None:
+            for index, algorithm in enumerate(algorithms, start=1):
+                algorithm_config = self._require_algorithm_config(
+                    algorithm, index=index
                 )
-            )
+                normalized_algorithms.append(
+                    normalize_alertgen_sensor_config(
+                        {
+                            "symbol": symbol,
+                            "alg_key": algorithm_config["alg_key"],
+                            "alg_param": algorithm_config["alg_param"],
+                            "buy": algorithm_config.get("buy", True),
+                            "sell": algorithm_config.get("sell", True),
+                        }
+                    )
+                )
 
         start_dt, end_dt = parse_date_range(
             start_date,
@@ -90,6 +99,20 @@ class ExperimentService:
                 "dataset_source": {"kind": "smarttrade_dataserver"},
                 "time_range": {"start": start_dt, "end": end_dt},
                 "candle_count": len(candles),
+                "input_kind": "configuration"
+                if configuration_payload is not None
+                else "single_algorithm",
+                "input_snapshot": configuration_payload
+                if configuration_payload is not None
+                else {
+                    "algorithms": [
+                        {
+                            "alg_key": alg["alg_key"],
+                            "alg_param": alg["alg_param"],
+                        }
+                        for alg in normalized_algorithms
+                    ]
+                },
                 "selected_algorithms": [
                     {
                         "alg_key": alg["alg_key"],
@@ -102,19 +125,30 @@ class ExperimentService:
             }
         )
 
-        for sensor_config in normalized_algorithms:
-            result = run_alert_algorithm(
-                sensor_config=sensor_config,
+        if configuration_payload is not None:
+            result = run_configuration_payload(
+                payload=configuration_payload,
+                symbol=symbol,
                 report_base_path=str(report_dir),
                 candles=candles,
             )
             self.result_repository.insert_result(
-                {
-                    "experiment_id": experiment_id,
-                    "created_at": created_at,
-                    **result,
-                }
+                {"experiment_id": experiment_id, "created_at": created_at, **result}
             )
+        else:
+            for sensor_config in normalized_algorithms:
+                result = run_alert_algorithm(
+                    sensor_config=sensor_config,
+                    report_base_path=str(report_dir),
+                    candles=candles,
+                )
+                self.result_repository.insert_result(
+                    {
+                        "experiment_id": experiment_id,
+                        "created_at": created_at,
+                        **result,
+                    }
+                )
         return experiment_id
 
     @staticmethod
