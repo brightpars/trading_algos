@@ -1,11 +1,48 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from flask import Blueprint, current_app, jsonify, request
 
 from trading_algos.configuration.serialization import configuration_from_dict
 from trading_algos.configuration.validation import validate_configuration_payload
 
 bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+def _serialize_experiment_payload(payload: object) -> object:
+    if isinstance(payload, dict):
+        serialized = {
+            key: _serialize_experiment_payload(value) for key, value in payload.items()
+        }
+        started_at = payload.get("started_at")
+        parsed = _parse_runtime_datetime(started_at)
+        if parsed is not None:
+            serialized.setdefault("started_at_epoch_ms", int(parsed.timestamp() * 1000))
+        return serialized
+    if isinstance(payload, list):
+        return [_serialize_experiment_payload(item) for item in payload]
+    if isinstance(payload, datetime):
+        if payload.tzinfo is None:
+            payload = payload.replace(tzinfo=timezone.utc)
+        return payload.astimezone(timezone.utc).isoformat()
+    return payload
+
+
+def _parse_runtime_datetime(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    return None
 
 
 @bp.get("/algorithms")
@@ -63,7 +100,7 @@ def experiment(experiment_id: str):
     )
     if payload is None:
         return jsonify({"error": "not found"}), 404
-    return jsonify(payload)
+    return jsonify(_serialize_experiment_payload(payload))
 
 
 @bp.get("/configurations/<draft_id>")

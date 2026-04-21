@@ -185,3 +185,4 @@ def test_experiment_api_returns_running_status_metadata(monkeypatch):
     assert payload["experiment"]["finished_at"] is None
     assert payload["experiment"]["duration_seconds"] is None
     assert payload["experiment"]["dataset_source"] is None
+    assert isinstance(payload["experiment"]["started_at_epoch_ms"], int)

@@ -263,7 +263,8 @@ class ExperimentService:
             return False
 
         started_at = experiment.get("started_at")
-        if not isinstance(started_at, datetime):
+        started_at = self._normalize_runtime_datetime(started_at)
+        if started_at is None:
             started_at = datetime.now(timezone.utc)
 
         self._terminate_active_run(experiment_id, experiment)
@@ -308,6 +309,22 @@ class ExperimentService:
                 "process_pid": None,
             },
         )
+
+    @staticmethod
+    def _normalize_runtime_datetime(value: object) -> datetime | None:
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc)
+            return value.astimezone(timezone.utc)
+        if isinstance(value, str):
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        return None
 
     @staticmethod
     def _launch_background_task(job: Callable[[], None]) -> multiprocessing.Process:

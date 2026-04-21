@@ -106,6 +106,9 @@ def _decorate_experiment(experiment: dict[str, object]) -> dict[str, object]:
         decorated.get("selected_algorithms")
     )
     started_at = decorated.get("started_at")
+    if isinstance(started_at, datetime) and started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+        decorated["started_at"] = started_at
     decorated["started_at_epoch_ms"] = (
         int(started_at.timestamp() * 1000) if isinstance(started_at, datetime) else None
     )
@@ -121,6 +124,8 @@ def _serialize_experiment_runtime(experiment: dict[str, object]) -> dict[str, ob
     for field in ("created_at", "updated_at", "started_at", "finished_at"):
         value = serialized.get(field)
         if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
             serialized[field] = value.astimezone(timezone.utc).isoformat()
     return serialized
 
