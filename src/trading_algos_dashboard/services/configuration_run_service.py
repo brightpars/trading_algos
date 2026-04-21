@@ -4,6 +4,9 @@ from collections.abc import Sequence
 from typing import Any
 
 from trading_algos.configuration.executor import evaluate_configuration_graph
+from trading_algos.configuration.executor import build_configuration_normalized_output
+from trading_algos.evaluation import evaluate_alert_algorithm_output
+from trading_algos.reporting import build_configuration_report
 
 
 def run_configuration_payload(
@@ -36,6 +39,47 @@ def run_configuration_payload(
         trend = "DOWN"
     elif latest_decision["buy_signal"]:
         trend = "UP"
+    normalized_output = build_configuration_normalized_output(root_result)
+    evaluation_results = evaluate_alert_algorithm_output(
+        output=normalized_output,
+        signal_quality_metrics=root_result.get("eval_dict")
+        or evaluation["signal_summary"],
+    )
+    report = build_configuration_report(
+        experiment_summary={},
+        algorithm_summary={
+            "algorithm_key": evaluation["configuration"].config_key,
+            "algorithm_name": evaluation["configuration"].name,
+            "family": "configuration",
+            "subcategory": "composite",
+            "algorithm_version": evaluation["configuration"].version,
+            "parameter_values": evaluation["configuration"].runtime_overrides,
+            "runtime_kind": "configuration",
+            "asset_scope": symbol,
+            "input_domains": ["candles"],
+            "output_modes": ["alerts"],
+            "warmup_period": 1,
+            "configuration_key": evaluation["configuration"].config_key,
+            "configuration_name": evaluation["configuration"].name,
+            "configuration_version": evaluation["configuration"].version,
+            "root_node_id": evaluation["configuration"].root_node_id,
+            "child_algorithm_references": [
+                item["node_id"] for item in evaluation["node_results"]
+            ],
+        },
+        signal_summary=evaluation["signal_summary"],
+        normalized_output=normalized_output,
+        evaluation_results=evaluation_results,
+        algorithm_chart_payload=root_result.get("chart_payload"),
+        node_results=[
+            {
+                "node_id": item["node_id"],
+                "node_type": item["node_type"],
+                "node_name": item["node_name"],
+            }
+            for item in evaluation["node_results"]
+        ],
+    )
     return {
         "input_kind": "configuration",
         "config_key": evaluation["configuration"].config_key,
@@ -63,4 +107,7 @@ def run_configuration_payload(
         ],
         "chart_payload": root_result.get("chart_payload"),
         "eval_dict": {},
+        "normalized_output": normalized_output.to_dict(),
+        "evaluator_outputs": [result.to_dict() for result in evaluation_results],
+        "report": report.to_dict(),
     }

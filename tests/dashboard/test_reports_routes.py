@@ -29,7 +29,22 @@ class _Db(dict):
 class _Client:
     def __getitem__(self, _db_name):
         db = _Db()
-        db["dashboard_results"].append({"experiment_id": "exp1", "alg_name": "Alg"})
+        db["dashboard_results"].append(
+            {
+                "experiment_id": "exp1",
+                "alg_name": "Alg",
+                "report": {
+                    "report_version": "1.0",
+                    "algorithm_summary": {"algorithm_name": "Alg"},
+                    "charts": [],
+                    "tables": [],
+                    "analysis_blocks": [],
+                    "evaluation_summary": {},
+                    "experiment_summary": {},
+                    "summary_cards": [],
+                },
+            }
+        )
         return db
 
 

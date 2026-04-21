@@ -23,6 +23,7 @@ class AlertAlgorithmOutput:
     points: tuple[AlertSeriesPoint, ...]
     derived_series: dict[str, list[Any]] = field(default_factory=dict)
     summary_metrics: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)

@@ -31,6 +31,9 @@ def test_run_alert_algorithm_returns_dashboard_payload(tmp_path):
     assert result["alg_key"] == "close_high_channel_breakout"
     assert "eval_dict" in result
     assert "chart_payload" in result
+    assert result["report"]["report_version"] == "1.0"
+    assert result["report"]["charts"]
+    assert result["evaluator_outputs"]
 
 
 def test_run_alert_algorithm_handles_short_input_history(tmp_path):
@@ -48,3 +51,4 @@ def test_run_alert_algorithm_handles_short_input_history(tmp_path):
 
     assert result["signal_summary"]["total_rows"] == 3
     assert result["eval_dict"]["correct_predictions"] >= 0
+    assert result["report"]["evaluation_summary"]["metric_groups"]

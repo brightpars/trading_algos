@@ -419,6 +419,12 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
     assert stored_experiments[0]["finished_at"] >= stored_experiments[0]["started_at"]
     assert stored_experiments[0]["duration_seconds"] >= 0
     assert Path(stored_experiments[0]["report_base_path"]).exists()
+    stored_results = app.extensions["result_repository"].list_results_for_experiment(
+        stored_experiments[0]["experiment_id"]
+    )
+    assert len(stored_results) == 1
+    assert stored_results[0]["report"]["report_version"] == "1.0"
+    assert stored_results[0]["report"]["charts"]
 
 
 def test_create_experiment_redirects_to_running_detail_page(monkeypatch, tmp_path):
@@ -506,6 +512,75 @@ def test_experiment_detail_shows_runtime_metadata(monkeypatch):
     assert b"Git revision:" in response.data
     assert b"127.0.0.1:7003" in response.data
     assert b"accfd73bac055e1555c2d6f8f031cea7095ff35d" in response.data
+
+
+def test_experiment_detail_renders_standardized_report_sections(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_reported",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "started_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "finished_at": datetime(2024, 2, 3, 12, 5, tzinfo=timezone.utc),
+            "duration_seconds": 300.0,
+            "repo_revision": "abc123",
+            "symbol": "AAPL",
+            "status": "completed",
+            "dataset_source": {"endpoint": "127.0.0.1:7003"},
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [],
+            "input_kind": "single_algorithm",
+            "input_snapshot": {"algorithms": []},
+            "notes": "reported",
+            "candle_count": 10,
+        }
+    )
+    app.extensions["result_repository"].insert_result(
+        {
+            "experiment_id": "exp_reported",
+            "alg_name": "Alg",
+            "latest_decision": {"trend": "UP", "confidence": 5},
+            "signal_summary": {"buy_count": 1, "sell_count": 1, "total_rows": 3},
+            "report": {
+                "report_version": "1.0",
+                "experiment_summary": {},
+                "algorithm_summary": {"algorithm_name": "Alg"},
+                "evaluation_summary": {"headline_metrics": {"cumulative_return": 0.1}},
+                "charts": [
+                    {
+                        "title": "Alg Price and Signals",
+                        "description": "desc",
+                        "payload": None,
+                    }
+                ],
+                "tables": [
+                    {
+                        "title": "Parameters",
+                        "rows": [{"parameter": "window", "value": 2}],
+                    }
+                ],
+                "analysis_blocks": [
+                    {"title": "Overall behavior summary", "body": "Body"}
+                ],
+                "summary_cards": [{"label": "Win rate", "value": 1.0}],
+            },
+        }
+    )
+
+    response = app.test_client().get("/experiments/exp_reported")
+
+    assert response.status_code == 200
+    assert b"Win rate" in response.data
+    assert b"Overall behavior summary" in response.data
+    assert b"Parameters" in response.data
 
 
 def test_running_experiment_detail_shows_runtime_panel(monkeypatch):

@@ -8,6 +8,10 @@ from typing import cast
 from trading_algos.alertgen.core.algorithm_registry import (
     get_alert_algorithm_spec_by_key,
 )
+from trading_algos.alertgen.contracts.outputs import (
+    AlertAlgorithmOutput,
+    AlertSeriesPoint,
+)
 from trading_algos.configuration.models import (
     AlgorithmConfiguration,
     AlgorithmNode,
@@ -136,6 +140,41 @@ def _composite_result(
         "decisions": decisions,
         "children": [child["node_id"] for child in child_results],
     }
+
+
+def build_configuration_normalized_output(
+    root_result: dict[str, Any],
+) -> AlertAlgorithmOutput:
+    rows = root_result["rows"]
+    points = []
+    for item in rows:
+        if item.get("buy_SIGNAL"):
+            signal_label = "buy"
+        elif item.get("sell_SIGNAL"):
+            signal_label = "sell"
+        else:
+            signal_label = "neutral"
+        points.append(
+            AlertSeriesPoint(
+                timestamp=str(item.get("ts", "")),
+                signal_label=signal_label,
+                confidence=float(item.get("trend_confidence", 0.0) or 0.0),
+            )
+        )
+    return AlertAlgorithmOutput(
+        algorithm_key=str(root_result.get("node_name", "configuration")),
+        points=tuple(points),
+        derived_series={
+            "close": [item.get("Close") for item in rows],
+            "buy_signal": [bool(item.get("buy_SIGNAL")) for item in rows],
+            "sell_signal": [bool(item.get("sell_SIGNAL")) for item in rows],
+        },
+        summary_metrics=dict(root_result.get("eval_dict") or {}),
+        metadata={
+            "algorithm_name": root_result.get("node_name", "configuration"),
+            "runtime_kind": "configuration",
+        },
+    )
 
 
 def _execute_node(

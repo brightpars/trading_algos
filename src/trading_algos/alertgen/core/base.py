@@ -321,4 +321,10 @@ class BaseAlertAlgorithm(ABC):
             points=tuple(points),
             derived_series=derived_series,
             summary_metrics=dict(self.eval_dict),
+            metadata={
+                "algorithm_name": self.alg_name,
+                "symbol": self.symbol,
+                "warmup_period": self.minimum_history(),
+                "evaluate_window_len": self.evaluate_window_len,
+            },
         )

@@ -360,9 +360,38 @@ class ExperimentService:
         experiment = self.experiment_repository.get_experiment(experiment_id)
         if experiment is None:
             return None
+        results = self.result_repository.list_results_for_experiment(experiment_id)
+        experiment_summary = self._build_experiment_summary(experiment)
+        for result in results:
+            report = result.get("report")
+            if isinstance(report, dict):
+                report["experiment_summary"] = {
+                    **experiment_summary,
+                    **dict(report.get("experiment_summary") or {}),
+                }
         return {
             "experiment": experiment,
-            "results": self.result_repository.list_results_for_experiment(
-                experiment_id
-            ),
+            "results": results,
+        }
+
+    @staticmethod
+    def _build_experiment_summary(experiment: dict[str, Any]) -> dict[str, Any]:
+        dataset_source = experiment.get("dataset_source")
+        if not isinstance(dataset_source, dict):
+            dataset_source = {}
+        time_range = experiment.get("time_range")
+        if not isinstance(time_range, dict):
+            time_range = {}
+        return {
+            "experiment_id": experiment.get("experiment_id"),
+            "experiment_type": experiment.get("input_kind"),
+            "created_at": experiment.get("created_at"),
+            "started_at": experiment.get("started_at"),
+            "finished_at": experiment.get("finished_at"),
+            "symbol_or_input_scope": experiment.get("symbol"),
+            "data_source_metadata": dataset_source,
+            "candle_count": experiment.get("candle_count"),
+            "repository_revision": experiment.get("repo_revision"),
+            "time_range": time_range,
+            "report_generated_at": datetime.now(timezone.utc).isoformat(),
         }

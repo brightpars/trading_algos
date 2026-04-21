@@ -2,12 +2,52 @@
 {% block content %}
 <h1>Report bundle for {{ experiment.experiment_id }}</h1>
 {% for result in results %}
+  {% set report = result.report %}
   <div class="card mb-3">
     <div class="card-body">
-      <h2 class="h5">{{ result.alg_name }}</h2>
+      <h2 class="h5">{{ report.algorithm_summary.algorithm_name if report else (result.alg_name or result.config_name) }}</h2>
+      {% if report %}
+      <p><strong>Report version:</strong> {{ report.report_version }}</p>
+      <div class="row g-3 mb-3">
+        {% for card in report.summary_cards %}
+        <div class="col-md-3">
+          <div class="border rounded p-3 h-100 bg-light">
+            <div class="small text-muted">{{ card.label }}</div>
+            <div class="fw-bold">{{ card.value }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <h3 class="h6">Experiment summary</h3>
+      <pre class="small bg-light p-3 rounded">{{ report.experiment_summary }}</pre>
+      <h3 class="h6">Evaluation summary</h3>
+      <pre class="small bg-light p-3 rounded">{{ report.evaluation_summary }}</pre>
+      <h3 class="h6">Charts</h3>
+      {% for chart in report.charts %}
+      <div class="mb-3">
+        <div class="fw-semibold">{{ chart.title }}</div>
+        <p class="small text-muted mb-2">{{ chart.description }}</p>
+        <div class="chart-container" data-chart='{{ chart.payload|tojson if chart.payload else "null" }}'></div>
+      </div>
+      {% endfor %}
+      <h3 class="h6">Tables</h3>
+      {% for table in report.tables %}
+      <div class="mb-3">
+        <div class="fw-semibold">{{ table.title }}</div>
+        <pre class="small bg-light p-3 rounded">{{ table.rows }}</pre>
+      </div>
+      {% endfor %}
+      <h3 class="h6">Analysis</h3>
+      <ul class="mb-0">
+        {% for block in report.analysis_blocks %}
+        <li><strong>{{ block.title }}:</strong> {{ block.body }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
       <p><strong>Report path:</strong> <code>{{ result.report_refs.report_data_path }}</code></p>
       <p><strong>Figure path:</strong> <code>{{ result.report_refs.figure_path }}</code></p>
       <pre class="small bg-light p-3 rounded">{{ result.eval_dict }}</pre>
+      {% endif %}
     </div>
   </div>
 {% endfor %}
