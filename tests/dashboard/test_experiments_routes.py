@@ -601,15 +601,13 @@ def test_cancel_experiment_requests_graceful_stop(monkeypatch):
     assert b"Experiment cancellation requested." in response.data
     stored = app.extensions["experiment_repository"].get_experiment("exp_running")
     assert stored is not None
-    assert stored["status"] == "cancelling"
-    assert stored["cancel_requested_at"] is not None
-    assert b"Cancelling experiment" in response.data
-    assert b"Stopping\xe2\x80\xa6" in response.data
+    assert stored["status"] == "cancelled"
+    assert stored["cancelled_at"] is not None
+    assert stored["process_pid"] is None
+    assert b"Experiment cancelled" in response.data
 
 
-def test_cancel_experiment_marks_cancelled_when_job_observes_request(
-    monkeypatch, tmp_path
-):
+def test_cancel_experiment_marks_cancelled_immediately(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
@@ -643,33 +641,12 @@ def test_cancel_experiment_marks_cancelled_when_job_observes_request(
 
     assert requested is True
 
-    service._run_experiment_job(
-        experiment_id=experiment_id,
-        created_at=app.extensions["experiment_repository"].get_experiment(
-            experiment_id
-        )["created_at"],
-        started_at=app.extensions["experiment_repository"].get_experiment(
-            experiment_id
-        )["started_at"],
-        symbol="AAPL",
-        start_dt=datetime.fromisoformat("2024-01-01T09:30"),
-        end_dt=datetime.fromisoformat("2024-01-01T09:30"),
-        normalized_algorithms=[
-            {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
-        ],
-        configuration_payload=None,
-        report_dir=Path(
-            app.extensions["experiment_repository"].get_experiment(experiment_id)[
-                "report_base_path"
-            ]
-        ),
-    )
-
     stored = app.extensions["experiment_repository"].get_experiment(experiment_id)
     assert stored is not None
     assert stored["status"] == "cancelled"
     assert stored["cancelled_at"] is not None
     assert stored["finished_at"] is not None
+    assert stored["process_pid"] is None
 
 
 def test_cancel_experiment_rejects_completed_experiment(monkeypatch):

@@ -350,9 +350,13 @@ def test_delete_configuration_removes_draft_and_related_history(monkeypatch):
 
     assert response.status_code == 200
     assert b"Configuration draft deleted; draft_id=" in response.data
-    assert app.extensions["configuration_builder_service"].get_draft_detail(draft_id) is None
     assert (
-        app.extensions["configuration_revision_repository"].list_revisions(draft_id) == []
+        app.extensions["configuration_builder_service"].get_draft_detail(draft_id)
+        is None
+    )
+    assert (
+        app.extensions["configuration_revision_repository"].list_revisions(draft_id)
+        == []
     )
     assert (
         app.extensions["publication_record_repository"].list_records_for_draft(draft_id)

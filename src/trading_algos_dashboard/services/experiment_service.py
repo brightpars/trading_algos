@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import subprocess
+import multiprocessing
+import os
+import signal
 import threading
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -26,10 +29,6 @@ from trading_algos_dashboard.services.data_source_service import (
 )
 
 
-class CancelledExperimentError(Exception):
-    pass
-
-
 class ExperimentService:
     def __init__(
         self,
@@ -38,15 +37,15 @@ class ExperimentService:
         result_repository: ResultRepository,
         data_source_service: SmarttradeDataSourceService,
         report_base_path: str,
-        task_launcher: Callable[[Callable[[], None]], None] | None = None,
+        task_launcher: Callable[[Callable[[], None]], Any | None] | None = None,
     ):
         self.experiment_repository = experiment_repository
         self.result_repository = result_repository
         self.data_source_service = data_source_service
         self.report_base_path = report_base_path
         self.task_launcher = task_launcher or self._launch_background_task
-        self._cancel_events: dict[str, threading.Event] = {}
-        self._cancel_events_lock = threading.Lock()
+        self._active_runs: dict[str, Any] = {}
+        self._active_runs_lock = threading.Lock()
 
     def create_experiment(
         self,
@@ -135,12 +134,11 @@ class ExperimentService:
                 "notes": notes,
                 "report_base_path": str(report_dir),
                 "error_message": None,
-                "cancel_requested_at": None,
                 "cancelled_at": None,
+                "process_pid": None,
             }
         )
-        self._register_cancel_event(experiment_id)
-        self.task_launcher(
+        task_handle = self.task_launcher(
             lambda: self._run_experiment_job(
                 experiment_id=experiment_id,
                 created_at=created_at,
@@ -153,6 +151,18 @@ class ExperimentService:
                 report_dir=report_dir,
             )
         )
+        if task_handle is not None:
+            with self._active_runs_lock:
+                self._active_runs[experiment_id] = task_handle
+            process_pid = getattr(task_handle, "pid", None)
+            if isinstance(process_pid, int):
+                self.experiment_repository.update_experiment(
+                    experiment_id,
+                    {
+                        "process_pid": process_pid,
+                        "updated_at": datetime.now(timezone.utc),
+                    },
+                )
         return experiment_id
 
     def _run_experiment_job(
@@ -169,15 +179,16 @@ class ExperimentService:
         report_dir: Path,
     ) -> None:
         try:
-            self._raise_if_cancel_requested(experiment_id)
+            self.experiment_repository.update_experiment(
+                experiment_id,
+                {"process_pid": os.getpid(), "updated_at": datetime.now(timezone.utc)},
+            )
             dataset_source = self.data_source_service.get_market_data_server_details()
-            self._raise_if_cancel_requested(experiment_id)
             candles = self.data_source_service.fetch_candles(
                 symbol=symbol,
                 start=start_dt,
                 end=end_dt,
             )
-            self._raise_if_cancel_requested(experiment_id)
             self.experiment_repository.update_experiment(
                 experiment_id,
                 {
@@ -188,7 +199,6 @@ class ExperimentService:
             )
 
             if configuration_payload is not None:
-                self._raise_if_cancel_requested(experiment_id)
                 result = run_configuration_payload(
                     payload=configuration_payload,
                     symbol=symbol,
@@ -200,13 +210,11 @@ class ExperimentService:
                 )
             else:
                 for sensor_config in normalized_algorithms:
-                    self._raise_if_cancel_requested(experiment_id)
                     result = run_alert_algorithm(
                         sensor_config=sensor_config,
                         report_base_path=str(report_dir),
                         candles=candles,
                     )
-                    self._raise_if_cancel_requested(experiment_id)
                     self.result_repository.insert_result(
                         {
                             "experiment_id": experiment_id,
@@ -214,10 +222,6 @@ class ExperimentService:
                             **result,
                         }
                     )
-        except CancelledExperimentError:
-            self._mark_cancelled(experiment_id=experiment_id, started_at=started_at)
-            self._clear_cancel_event(experiment_id)
-            return
         except Exception as exc:
             finished_at = datetime.now(timezone.utc)
             self.experiment_repository.update_experiment(
@@ -229,9 +233,9 @@ class ExperimentService:
                     "duration_seconds": (finished_at - started_at).total_seconds(),
                     "error_message": str(exc),
                     "cancelled_at": None,
+                    "process_pid": None,
                 },
             )
-            self._clear_cancel_event(experiment_id)
             return
 
         finished_at = datetime.now(timezone.utc)
@@ -244,9 +248,10 @@ class ExperimentService:
                 "duration_seconds": (finished_at - started_at).total_seconds(),
                 "error_message": None,
                 "cancelled_at": None,
+                "process_pid": None,
             },
         )
-        self._clear_cancel_event(experiment_id)
+        self._discard_active_run(experiment_id)
 
     def request_cancel(self, experiment_id: str) -> bool:
         experiment = self.experiment_repository.get_experiment(experiment_id)
@@ -254,49 +259,43 @@ class ExperimentService:
             raise ValueError("Experiment was not found")
 
         status = experiment.get("status")
-        if status not in {"running", "cancelling"}:
+        if status != "running":
             return False
 
-        requested_at = datetime.now(timezone.utc)
-        self.experiment_repository.update_experiment(
-            experiment_id,
-            {
-                "status": "cancelling",
-                "updated_at": requested_at,
-                "cancel_requested_at": requested_at,
-            },
-        )
-        self._register_cancel_event(experiment_id).set()
+        started_at = experiment.get("started_at")
+        if not isinstance(started_at, datetime):
+            started_at = datetime.now(timezone.utc)
+
+        self._terminate_active_run(experiment_id, experiment)
+        self._mark_cancelled(experiment_id=experiment_id, started_at=started_at)
         return True
 
-    def _register_cancel_event(self, experiment_id: str) -> threading.Event:
-        with self._cancel_events_lock:
-            event = self._cancel_events.get(experiment_id)
-            if event is None:
-                event = threading.Event()
-                self._cancel_events[experiment_id] = event
-            return event
+    def _terminate_active_run(
+        self, experiment_id: str, experiment: dict[str, Any]
+    ) -> None:
+        with self._active_runs_lock:
+            active_run = self._active_runs.pop(experiment_id, None)
 
-    def _clear_cancel_event(self, experiment_id: str) -> None:
-        with self._cancel_events_lock:
-            self._cancel_events.pop(experiment_id, None)
+        if active_run is not None:
+            terminate = getattr(active_run, "terminate", None)
+            if callable(terminate):
+                terminate()
+                return
 
-    def _is_cancel_requested(self, experiment_id: str) -> bool:
-        with self._cancel_events_lock:
-            event = self._cancel_events.get(experiment_id)
-        if event is not None and event.is_set():
-            return True
-        experiment = self.experiment_repository.get_experiment(experiment_id)
-        if experiment is None:
-            return False
-        return experiment.get("status") == "cancelling"
+        process_pid = experiment.get("process_pid")
+        if isinstance(process_pid, int):
+            try:
+                os.kill(process_pid, signal.SIGTERM)
+            except ProcessLookupError:
+                return
 
-    def _raise_if_cancel_requested(self, experiment_id: str) -> None:
-        if self._is_cancel_requested(experiment_id):
-            raise CancelledExperimentError()
+    def _discard_active_run(self, experiment_id: str) -> None:
+        with self._active_runs_lock:
+            self._active_runs.pop(experiment_id, None)
 
     def _mark_cancelled(self, *, experiment_id: str, started_at: datetime) -> None:
         cancelled_at = datetime.now(timezone.utc)
+        self._discard_active_run(experiment_id)
         self.experiment_repository.update_experiment(
             experiment_id,
             {
@@ -306,13 +305,15 @@ class ExperimentService:
                 "cancelled_at": cancelled_at,
                 "duration_seconds": (cancelled_at - started_at).total_seconds(),
                 "error_message": None,
+                "process_pid": None,
             },
         )
 
     @staticmethod
-    def _launch_background_task(job: Callable[[], None]) -> None:
-        thread = threading.Thread(target=job, daemon=True)
-        thread.start()
+    def _launch_background_task(job: Callable[[], None]) -> multiprocessing.Process:
+        process = multiprocessing.Process(target=job, daemon=True)
+        process.start()
+        return process
 
     @staticmethod
     def _repo_revision() -> str | None:
