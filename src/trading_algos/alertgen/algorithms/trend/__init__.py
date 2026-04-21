@@ -1,8 +1,10 @@
-from trading_algos.alertgen.algorithms.composite.aggregate import agreegate_algs
 from trading_algos.alertgen.algorithms.trend.boundary_breakout import (
     BoundaryBreakoutAlertAlgorithm,
     DoubleRedConfirmationAlertAlgorithm,
     LowAnchoredBoundaryBreakoutAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.trend.catalog import (
+    register_trend_alert_algorithms,
 )
 from trading_algos.alertgen.algorithms.trend.channel_breakout import (
     CloseHighChannelBreakoutAlertAlgorithm,
@@ -15,5 +17,5 @@ __all__ = [
     "DoubleRedConfirmationAlertAlgorithm",
     "LowAnchoredBoundaryBreakoutAlertAlgorithm",
     "RollingChannelBreakoutAlertAlgorithm",
-    "agreegate_algs",
+    "register_trend_alert_algorithms",
 ]

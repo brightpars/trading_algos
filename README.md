@@ -24,6 +24,7 @@ There is still a `src/trading_algos_dashboard` package in this repository today,
 
 - `BaseAlertAlgorithm` is now an abstract base class with a clearer extension contract.
 - Algorithm creation now flows through a registry/catalog instead of a hardcoded factory chain.
+- Algorithm specs now expose richer library metadata such as family, asset scope, input domains, output modes, runtime kind, and composition roles.
 - Built-in algorithms expose structured metadata via registered specs.
 - Default config and validation now resolve supported algorithms from the shared registry.
 - Typed alert domain models now exist for candles, decisions, metadata, and report payloads.
@@ -35,12 +36,17 @@ There is still a `src/trading_algos_dashboard` package in this repository today,
 
 1. Implement a new subclass of `BaseAlertAlgorithm`.
 2. Define its prediction logic in `trend_prediction_logic()`.
-3. Register it in `src/trading_algos/alertgen/core/catalog.py` with:
+3. Place it under the correct family package in `src/trading_algos/alertgen/algorithms/`.
+4. Register it in the matching family `catalog.py` with:
    - stable key/name
+   - family/subcategory
    - parameter normalizer
    - default parameter
    - description/tags
-4. Use `list_alert_algorithm_specs()` to inspect available algorithms programmatically.
+   - input domains / asset scope / output modes / composition roles
+5. Use `list_alert_algorithm_specs()` to inspect available algorithms programmatically.
+
+See `docs/algorithm_authoring_guide.md` for the expected authoring flow.
 
 ### Config migration note
 

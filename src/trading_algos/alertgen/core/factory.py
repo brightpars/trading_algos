@@ -14,7 +14,7 @@ def create_alertgen_algorithm(sensor_config, report_base_path):
             if isinstance(sensor_config["configuration_payload"], dict)
             else sensor_config["configuration_payload"]
         )
-        from trading_algos.alertgen.algorithms.aggregate import (
+        from trading_algos.alertgen.algorithms.composite.aggregate import (
             ConfigBackedAlertAlgorithm,
         )
 

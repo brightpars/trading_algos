@@ -3,14 +3,14 @@ import json
 import pytest
 
 from trading_algos.alertgen import list_alert_algorithm_specs
-from trading_algos.alertgen.algorithms.aggregate import (
+from trading_algos.alertgen.algorithms.composite.aggregate import (
     AggregateAlertAlgorithm,
     agreegate_algs,
 )
-from trading_algos.alertgen.algorithms.boundary_breakout import (
+from trading_algos.alertgen.algorithms.trend.boundary_breakout import (
     LowAnchoredBoundaryBreakoutAlertAlgorithm,
 )
-from trading_algos.alertgen.algorithms.channel_breakout import (
+from trading_algos.alertgen.algorithms.trend.channel_breakout import (
     CloseHighChannelBreakoutAlertAlgorithm,
     RollingChannelBreakoutAlertAlgorithm,
 )

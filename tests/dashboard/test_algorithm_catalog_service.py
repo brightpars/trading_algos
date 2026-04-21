@@ -15,3 +15,6 @@ def test_catalog_service_returns_single_entry():
     assert item["name"] == "Close/High Channel Breakout"
     assert item["param_schema"]
     assert item["param_schema"][0]["key"] == "window"
+    assert item["family"] == "trend"
+    assert item["asset_scope"] == "single_asset"
+    assert "signal" in item["output_modes"]

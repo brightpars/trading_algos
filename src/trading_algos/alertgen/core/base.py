@@ -3,6 +3,10 @@ import logging
 import os
 from abc import ABC, abstractmethod
 
+from trading_algos.alertgen.contracts.outputs import (
+    AlertAlgorithmOutput,
+    AlertSeriesPoint,
+)
 from trading_algos.alertgen.shared_utils.common import CANDLE_COLOUR, TREND
 from trading_algos.alertgen.shared_utils.evaluation import (
     calculate_ground_truth,
@@ -289,4 +293,32 @@ class BaseAlertAlgorithm(ABC):
             alg_specific_report=self.alg_specific_report,
             figure_w=DEFAULT_FIGURE_W,
             figure_l=DEFAULT_FIGURE_L,
+        )
+
+    def normalized_output(self) -> AlertAlgorithmOutput:
+        points = []
+        for item in self.data_list:
+            if item.get("buy_SIGNAL"):
+                signal_label = "buy"
+            elif item.get("sell_SIGNAL"):
+                signal_label = "sell"
+            else:
+                signal_label = "neutral"
+            points.append(
+                AlertSeriesPoint(
+                    timestamp=str(item.get("ts", "")),
+                    signal_label=signal_label,
+                    confidence=float(item.get("trend_confidence", 0.0) or 0.0),
+                )
+            )
+        derived_series = {
+            "close": self._close_values(),
+            "buy_signal": [bool(item.get("buy_SIGNAL")) for item in self.data_list],
+            "sell_signal": [bool(item.get("sell_SIGNAL")) for item in self.data_list],
+        }
+        return AlertAlgorithmOutput(
+            algorithm_key=self.alg_name,
+            points=tuple(points),
+            derived_series=derived_series,
+            summary_metrics=dict(self.eval_dict),
         )

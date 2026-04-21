@@ -1,13 +1,13 @@
 import logging
 
 from trading_algos.alertgen.core.base import BaseAlertAlgorithm
-from trading_algos.configuration.executor import run_configuration_graph
 from trading_algos.alertgen.shared_utils.common import TREND
 from trading_algos.alertgen.shared_utils.plotting import (
     PLOT,
     add_normal_graph,
     save_figure,
 )
+from trading_algos.configuration.executor import run_configuration_graph
 
 
 LOGGER = logging.getLogger(__name__)
@@ -142,7 +142,7 @@ class agreegate_algs(BaseAlertAlgorithm):
             self.latest_predicted_trend = TREND.DOWN
             self.latest_predicted_trend_confidence = sell_trend_confidence
             LOGGER.debug(
-                "%s => %s, %s",
+                "aggregate: sell_decision; trends=%s trend=%s confidence=%s",
                 self.latest_predicted_trend_list_sell,
                 self.latest_predicted_trend,
                 self.latest_predicted_trend_confidence,
@@ -152,7 +152,7 @@ class agreegate_algs(BaseAlertAlgorithm):
             self.latest_predicted_trend = TREND.UP
             self.latest_predicted_trend_confidence = buy_trend_confidence
             LOGGER.debug(
-                "%s => %s, %s",
+                "aggregate: buy_decision; trends=%s trend=%s confidence=%s",
                 self.latest_predicted_trend_list_buy,
                 self.latest_predicted_trend,
                 self.latest_predicted_trend_confidence,
