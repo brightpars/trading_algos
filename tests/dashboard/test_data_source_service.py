@@ -131,70 +131,17 @@ def test_check_connection_raises_when_server_is_unavailable(monkeypatch):
         raise AssertionError("Expected DataSourceUnavailableError")
 
 
-def test_fetch_candles_prefers_bulk_db_range_when_available(monkeypatch):
+def test_fetch_candles_reads_via_proxy_minute_by_minute(monkeypatch):
     service = SmarttradeDataSourceService(
         smarttrade_path="/tmp/smarttrade",
         user_id=1,
     )
 
-    class _DbInterface:
-        def get_data_within_dates(self, symbol, start, end):
-            assert symbol == "AAPL"
-            assert start.isoformat() == "2024-01-01T09:30:00"
-            assert end.isoformat() == "2024-01-01T09:32:00"
-            return [
-                _MongoLikeRow(
-                    {
-                        "_id": "mongo-id-1",
-                        "ts": "2024-01-01 09:30:00",
-                        "Open": 10,
-                        "High": 11,
-                        "Low": 9,
-                        "Close": 10.5,
-                    }
-                ),
-                _MongoLikeRow(
-                    {
-                        "_id": "mongo-id-2",
-                        "ts": "2024-01-01 09:32:00",
-                        "Open": 12,
-                        "High": 13,
-                        "Low": 11,
-                        "Close": 12.5,
-                    }
-                ),
-            ]
-
-    monkeypatch.setattr(service, "_db_interface", lambda: _DbInterface())
-    monkeypatch.setattr(
-        service,
-        "_data_proxy",
-        lambda: (_ for _ in ()).throw(
-            AssertionError("proxy fallback should not be used")
-        ),
-    )
-
-    candles = service.fetch_candles(
-        symbol="AAPL",
-        start=datetime.fromisoformat("2024-01-01T09:30"),
-        end=datetime.fromisoformat("2024-01-01T09:32"),
-    )
-
-    assert [item["ts"] for item in candles] == [
-        "2024-01-01 09:30:00",
-        "2024-01-01 09:32:00",
-    ]
-    assert all("_id" not in item for item in candles)
-
-
-def test_fetch_candles_falls_back_to_proxy_when_bulk_db_access_fails(monkeypatch):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
-        user_id=1,
-    )
+    seen_minutes: list[int] = []
 
     class _Proxy:
         def get_data(self, _symbol, ts):
+            seen_minutes.append(ts.minute)
             if ts.minute == 31:
                 raise Fault(1, "missing candle")
             return {
@@ -206,11 +153,6 @@ def test_fetch_candles_falls_back_to_proxy_when_bulk_db_access_fails(monkeypatch
                 "Close": 10.5,
             }
 
-    monkeypatch.setattr(
-        service,
-        "_db_interface",
-        lambda: (_ for _ in ()).throw(RuntimeError("db unavailable")),
-    )
     monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
 
     candles = service.fetch_candles(
@@ -225,9 +167,10 @@ def test_fetch_candles_falls_back_to_proxy_when_bulk_db_access_fails(monkeypatch
         "2024-01-01 09:32:00",
     ]
     assert all("_id" not in item for item in candles)
+    assert seen_minutes == [30, 31, 32]
 
 
-def test_fetch_candles_raises_market_data_unavailable_when_bulk_db_returns_empty(
+def test_fetch_candles_raises_market_data_unavailable_when_all_proxy_rows_missing(
     monkeypatch,
 ):
     service = SmarttradeDataSourceService(
@@ -235,11 +178,11 @@ def test_fetch_candles_raises_market_data_unavailable_when_bulk_db_returns_empty
         user_id=1,
     )
 
-    class _DbInterface:
-        def get_data_within_dates(self, _symbol, _start, _end):
-            return []
+    class _Proxy:
+        def get_data(self, _symbol, _ts):
+            raise Fault(1, "missing candle")
 
-    monkeypatch.setattr(service, "_db_interface", lambda: _DbInterface())
+    monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
 
     try:
         service.fetch_candles(
@@ -254,3 +197,63 @@ def test_fetch_candles_raises_market_data_unavailable_when_bulk_db_returns_empty
         )
     else:
         raise AssertionError("Expected MarketDataUnavailableError")
+
+
+def test_fetch_candles_logs_selected_proxy_mode(monkeypatch, caplog):
+    service = SmarttradeDataSourceService(
+        smarttrade_path="/tmp/smarttrade",
+        user_id=1,
+    )
+
+    class _Proxy:
+        def get_data(self, _symbol, ts):
+            return {
+                "_id": "mongo-id",
+                "ts": ts.isoformat(sep=" "),
+                "Open": 10,
+                "High": 11,
+                "Low": 9,
+                "Close": 10.5,
+            }
+
+    monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
+
+    with caplog.at_level("INFO"):
+        candles = service.fetch_candles(
+            symbol="AAPL",
+            start=datetime.fromisoformat("2024-01-01T09:30"),
+            end=datetime.fromisoformat("2024-01-01T09:30"),
+        )
+
+    assert len(candles) == 1
+    assert "candle_fetch_mode_selected; mode=proxy_minute_rpc" in caplog.text
+
+
+def test_fetch_candles_logs_proxy_completion(monkeypatch, caplog):
+    service = SmarttradeDataSourceService(
+        smarttrade_path="/tmp/smarttrade",
+        user_id=1,
+    )
+
+    class _Proxy:
+        def get_data(self, _symbol, ts):
+            return {
+                "_id": "mongo-id",
+                "ts": ts.isoformat(sep=" "),
+                "Open": 10,
+                "High": 11,
+                "Low": 9,
+                "Close": 10.5,
+            }
+
+    monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
+
+    with caplog.at_level("INFO"):
+        candles = service.fetch_candles(
+            symbol="AAPL",
+            start=datetime.fromisoformat("2024-01-01T09:30"),
+            end=datetime.fromisoformat("2024-01-01T09:30"),
+        )
+
+    assert len(candles) == 1
+    assert "proxy_fetch_completed" in caplog.text

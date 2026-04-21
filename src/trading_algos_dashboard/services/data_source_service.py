@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import sys
+from collections.abc import Mapping
 from datetime import datetime, timedelta
 from pathlib import Path
-from collections.abc import Iterable
-from collections.abc import Mapping
+from time import perf_counter
 from typing import Any
 from typing import cast
 from xmlrpc.client import Fault
@@ -17,6 +18,8 @@ from trading_algos_dashboard.services.data_source_settings_service import (
 
 
 DEFAULT_CONNECTION_CHECK_TIMEOUT_SECONDS = 2.0
+
+logger = logging.getLogger(__name__)
 
 
 class DataSourceUnavailableError(RuntimeError):
@@ -133,22 +136,6 @@ class SmarttradeDataSourceService:
             port,
         )
 
-    def _db_interface(self) -> Any:
-        self._prepare_imports()
-        try:
-            db_interface_module = importlib.import_module(
-                "utils_shared.objects_factory.db_interface"
-            )
-            get_or_create_db_interface = getattr(
-                db_interface_module, "get_or_create_db_interface"
-            )
-            return get_or_create_db_interface(self.user_id)
-        except ModuleNotFoundError as exc:
-            raise DataSourceUnavailableError(
-                "Smarttrade data service dependencies are unavailable. "
-                "Run the dashboard in an environment where smarttrade is installed."
-            ) from exc
-
     @staticmethod
     def _normalize_candle_row(row: Any) -> dict[str, Any]:
         if isinstance(row, dict):
@@ -166,21 +153,6 @@ class SmarttradeDataSourceService:
         mapping.pop("_id", None)
         return mapping
 
-    def _fetch_candles_via_db(
-        self,
-        *,
-        symbol: str,
-        start: datetime,
-        end: datetime,
-    ) -> list[dict[str, Any]]:
-        db_interface = self._db_interface()
-        rows = db_interface.get_data_within_dates(symbol, start, end)
-        if not isinstance(rows, Iterable):
-            raise TypeError(
-                "Smarttrade db interface returned a non-iterable candle result"
-            )
-        return [self._normalize_candle_row(row) for row in rows]
-
     def _fetch_candles_via_proxy(
         self,
         *,
@@ -188,13 +160,18 @@ class SmarttradeDataSourceService:
         start: datetime,
         end: datetime,
     ) -> list[dict[str, Any]]:
+        started_at_perf = perf_counter()
         proxy = self._data_proxy()
         result: list[dict[str, Any]] = []
+        missing_count = 0
+        request_count = 0
         ts = start
         while ts <= end:
+            request_count += 1
             try:
                 row = proxy.get_data(symbol, ts)
             except Fault:
+                missing_count += 1
                 ts += timedelta(minutes=1)
                 continue
             except Exception as exc:
@@ -203,6 +180,16 @@ class SmarttradeDataSourceService:
                 ) from exc
             result.append(self._normalize_candle_row(row))
             ts += timedelta(minutes=1)
+        logger.info(
+            "data_source: proxy_fetch_completed; symbol=%s start=%s end=%s candle_count=%s missing_count=%s request_count=%s duration_seconds=%.6f",
+            symbol,
+            start.isoformat(sep=" "),
+            end.isoformat(sep=" "),
+            len(result),
+            missing_count,
+            request_count,
+            perf_counter() - started_at_perf,
+        )
         return result
 
     def _data_proxy(self) -> Any:
@@ -251,10 +238,13 @@ class SmarttradeDataSourceService:
         if end < start:
             raise ValueError("End datetime must be after start datetime")
 
-        try:
-            result = self._fetch_candles_via_db(symbol=symbol, start=start, end=end)
-        except Exception:
-            result = self._fetch_candles_via_proxy(symbol=symbol, start=start, end=end)
+        logger.info(
+            "data_source: candle_fetch_mode_selected; mode=proxy_minute_rpc symbol=%s start=%s end=%s",
+            symbol,
+            start.isoformat(sep=" "),
+            end.isoformat(sep=" "),
+        )
+        result = self._fetch_candles_via_proxy(symbol=symbol, start=start, end=end)
 
         if not result:
             raise MarketDataUnavailableError(
