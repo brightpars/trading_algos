@@ -100,6 +100,23 @@ def _serialize_recent_experiment(experiment: dict[str, object]) -> dict[str, str
     }
 
 
+def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
+    input_kind = experiment.get("input_kind")
+    input_snapshot = experiment.get("input_snapshot")
+
+    if input_kind == "configuration" and isinstance(input_snapshot, dict):
+        return json.dumps(input_snapshot, sort_keys=True)
+
+    selected_algorithms = experiment.get("selected_algorithms")
+    if isinstance(selected_algorithms, list) and len(selected_algorithms) > 0:
+        return json.dumps(selected_algorithms, sort_keys=True)
+
+    if input_kind == "single_algorithm" and isinstance(input_snapshot, dict):
+        return json.dumps(input_snapshot, sort_keys=True)
+
+    return None
+
+
 def _decorate_experiment(experiment: dict[str, object]) -> dict[str, object]:
     decorated = dict(experiment)
     decorated["has_legacy_selected_algorithms"] = _has_legacy_selected_algorithms(
@@ -182,15 +199,21 @@ def _cleanup_selected_algorithms_payload(
 def _recent_experiment_presets() -> list[dict[str, str]]:
     repo = current_app.extensions["experiment_repository"]
     experiments = repo.list_experiments()
-    eligible_experiments = [
-        experiment
-        for experiment in experiments
-        if isinstance(experiment.get("selected_algorithms"), list)
-        and len(experiment.get("selected_algorithms", [])) > 0
-    ]
+    recent_distinct_experiments: list[dict[str, object]] = []
+    seen_signatures: set[str] = set()
+
+    for experiment in experiments:
+        signature = _recent_experiment_signature(experiment)
+        if signature is None or signature in seen_signatures:
+            continue
+        seen_signatures.add(signature)
+        recent_distinct_experiments.append(experiment)
+        if len(recent_distinct_experiments) == 3:
+            break
+
     return [
         _serialize_recent_experiment(experiment)
-        for experiment in eligible_experiments[:3]
+        for experiment in recent_distinct_experiments
     ]
 
 
