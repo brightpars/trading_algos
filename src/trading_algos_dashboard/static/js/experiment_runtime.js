@@ -40,14 +40,18 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const render = () => {
-    const startedAt = runtime.started_at ? new Date(runtime.started_at) : null;
-    const finishedAt = runtime.finished_at ? new Date(runtime.finished_at) : null;
+    const startedAtEpochMs =
+      typeof runtime.started_at_epoch_ms === "number"
+        ? runtime.started_at_epoch_ms
+        : null;
 
     if (timerElement) {
       if (runtime.duration_seconds != null) {
         timerElement.textContent = formatDuration(runtime.duration_seconds);
-      } else if (startedAt && !Number.isNaN(startedAt.getTime())) {
-        timerElement.textContent = formatDuration((Date.now() - startedAt.getTime()) / 1000);
+      } else if (startedAtEpochMs != null) {
+        timerElement.textContent = formatDuration(
+          (Date.now() - startedAtEpochMs) / 1000,
+        );
       } else {
         timerElement.textContent = "00:00:00";
       }

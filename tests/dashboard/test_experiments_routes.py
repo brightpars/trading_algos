@@ -554,6 +554,7 @@ def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
     assert b"This page updates automatically every second" in response.data
     assert b"data-experiment-runtime=" in response.data
     assert b"data-status-api-url=" in response.data
+    assert b"started_at_epoch_ms" in response.data
     assert b"00:00:00" in response.data
     assert b"close_high_channel_breakout" in response.data
     assert b"Stop experiment" in response.data
