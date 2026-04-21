@@ -93,6 +93,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     configuration_builder_service = ConfigurationBuilderService(
         draft_repository=configuration_draft_repository,
         revision_repository=configuration_revision_repository,
+        publication_record_repository=publication_record_repository,
     )
     configuration_publish_service = ConfigurationPublishService(
         publication_record_repository=publication_record_repository,

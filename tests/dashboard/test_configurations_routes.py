@@ -6,6 +6,10 @@ class _Collection:
     def __init__(self):
         self.docs = []
 
+    class _DeleteResult:
+        def __init__(self, deleted_count):
+            self.deleted_count = deleted_count
+
     def find(self, *_args, **_kwargs):
         return self
 
@@ -31,6 +35,22 @@ class _Collection:
         if "$set" in update:
             doc.update(update["$set"])
         return None
+
+    def delete_one(self, query):
+        for index, doc in enumerate(self.docs):
+            if all(doc.get(key) == value for key, value in query.items()):
+                del self.docs[index]
+                return self._DeleteResult(1)
+        return self._DeleteResult(0)
+
+    def delete_many(self, query):
+        original_count = len(self.docs)
+        self.docs = [
+            doc
+            for doc in self.docs
+            if not all(doc.get(key) == value for key, value in query.items())
+        ]
+        return self._DeleteResult(original_count - len(self.docs))
 
     def __iter__(self):
         return iter(self.docs)
@@ -217,6 +237,7 @@ def test_configuration_detail_shows_publish_history(monkeypatch):
     assert b"algcfg_1" in response.data
     assert b"Structure summary" in response.data
     assert b"Edit draft" in response.data
+    assert b"Delete draft" in response.data
     assert b"Revision 1" in response.data
     assert b"Initial revision created." in response.data
     assert b"Published" in response.data
@@ -298,3 +319,57 @@ def test_configuration_detail_publish_uses_publish_service(monkeypatch):
     )
     assert response.status_code == 200
     assert b"Published configuration remote_config_id=algcfg_1" in response.data
+
+
+def test_delete_configuration_removes_draft_and_related_history(monkeypatch):
+    app = _build_app(monkeypatch)
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        _sample_configuration_payload()
+    )
+    app.extensions["configuration_builder_service"].update_draft(
+        draft_id,
+        {
+            **_sample_configuration_payload(),
+            "name": "Updated Combo Breakout",
+        },
+    )
+    app.extensions["publication_record_repository"].create_record(
+        {
+            "draft_id": draft_id,
+            "created_at": "2026-04-21T10:00:00Z",
+            "remote_config_id": "algcfg_1",
+            "remote_status": "published",
+            "result": {"config_id": "algcfg_1"},
+        }
+    )
+
+    response = app.test_client().post(
+        f"/configurations/{draft_id}/delete",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Configuration draft deleted; draft_id=" in response.data
+    assert (
+        app.extensions["configuration_builder_service"].get_draft_detail(draft_id)
+        is None
+    )
+    assert (
+        app.extensions["configuration_revision_repository"].list_revisions(draft_id)
+        == []
+    )
+    assert (
+        app.extensions["publication_record_repository"].list_records_for_draft(draft_id)
+        == []
+    )
+
+
+def test_delete_configuration_missing_draft_returns_404(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/configurations/not-real/delete",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 404

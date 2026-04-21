@@ -443,3 +443,14 @@ def publish_configuration(draft_id: str):
             "success",
         )
     return redirect(url_for("configurations.detail_configuration", draft_id=draft_id))
+
+
+@bp.post("/<draft_id>/delete")
+def delete_configuration(draft_id: str):
+    deleted = current_app.extensions["configuration_builder_service"].delete_draft(
+        draft_id
+    )
+    if not deleted:
+        abort(404)
+    flash(f"Configuration draft deleted; draft_id={draft_id}", "success")
+    return redirect(url_for("configurations.list_configurations"))

@@ -13,6 +13,9 @@ from trading_algos_dashboard.repositories.configuration_draft_repository import 
 from trading_algos_dashboard.repositories.configuration_revision_repository import (
     ConfigurationRevisionRepository,
 )
+from trading_algos_dashboard.repositories.publication_record_repository import (
+    PublicationRecordRepository,
+)
 
 
 class ConfigurationBuilderService:
@@ -21,9 +24,11 @@ class ConfigurationBuilderService:
         *,
         draft_repository: ConfigurationDraftRepository,
         revision_repository: ConfigurationRevisionRepository,
+        publication_record_repository: PublicationRecordRepository,
     ):
         self.draft_repository = draft_repository
         self.revision_repository = revision_repository
+        self.publication_record_repository = publication_record_repository
 
     def create_draft(self, payload: dict[str, Any]) -> str:
         normalized = validate_configuration_payload(configuration_from_dict(payload))
@@ -84,3 +89,12 @@ class ConfigurationBuilderService:
             "draft": draft,
             "revisions": self.revision_repository.list_revisions(draft_id),
         }
+
+    def delete_draft(self, draft_id: str) -> bool:
+        draft = self.draft_repository.get_draft(draft_id)
+        if draft is None:
+            return False
+        self.revision_repository.delete_revisions(draft_id)
+        self.publication_record_repository.delete_records_for_draft(draft_id)
+        self.draft_repository.delete_draft(draft_id)
+        return True

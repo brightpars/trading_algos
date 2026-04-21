@@ -22,3 +22,7 @@ class ConfigurationRevisionRepository(MongoRepository):
                 "revision_no", -1
             )
         ]
+
+    def delete_revisions(self, draft_id: str) -> int:
+        result = self.collection.delete_many({"draft_id": draft_id})
+        return int(getattr(result, "deleted_count", 0))

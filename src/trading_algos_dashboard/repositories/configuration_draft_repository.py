@@ -26,3 +26,7 @@ class ConfigurationDraftRepository(MongoRepository):
             self._without_id(doc) or {}
             for doc in self.collection.find({}).sort("updated_at", -1)
         ]
+
+    def delete_draft(self, draft_id: str) -> bool:
+        result = self.collection.delete_one({"draft_id": draft_id})
+        return bool(getattr(result, "deleted_count", 0))

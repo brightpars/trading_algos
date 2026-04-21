@@ -105,6 +105,11 @@
   <form method="post" action="{{ url_for('configurations.publish_configuration', draft_id=draft.draft_id) }}">
     <button class="btn btn-success" type="submit">Publish to SmartTrade</button>
   </form>
+  {% if summary.status == 'draft' %}
+  <form method="post" action="{{ url_for('configurations.delete_configuration', draft_id=draft.draft_id) }}">
+    <button class="btn btn-outline-danger" type="submit">Delete draft</button>
+  </form>
+  {% endif %}
 </div>
 <h2 class="h4 mt-4">Revision history</h2>
 <div class="builder-history-list mb-4">

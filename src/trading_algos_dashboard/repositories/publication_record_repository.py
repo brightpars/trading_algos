@@ -22,3 +22,7 @@ class PublicationRecordRepository(MongoRepository):
                 "created_at", -1
             )
         ]
+
+    def delete_records_for_draft(self, draft_id: str) -> int:
+        result = self.collection.delete_many({"draft_id": draft_id})
+        return int(getattr(result, "deleted_count", 0))
