@@ -36,6 +36,9 @@ def test_run_alert_algorithm_returns_dashboard_payload(tmp_path):
     assert result["report"]["charts"]
     assert result["evaluator_outputs"]
     assert result["report"]["diagnostics"]
+    assert result["execution_steps"]
+    assert result["execution_steps"][0]["step"] == "run_algorithm"
+    assert result["execution_steps"][0]["duration_seconds"] >= 0
 
 
 def test_run_alert_algorithm_handles_short_input_history(tmp_path):
@@ -54,6 +57,7 @@ def test_run_alert_algorithm_handles_short_input_history(tmp_path):
     assert result["signal_summary"]["total_rows"] == 3
     assert result["eval_dict"]["correct_predictions"] >= 0
     assert result["report"]["evaluation_summary"]["metric_groups"]
+    assert result["execution_steps"][0]["metadata"]["candle_count"] == 3
     assert any(
         chart["chart_id"] == "core_indicators" for chart in result["report"]["charts"]
     )

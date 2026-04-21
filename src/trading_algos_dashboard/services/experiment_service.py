@@ -8,6 +8,7 @@ import threading
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
@@ -133,6 +134,7 @@ class ExperimentService:
                 ],
                 "notes": notes,
                 "report_base_path": str(report_dir),
+                "execution_steps": [],
                 "error_message": None,
                 "cancelled_at": None,
                 "process_pid": None,
@@ -178,22 +180,40 @@ class ExperimentService:
         configuration_payload: dict[str, Any] | None,
         report_dir: Path,
     ) -> None:
+        execution_steps: list[dict[str, Any]] = []
         try:
             self.experiment_repository.update_experiment(
                 experiment_id,
                 {"process_pid": os.getpid(), "updated_at": datetime.now(timezone.utc)},
             )
             dataset_source = self.data_source_service.get_market_data_server_details()
+            read_started_at = datetime.now(timezone.utc)
+            read_started_at_perf = perf_counter()
             candles = self.data_source_service.fetch_candles(
                 symbol=symbol,
                 start=start_dt,
                 end=end_dt,
+            )
+            read_finished_at = datetime.now(timezone.utc)
+            execution_steps.append(
+                {
+                    "step": "read_candles",
+                    "label": "Read candles",
+                    "started_at": read_started_at,
+                    "finished_at": read_finished_at,
+                    "duration_seconds": perf_counter() - read_started_at_perf,
+                    "metadata": {
+                        "symbol": symbol,
+                        "candle_count": len(candles),
+                    },
+                }
             )
             self.experiment_repository.update_experiment(
                 experiment_id,
                 {
                     "dataset_source": dataset_source,
                     "candle_count": len(candles),
+                    "execution_steps": execution_steps,
                     "updated_at": datetime.now(timezone.utc),
                 },
             )
@@ -205,6 +225,14 @@ class ExperimentService:
                     report_base_path=str(report_dir),
                     candles=candles,
                 )
+                execution_steps.extend(self._result_execution_steps(result))
+                self.experiment_repository.update_experiment(
+                    experiment_id,
+                    {
+                        "execution_steps": execution_steps,
+                        "updated_at": datetime.now(timezone.utc),
+                    },
+                )
                 self.result_repository.insert_result(
                     {"experiment_id": experiment_id, "created_at": created_at, **result}
                 )
@@ -214,6 +242,14 @@ class ExperimentService:
                         sensor_config=sensor_config,
                         report_base_path=str(report_dir),
                         candles=candles,
+                    )
+                    execution_steps.extend(self._result_execution_steps(result))
+                    self.experiment_repository.update_experiment(
+                        experiment_id,
+                        {
+                            "execution_steps": execution_steps,
+                            "updated_at": datetime.now(timezone.utc),
+                        },
                     )
                     self.result_repository.insert_result(
                         {
@@ -231,6 +267,7 @@ class ExperimentService:
                     "status": "failed",
                     "finished_at": finished_at,
                     "duration_seconds": (finished_at - started_at).total_seconds(),
+                    "execution_steps": execution_steps,
                     "error_message": str(exc),
                     "cancelled_at": None,
                     "process_pid": None,
@@ -246,6 +283,7 @@ class ExperimentService:
                 "status": "completed",
                 "finished_at": finished_at,
                 "duration_seconds": (finished_at - started_at).total_seconds(),
+                "execution_steps": execution_steps,
                 "error_message": None,
                 "cancelled_at": None,
                 "process_pid": None,
@@ -395,3 +433,10 @@ class ExperimentService:
             "time_range": time_range,
             "report_generated_at": datetime.now(timezone.utc).isoformat(),
         }
+
+    @staticmethod
+    def _result_execution_steps(result: dict[str, Any]) -> list[dict[str, Any]]:
+        execution_steps = result.get("execution_steps")
+        if not isinstance(execution_steps, list):
+            return []
+        return [step for step in execution_steps if isinstance(step, dict)]

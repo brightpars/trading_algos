@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from time import perf_counter
 from collections.abc import Sequence
 from typing import Any
 
@@ -19,12 +21,16 @@ def run_configuration_payload(
     report_base_path: str,
     candles: Sequence[dict[str, Any]],
 ) -> dict[str, Any]:
+    started_at = datetime.now(timezone.utc)
+    started_at_perf = perf_counter()
     evaluation = evaluate_configuration_graph(
         configuration=payload,
         symbol=symbol,
         report_base_path=report_base_path,
         candles=candles,
     )
+    finished_at = datetime.now(timezone.utc)
+    duration_seconds = perf_counter() - started_at_perf
     root_result = evaluation["root_result"]
     decisions = root_result["decisions"]
     latest_decision = (
@@ -89,6 +95,19 @@ def run_configuration_payload(
         "config_key": evaluation["configuration"].config_key,
         "config_version": evaluation["configuration"].version,
         "config_name": evaluation["configuration"].name,
+        "execution_steps": [
+            {
+                "step": "run_configuration",
+                "label": f"Run {evaluation['configuration'].name}",
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "duration_seconds": duration_seconds,
+                "metadata": {
+                    "config_key": evaluation["configuration"].config_key,
+                    "candle_count": len(candles),
+                },
+            }
+        ],
         "signal_summary": evaluation["signal_summary"],
         "latest_decision": {
             "trend": trend,

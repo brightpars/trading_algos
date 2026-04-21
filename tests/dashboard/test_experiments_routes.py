@@ -500,6 +500,24 @@ def test_experiment_detail_shows_runtime_metadata(monkeypatch):
             "selected_algorithms": [],
             "notes": "runtime payload",
             "candle_count": 42,
+            "execution_steps": [
+                {
+                    "step": "read_candles",
+                    "label": "Read candles",
+                    "started_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+                    "finished_at": datetime(2024, 2, 3, 12, 1, tzinfo=timezone.utc),
+                    "duration_seconds": 60.0,
+                    "metadata": {"candle_count": 42},
+                },
+                {
+                    "step": "run_algorithm",
+                    "label": "Run close_high_channel_breakout",
+                    "started_at": datetime(2024, 2, 3, 12, 1, tzinfo=timezone.utc),
+                    "finished_at": datetime(2024, 2, 3, 12, 5, tzinfo=timezone.utc),
+                    "duration_seconds": 240.0,
+                    "metadata": {"alg_key": "close_high_channel_breakout"},
+                },
+            ],
         }
     )
 
@@ -509,6 +527,11 @@ def test_experiment_detail_shows_runtime_metadata(monkeypatch):
     assert b"Started:" in response.data
     assert b"Finished:" in response.data
     assert b"Duration (seconds):" in response.data
+    assert b"Step durations" in response.data
+    assert b"Read candles" in response.data
+    assert b"Run close_high_channel_breakout" in response.data
+    assert b"60.00s" in response.data
+    assert b"240.00s" in response.data
     assert b"Git revision:" in response.data
     assert b"127.0.0.1:7003" in response.data
     assert b"accfd73bac055e1555c2d6f8f031cea7095ff35d" in response.data
@@ -620,6 +643,16 @@ def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
             },
             "notes": "runtime payload",
             "candle_count": None,
+            "execution_steps": [
+                {
+                    "step": "read_candles",
+                    "label": "Read candles",
+                    "started_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+                    "finished_at": datetime(2024, 2, 3, 12, 0, 30, tzinfo=timezone.utc),
+                    "duration_seconds": 30.0,
+                    "metadata": {},
+                }
+            ],
         }
     )
 
@@ -633,6 +666,8 @@ def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
     assert b"started_at_epoch_ms" in response.data
     assert b"00:00:00" in response.data
     assert b"close_high_channel_breakout" in response.data
+    assert b"Step durations" in response.data
+    assert b"Read candles" in response.data
     assert b"Stop experiment" in response.data
 
 

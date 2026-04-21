@@ -116,6 +116,46 @@
   <p class="mb-1"><strong>Git revision:</strong> <code>{{ experiment.repo_revision or 'unknown' }}</code></p>
   <p class="mb-0"><strong>Market data server:</strong> {{ experiment.dataset_source.endpoint if experiment.dataset_source else '—' }}</p>
 </div>
+{% if experiment.execution_steps %}
+<div class="card mb-4">
+  <div class="card-body">
+    <h3 class="h5">Step durations</h3>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Started</th>
+            <th>Finished</th>
+            <th>Duration</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for step in experiment.execution_steps %}
+          <tr>
+            <td>
+              <div>{{ step.label or step.step }}</div>
+              {% if step.metadata %}
+              <div class="text-muted small"><code>{{ step.metadata }}</code></div>
+              {% endif %}
+            </td>
+            <td>{{ step.started_at or '—' }}</td>
+            <td>{{ step.finished_at or '—' }}</td>
+            <td>
+              {% if step.duration_seconds is not none %}
+              {{ '%.2f'|format(step.duration_seconds) }}s
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% for result in results %}
   {% set report = result.report %}
   <div class="card mb-4">
@@ -123,6 +163,16 @@
       <h3 class="h5">{{ report.algorithm_summary.algorithm_name if report else (result.alg_name or result.config_name) }}</h3>
       {% if result.alg_param %}<p><strong>Params:</strong> <code>{{ result.alg_param }}</code></p>{% endif %}
       {% if result.config_key %}<p><strong>Configuration:</strong> <code>{{ result.config_key }}</code> v{{ result.config_version }}</p>{% endif %}
+      {% if result.execution_steps %}
+      <div class="mb-3">
+        <strong>Run timing:</strong>
+        <ul class="mb-0 mt-1">
+          {% for step in result.execution_steps %}
+          <li>{{ step.label or step.step }} — {{ '%.2f'|format(step.duration_seconds) }}s</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
       <p><strong>Latest decision:</strong> {{ result.latest_decision.trend }} (confidence={{ result.latest_decision.confidence }})</p>
       <p><strong>Signal summary:</strong> {{ result.signal_summary }}</p>
       {% if report %}

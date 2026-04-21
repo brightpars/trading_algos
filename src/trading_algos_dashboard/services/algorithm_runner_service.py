@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from time import perf_counter
 from collections.abc import Sequence
 from typing import Any
 
@@ -21,6 +23,8 @@ def run_alert_algorithm(
     report_base_path: str,
     candles: Sequence[dict[str, Any]],
 ) -> dict[str, Any]:
+    started_at = datetime.now(timezone.utc)
+    started_at_perf = perf_counter()
     algorithm, alg_param = create_alertgen_algorithm(
         sensor_config=sensor_config,
         report_base_path=report_base_path,
@@ -28,6 +32,8 @@ def run_alert_algorithm(
     algorithm.process_list(list(candles))
     algorithm.evaluate()
     algorithm.write_analysis_report()
+    finished_at = datetime.now(timezone.utc)
+    duration_seconds = perf_counter() - started_at_perf
 
     latest_decision = algorithm.current_decision()
     interactive_payloads = normalize_interactive_payloads(
@@ -86,6 +92,19 @@ def run_alert_algorithm(
         "alg_key": sensor_config["alg_key"],
         "alg_name": algorithm.alg_name,
         "alg_param": alg_param,
+        "execution_steps": [
+            {
+                "step": "run_algorithm",
+                "label": f"Run {algorithm.alg_name}",
+                "started_at": started_at,
+                "finished_at": finished_at,
+                "duration_seconds": duration_seconds,
+                "metadata": {
+                    "alg_key": sensor_config["alg_key"],
+                    "candle_count": len(candles),
+                },
+            }
+        ],
         "algorithm_metadata": algorithm_metadata,
         "eval_dict": algorithm.eval_dict,
         "evaluator_outputs": [result.to_dict() for result in evaluation_results],
