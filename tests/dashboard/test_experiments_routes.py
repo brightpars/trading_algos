@@ -333,13 +333,13 @@ def test_new_experiment_page_deduplicates_recent_run_presets_by_config(monkeypat
             "input_snapshot": {
                 "algorithms": [{"alg_key": "alg_a", "alg_param": {"window": 5}}]
             },
-            "symbol": "AAPL",
+            "symbol": "MSFT",
             "time_range": {
-                "start": "2024-01-01 09:30:00",
-                "end": "2024-01-31 16:00:00",
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
             },
             "selected_algorithms": [{"alg_key": "alg_a", "alg_param": {"window": 5}}],
-            "notes": "older duplicate",
+            "notes": "newest duplicate",
         }
     )
     app.extensions["experiment_repository"].create_experiment(
@@ -399,10 +399,62 @@ def test_new_experiment_page_deduplicates_recent_run_presets_by_config(monkeypat
     assert response.status_code == 200
     assert response.data.count(b"recent-experiment-preset") == 3
     assert b"newest duplicate" in response.data
-    assert b"older duplicate" not in response.data
+    assert b"exp_duplicate_older" not in response.data
     assert b"distinct b" in response.data
     assert b"distinct c" in response.data
     assert b"distinct d" not in response.data
+
+
+def test_new_experiment_page_treats_different_time_ranges_as_distinct_presets(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_same_algos_time_1",
+            "created_at": datetime(2024, 2, 4, 12, 0, tzinfo=timezone.utc),
+            "input_kind": "single_algorithm",
+            "input_snapshot": {
+                "algorithms": [{"alg_key": "alg_a", "alg_param": {"window": 5}}]
+            },
+            "symbol": "MSFT",
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [{"alg_key": "alg_a", "alg_param": {"window": 5}}],
+            "notes": "same algos first time range",
+        }
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_same_algos_time_2",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "input_kind": "single_algorithm",
+            "input_snapshot": {
+                "algorithms": [{"alg_key": "alg_a", "alg_param": {"window": 5}}]
+            },
+            "symbol": "MSFT",
+            "time_range": {
+                "start": "2024-01-01 09:30:00",
+                "end": "2024-01-31 16:00:00",
+            },
+            "selected_algorithms": [{"alg_key": "alg_a", "alg_param": {"window": 5}}],
+            "notes": "same algos second time range",
+        }
+    )
+
+    response = app.test_client().get("/experiments/new")
+
+    assert response.status_code == 200
+    assert response.data.count(b"recent-experiment-preset") == 2
+    assert b"same algos first time range" in response.data
+    assert b"same algos second time range" in response.data
 
 
 def test_new_experiment_page_deduplicates_recent_configuration_run_presets(monkeypatch):
@@ -447,13 +499,13 @@ def test_new_experiment_page_deduplicates_recent_configuration_run_presets(monke
             "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
             "input_kind": "configuration",
             "input_snapshot": dict(configuration_payload),
-            "symbol": "AAPL",
+            "symbol": "MSFT",
             "time_range": {
-                "start": "2024-01-01 09:30:00",
-                "end": "2024-01-31 16:00:00",
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
             },
             "selected_algorithms": [],
-            "notes": "older config",
+            "notes": "newest config",
         }
     )
 
@@ -462,7 +514,69 @@ def test_new_experiment_page_deduplicates_recent_configuration_run_presets(monke
     assert response.status_code == 200
     assert response.data.count(b"recent-experiment-preset") == 1
     assert b"newest config" in response.data
-    assert b"older config" not in response.data
+    assert b"exp_config_older" not in response.data
+
+
+def test_new_experiment_page_treats_configuration_runs_with_different_time_ranges_as_distinct(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    configuration_payload = {
+        "config_key": "combo_breakout",
+        "name": "Combo Breakout",
+        "version": "1",
+        "root_node_id": "alg1",
+        "nodes": [
+            {
+                "node_id": "alg1",
+                "node_type": "algorithm",
+                "alg_key": "close_high_channel_breakout",
+                "alg_param": {"window": 2},
+            }
+        ],
+    }
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_config_time_1",
+            "created_at": datetime(2024, 2, 4, 12, 0, tzinfo=timezone.utc),
+            "input_kind": "configuration",
+            "input_snapshot": configuration_payload,
+            "symbol": "MSFT",
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [],
+            "notes": "config first time range",
+        }
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_config_time_2",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "input_kind": "configuration",
+            "input_snapshot": dict(configuration_payload),
+            "symbol": "MSFT",
+            "time_range": {
+                "start": "2024-01-01 09:30:00",
+                "end": "2024-01-31 16:00:00",
+            },
+            "selected_algorithms": [],
+            "notes": "config second time range",
+        }
+    )
+
+    response = app.test_client().get("/experiments/new")
+
+    assert response.status_code == 200
+    assert response.data.count(b"recent-experiment-preset") == 2
+    assert b"config first time range" in response.data
+    assert b"config second time range" in response.data
 
 
 def test_create_experiment_returns_503_when_data_source_dependencies_are_missing(

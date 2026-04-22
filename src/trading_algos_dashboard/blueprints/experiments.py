@@ -101,11 +101,24 @@ def _serialize_recent_experiment(experiment: dict[str, object]) -> dict[str, str
 
 
 def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
+    time_range = experiment.get("time_range")
+    if not isinstance(time_range, dict):
+        time_range = {}
+
+    signature_payload: dict[str, object] = {
+        "symbol": str(experiment.get("symbol", "")),
+        "start": str(time_range.get("start", "")),
+        "end": str(time_range.get("end", "")),
+        "notes": str(experiment.get("notes", "")),
+    }
+
     selected_algorithms = experiment.get("selected_algorithms")
     if isinstance(selected_algorithms, list) and len(selected_algorithms) > 0:
         normalized_algorithms = []
         for algorithm in selected_algorithms:
-            if isinstance(algorithm, dict) and isinstance(algorithm.get("alg_key"), str):
+            if isinstance(algorithm, dict) and isinstance(
+                algorithm.get("alg_key"), str
+            ):
                 normalized_algorithms.append(
                     {
                         "alg_key": algorithm.get("alg_key"),
@@ -116,8 +129,10 @@ def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
             if isinstance(algorithm, str):
                 normalized_algorithms.append({"legacy_alg_key": algorithm})
         if normalized_algorithms:
+            signature_payload["input_kind"] = "single_algorithm"
+            signature_payload["algorithms"] = normalized_algorithms
             return json.dumps(
-                {"input_kind": "single_algorithm", "algorithms": normalized_algorithms},
+                signature_payload,
                 sort_keys=True,
             )
 
@@ -125,8 +140,10 @@ def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
     input_snapshot = experiment.get("input_snapshot")
 
     if input_kind == "configuration" and isinstance(input_snapshot, dict):
+        signature_payload["input_kind"] = "configuration"
+        signature_payload["configuration"] = input_snapshot
         return json.dumps(
-            {"input_kind": "configuration", "configuration": input_snapshot},
+            signature_payload,
             sort_keys=True,
         )
 
@@ -143,11 +160,10 @@ def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
                 and isinstance(algorithm.get("alg_key"), str)
             ]
             if normalized_algorithms:
+                signature_payload["input_kind"] = "single_algorithm"
+                signature_payload["algorithms"] = normalized_algorithms
                 return json.dumps(
-                    {
-                        "input_kind": "single_algorithm",
-                        "algorithms": normalized_algorithms,
-                    },
+                    signature_payload,
                     sort_keys=True,
                 )
 
