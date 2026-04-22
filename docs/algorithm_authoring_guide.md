@@ -6,7 +6,7 @@ Use this guide when adding a new algorithm to the library.
 
 1. Place the implementation under the correct family package in `src/trading_algos/alertgen/algorithms/`.
 2. Register the algorithm in the matching family `catalog.py` module.
-3. Define a rich spec with family, subcategory, input domains, output modes, and composition roles.
+3. Define a rich spec with a required `catalog_ref`, family, subcategory, input domains, output modes, and composition roles.
 4. Reuse shared validation helpers and keep `alg_param` machine-readable.
 5. Ensure the algorithm can produce normalized output via `BaseAlertAlgorithm.normalized_output()`.
 6. Add or extend tests that verify catalog exposure and parameter schema behavior.
@@ -29,6 +29,7 @@ Every algorithm spec should define at least:
 
 - stable `key`
 - human-readable `name`
+- stable `catalog_ref` in the form `<catalog_type>:<catalog_number>` such as `algorithm:6`
 - `family`
 - `subcategory`
 - `description`

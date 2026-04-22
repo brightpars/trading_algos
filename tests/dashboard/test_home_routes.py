@@ -6,6 +6,9 @@ class _Collection:
     def __init__(self):
         self.docs = []
 
+    def _matches(self, doc, query):
+        return all(doc.get(k) == v for k, v in query.items())
+
     def find(self, *_args, **_kwargs):
         return self
 
@@ -31,6 +34,19 @@ class _Collection:
         if "$set" in update:
             doc.update(update["$set"])
         return None
+
+    def delete_many(self, query):
+        effective_query = dict(query or {})
+        original_count = len(self.docs)
+        self.docs = [
+            doc for doc in self.docs if not self._matches(doc, effective_query)
+        ]
+
+        class _DeleteResult:
+            def __init__(self, deleted_count):
+                self.deleted_count = deleted_count
+
+        return _DeleteResult(original_count - len(self.docs))
 
     def __iter__(self):
         return iter(self.docs)

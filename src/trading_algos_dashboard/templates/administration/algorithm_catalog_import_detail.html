@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Algorithm catalog import detail · Trading Algos Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4 gap-3 flex-wrap">
+  <div>
+    <h1>Algorithm catalog import detail</h1>
+    <p class="text-muted mb-0">Inspect the detailed changes and outcomes from one catalog import run.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('administration.algorithm_catalog_admin') }}">Back to catalog administration</a>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <dl class="row mb-0">
+      <dt class="col-sm-3">Completed</dt><dd class="col-sm-9"><code>{{ run.completed_at }}</code></dd>
+      <dt class="col-sm-3">Status</dt><dd class="col-sm-9">{{ run.status }}</dd>
+      <dt class="col-sm-3">Source file</dt><dd class="col-sm-9"><code>{{ run.source_filename or 'unknown' }}</code></dd>
+      <dt class="col-sm-3">Source version</dt><dd class="col-sm-9"><code>{{ run.source_version }}</code></dd>
+      <dt class="col-sm-3">Content type</dt><dd class="col-sm-9"><code>{{ run.source_content_type or 'unknown' }}</code></dd>
+      <dt class="col-sm-3">Created</dt><dd class="col-sm-9">{{ run.rows_created }}</dd>
+      <dt class="col-sm-3">Updated</dt><dd class="col-sm-9">{{ run.rows_updated }}</dd>
+      <dt class="col-sm-3">Unchanged</dt><dd class="col-sm-9">{{ run.rows_unchanged }}</dd>
+      <dt class="col-sm-3">Deactivated</dt><dd class="col-sm-9">{{ run.rows_deactivated }}</dd>
+      <dt class="col-sm-3">Links written</dt><dd class="col-sm-9">{{ run.links_written }}</dd>
+      {% if previous_run %}
+      <dt class="col-sm-3">Previous run</dt><dd class="col-sm-9"><code>{{ previous_run.completed_at }}</code></dd>
+      {% endif %}
+    </dl>
+  </div>
+</div>
+
+{% if previous_run %}
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4"><div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Created delta</div><div class="fs-4 fw-semibold">{{ run.rows_created - previous_run.rows_created }}</div></div></div></div>
+  <div class="col-12 col-md-4"><div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Updated delta</div><div class="fs-4 fw-semibold">{{ run.rows_updated - previous_run.rows_updated }}</div></div></div></div>
+  <div class="col-12 col-md-4"><div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Deactivated delta</div><div class="fs-4 fw-semibold">{{ run.rows_deactivated - previous_run.rows_deactivated }}</div></div></div></div>
+</div>
+{% endif %}
+
+{% macro render_entry_list(title, entries) -%}
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h2 class="h5 mb-3">{{ title }}</h2>
+    {% if entries %}
+    <ul class="mb-0 algorithm-import-entry-list">
+      {% for entry in entries %}
+      <li>
+        <strong>#{{ entry.catalog_number }}</strong> {{ entry.name }}
+        <span class="text-muted">({{ entry.category }})</span>
+        {% if entry.implementation_decision %}
+        <span class="badge text-bg-light">decision={{ entry.implementation_decision }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-muted mb-0">None.</p>
+    {% endif %}
+  </div>
+</div>
+{%- endmacro %}
+
+{{ render_entry_list('Created entries', created_entries) }}
+{{ render_entry_list('Updated entries', updated_entries) }}
+{{ render_entry_list('Deactivated entries', deactivated_entries) }}
+{{ render_entry_list('Unresolved entries', unresolved_entries) }}
+{{ render_entry_list('Entries with changed links', changed_link_entries) }}
+{{ render_entry_list('Entries with preserved manual links', preserved_manual_link_entries) }}
+{% endblock %}

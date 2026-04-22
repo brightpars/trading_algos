@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from inspect import getsourcefile
+from pathlib import Path
 from typing import Any, Callable, Literal
 
 
@@ -39,6 +41,7 @@ CompositionRole = Literal[
 class AlgorithmSpec:
     key: str
     name: str
+    catalog_ref: str
     builder: AlgorithmBuilder
     default_param: Any
     param_normalizer: Normalizer
@@ -61,6 +64,26 @@ class AlgorithmSpec:
         "leaf_signal",
         "ensemble_member",
     )
+
+    @property
+    def builder_name(self) -> str:
+        return getattr(self.builder, "__name__", "")
+
+    @property
+    def builder_module(self) -> str:
+        return str(getattr(self.builder, "__module__", ""))
+
+    @property
+    def builder_source_file(self) -> str:
+        source_file = getsourcefile(self.builder)
+        if source_file is None:
+            return ""
+        source_path = Path(source_file).resolve()
+        project_root = Path(__file__).resolve().parents[3]
+        try:
+            return str(source_path.relative_to(project_root))
+        except ValueError:
+            return str(source_path)
 
 
 AlertAlgorithmSpec = AlgorithmSpec

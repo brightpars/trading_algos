@@ -21,8 +21,14 @@ def test_create_app_registers_core_routes(monkeypatch):
         def __init__(self):
             self.docs = []
 
-        def find(self, *_args, **_kwargs):
-            return _Cursor(self.docs)
+        def find(self, query=None, **_kwargs):
+            effective_query = dict(query or {})
+            filtered = [
+                doc
+                for doc in self.docs
+                if all(doc.get(k) == v for k, v in effective_query.items())
+            ]
+            return _Cursor(filtered)
 
         def insert_one(self, payload):
             self.docs.append(dict(payload))
@@ -94,6 +100,7 @@ def test_create_app_registers_core_routes(monkeypatch):
     assert client.get("/health").status_code == 200
     assert client.get("/algorithms").status_code == 200
     assert client.get("/administration").status_code == 200
+    assert client.get("/api/algorithms/catalog").status_code == 200
     response = client.get("/")
     assert b"Market data server" in response.data
     assert b'value="127.0.0.2"' in response.data

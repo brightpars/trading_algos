@@ -105,6 +105,37 @@ pre {
   gap: 0.5rem;
 }
 
+.catalog-admin-actions {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.catalog-admin-actions__form {
+  align-items: flex-end;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.catalog-admin-actions__form--upload {
+  flex-wrap: wrap;
+}
+
+.catalog-admin-actions__form--sync {
+  margin-top: 1.75rem;
+}
+
+.catalog-admin-actions__form--sync .btn {
+  white-space: nowrap;
+}
+
+@media (width <= 767.98px) {
+  .catalog-admin-actions__form--sync {
+    margin-top: 0;
+  }
+}
+
 .builder-algorithm-meta {
   color: #6c757d;
   display: flex;
@@ -256,10 +287,37 @@ pre {
 
 .experiment-runtime-timer {
   color: #0d6efd;
-  font-size: 2rem;
-  font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1;
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.algorithm-catalog-card {
+  border: 1px solid #e5e7eb;
+}
+
+.algorithm-catalog-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.offcanvas.offcanvas-end {
+  width: min(640px, 92vw);
+}
+
+.algorithm-import-entry-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.algorithm-import-entry-list li {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  list-style-position: inside;
+  padding: 0.6rem 0.75rem;
 }
 
 .experiment-runtime-card.is-failed {

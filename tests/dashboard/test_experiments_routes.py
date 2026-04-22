@@ -34,10 +34,13 @@ class _Collection:
                 return doc
         return None
 
-    def update_one(self, query, update):
+    def update_one(self, query, update, upsert=False):
         doc = self.find_one(query)
         if doc is None:
-            return None
+            if not upsert:
+                return None
+            doc = dict(query)
+            self.docs.append(doc)
         if "$set" in update and isinstance(update["$set"], dict):
             doc.update(update["$set"])
         return None
@@ -128,6 +131,21 @@ def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypa
     assert b"Combo Breakout" in response.data
     assert draft_id.encode() in response.data
     assert b"close_high_channel_breakout" in response.data
+
+
+def test_new_experiment_page_prefills_selected_algorithm_from_query(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+
+    response = app.test_client().get("/experiments/new?alg_key=boundary_breakout")
+
+    assert response.status_code == 200
+    assert b"boundary_breakout" in response.data
+    assert b"&#34;alg_key&#34;: &#34;boundary_breakout&#34;" in response.data
 
 
 def test_experiment_history_allows_deleting_one_experiment(monkeypatch):
@@ -1349,108 +1367,6 @@ def test_data_source_unavailable_message_includes_data_server_endpoint(monkeypat
     )
 
 
-def test_new_experiment_page_shows_cleanup_action_for_legacy_selected_algorithms(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_legacy",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": ["close_high_channel_breakout"],
-            "notes": "legacy payload",
-        }
-    )
-
-    client = app.test_client()
-    response = client.get("/experiments/new")
-
-    assert response.status_code == 200
-    assert b"Clean selected algos" in response.data
-    assert b"/experiments/exp_legacy/cleanup-selected-algorithms" in response.data
-
-
-def test_new_experiment_page_shows_cleanup_action_for_non_legacy_selected_algorithms(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_clean",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": [
-                {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 20}}
-            ],
-            "notes": "valid payload",
-        }
-    )
-
-    client = app.test_client()
-    response = client.get("/experiments/new")
-
-    assert response.status_code == 200
-    assert b"Clean selected algos" in response.data
-    assert b"/experiments/exp_clean/cleanup-selected-algorithms" in response.data
-
-
-def test_recent_preset_ignores_invalid_selected_algorithm_entries_in_algorithms_json(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_mixed",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": [
-                "close_high_channel_breakout",
-                {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 20}},
-                {"alg_param": {"window": 5}},
-            ],
-            "notes": "mixed payload",
-        }
-    )
-
-    client = app.test_client()
-    response = client.get("/experiments/new")
-
-    assert response.status_code == 200
-    assert b"data-algorithms-json=" in response.data
-    assert b"close_high_channel_breakout" in response.data
-    assert b"window" in response.data
-    assert b"20" in response.data
-    assert b'close_high_channel_breakout"]' not in response.data
-
-
 def test_recent_preset_does_not_double_encode_algorithms_json(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
@@ -1483,201 +1399,3 @@ def test_recent_preset_does_not_double_encode_algorithms_json(monkeypatch):
         b"data-algorithms-json='[{&#34;alg_key&#34;: &#34;boundary_breakout&#34;, &#34;alg_param&#34;: {&#34;period&#34;: 5}}]'"
         in response.data
     )
-
-
-def test_cleanup_selected_algorithms_rewrites_legacy_entries(monkeypatch):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_legacy",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": ["close_high_channel_breakout"],
-            "notes": "legacy payload",
-        }
-    )
-
-    client = app.test_client()
-    response = client.post("/experiments/exp_legacy/cleanup-selected-algorithms")
-
-    assert response.status_code == 302
-    stored = app.extensions["experiment_repository"].get_experiment("exp_legacy")
-    assert stored is not None
-    assert stored["selected_algorithms"] == []
-
-
-def test_cleanup_selected_algorithms_returns_error_for_unknown_legacy_algorithm(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_unknown",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": ["missing_alg"],
-            "notes": "legacy payload",
-        }
-    )
-
-    client = app.test_client()
-    response = client.post(
-        "/experiments/exp_unknown/cleanup-selected-algorithms",
-        follow_redirects=True,
-    )
-
-    assert response.status_code == 200
-    assert b"Removed saved selected algorithm config." in response.data
-    stored = app.extensions["experiment_repository"].get_experiment("exp_unknown")
-    assert stored is not None
-    assert stored["selected_algorithms"] == []
-
-
-def test_experiment_detail_shows_cleanup_action_for_legacy_selected_algorithms(
-    monkeypatch,
-):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_legacy",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": ["close_high_channel_breakout"],
-            "notes": "legacy payload",
-            "candle_count": 0,
-        }
-    )
-
-    client = app.test_client()
-    response = client.get("/experiments/exp_legacy")
-
-    assert response.status_code == 200
-    assert b"Clean selected algos" not in response.data
-    assert b"/experiments/exp_legacy/cleanup-selected-algorithms" not in response.data
-
-
-def test_cleanup_selected_algorithms_hides_action_after_success(monkeypatch):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_legacy",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": ["close_high_channel_breakout"],
-            "notes": "legacy payload",
-            "candle_count": 0,
-        }
-    )
-
-    client = app.test_client()
-    cleanup_response = client.post(
-        "/experiments/exp_legacy/cleanup-selected-algorithms",
-        headers={"Referer": "/experiments/exp_legacy"},
-        follow_redirects=True,
-    )
-
-    assert cleanup_response.status_code == 200
-    assert b"Removed saved selected algorithm config." in cleanup_response.data
-    assert b"Clean selected algos" not in cleanup_response.data
-
-    history_response = client.get("/experiments")
-    assert history_response.status_code == 200
-    assert b"Clean selected algos" not in history_response.data
-
-
-def test_history_page_does_not_show_cleanup_action(monkeypatch):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_history",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": ["close_high_channel_breakout"],
-            "notes": "history payload",
-            "candle_count": 0,
-        }
-    )
-
-    client = app.test_client()
-    response = client.get("/experiments")
-
-    assert response.status_code == 200
-    assert b"Clean selected algos" not in response.data
-
-
-def test_cleanup_selected_algorithms_removes_recent_preset_box(monkeypatch):
-    monkeypatch.setattr(
-        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
-    )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
-    app.extensions["experiment_repository"].create_experiment(
-        {
-            "experiment_id": "exp_legacy",
-            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
-            "symbol": "AAPL",
-            "time_range": {
-                "start": "2024-02-01 09:30:00",
-                "end": "2024-02-03 16:00:00",
-            },
-            "selected_algorithms": ["close_high_channel_breakout"],
-            "notes": "legacy payload",
-        }
-    )
-
-    client = app.test_client()
-    cleanup_response = client.post(
-        "/experiments/exp_legacy/cleanup-selected-algorithms",
-        headers={"Referer": "/experiments/new"},
-        follow_redirects=True,
-    )
-
-    assert cleanup_response.status_code == 200
-    assert b"Removed saved selected algorithm config." in cleanup_response.data
-    assert b"recent-experiment-preset" not in cleanup_response.data

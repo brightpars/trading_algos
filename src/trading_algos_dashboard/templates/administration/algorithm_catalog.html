@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% block title %}Algorithm catalog administration · Trading Algos Dashboard{% endblock %}
+{% block content %}
+<div data-admin-algorithm-catalog>
+<div class="d-flex justify-content-between align-items-start mb-4 gap-3 flex-wrap">
+  <div>
+    <h1>Algorithm catalog administration</h1>
+    <p class="text-muted mb-0">Review imported catalog entries, inspect read-only implementation mappings, and rebuild linkages from implementation-declared catalog references.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('administration.administration_home') }}">Back to administration</a>
+</div>
+
+<form method="get" class="card shadow-sm mb-4">
+  <div class="card-body row g-3 align-items-end">
+    <div class="col-12 col-lg-4">
+      <label class="form-label" for="catalog-admin-search">Search</label>
+      <input id="catalog-admin-search" class="form-control" type="search" name="q" value="{{ filters.search_text }}" placeholder="Search names, IDs, links, notes, references, and implementation metadata">
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+      <label class="form-label" for="catalog-admin-status">Status</label>
+      <select id="catalog-admin-status" class="form-select" name="status">
+        <option value="">All</option>
+        {% for status in implementation_statuses %}
+        <option value="{{ status.value }}" {% if filters.implementation_status == status.value %}selected{% endif %}>{{ status.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+      <label class="form-label" for="catalog-admin-review-state">Review state</label>
+      <select id="catalog-admin-review-state" class="form-select" name="review_state">
+        <option value="">All</option>
+        {% for state in review_states %}
+        <option value="{{ state.value }}" {% if filters.review_state == state.value %}selected{% endif %}>{{ state.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+      <label class="form-label" for="catalog-admin-category">Category</label>
+      <select id="catalog-admin-category" class="form-select" name="category">
+        <option value="">All</option>
+        {% for category in categories %}
+        <option value="{{ category }}" {% if filters.category == category %}selected{% endif %}>{{ category }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+      <label class="form-label" for="catalog-admin-catalog-type">Catalog type</label>
+      <select id="catalog-admin-catalog-type" class="form-select" name="catalog_type">
+        <option value="">All</option>
+        {% for catalog_type in catalog_types %}
+        <option value="{{ catalog_type }}" {% if filters.catalog_type == catalog_type %}selected{% endif %}>{{ catalog_type|replace('_', ' ')|title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+      <label class="form-label" for="catalog-admin-advanced-label">Advanced</label>
+      <select id="catalog-admin-advanced-label" class="form-select" name="advanced_label">
+        <option value="">All</option>
+        {% for advanced_label in advanced_labels %}
+        <option value="{{ advanced_label }}" {% if filters.advanced_label == advanced_label %}selected{% endif %}>{{ advanced_label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-4 col-lg-2">
+      <label class="form-label" for="catalog-admin-linked">Link state</label>
+      <select id="catalog-admin-linked" class="form-select" name="linked">
+        <option value="" {% if not filters.linked %}selected{% endif %}>All</option>
+        <option value="true" {% if filters.linked == 'true' %}selected{% endif %}>Linked</option>
+        <option value="false" {% if filters.linked == 'false' %}selected{% endif %}>Unlinked</option>
+      </select>
+    </div>
+    <div class="col-12 col-md-4 col-lg-2 d-flex gap-2">
+      <button class="btn btn-primary w-100" type="submit">Apply</button>
+    </div>
+    <div class="col-12">
+      <div class="d-flex gap-4 flex-wrap">
+        <div class="form-check">
+          <input id="catalog-admin-only-broken" class="form-check-input" type="checkbox" name="only_broken" value="true" {% if filters.only_broken %}checked{% endif %}>
+          <label class="form-check-label" for="catalog-admin-only-broken">Show only broken links</label>
+        </div>
+        <div class="form-check">
+          <input id="catalog-admin-only-unresolved" class="form-check-input" type="checkbox" name="only_unresolved" value="true" {% if filters.only_unresolved %}checked{% endif %}>
+          <label class="form-check-label" for="catalog-admin-only-unresolved">Show only unresolved items in the API-driven queue</label>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 d-flex gap-2">
+      <a class="btn btn-outline-secondary" href="{{ url_for('administration.algorithm_catalog_admin') }}">Reset</a>
+    </div>
+  </div>
+</form>
+
+{% if filters.search_text %}
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h2 class="h5 mb-1">Search results</h2>
+        <p class="text-muted mb-0">All catalog entries matching <code>{{ filters.search_text }}</code>, regardless of workflow bucket.</p>
+      </div>
+      <span class="badge text-bg-primary">{{ queue_payload['total_count'] }} matches</span>
+    </div>
+    {% if queue_payload['items'] %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Current link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in queue_payload['items'] %}
+          <tr>
+            <td>{{ entry.catalog_number }}</td>
+            <td>
+              <div class="fw-semibold">{{ entry.name }}</div>
+              <div class="small text-muted">{{ entry.category }} · {{ entry.catalog_type|replace('_', ' ') }}</div>
+            </td>
+            <td>
+              <span class="badge {{ 'text-bg-success' if entry.implementation_status == 'implemented' else 'text-bg-warning' if entry.implementation_status in ['broken_link', 'implementation_needs_review'] else 'text-bg-secondary' }}">{{ entry.implementation_label }}</span>
+              <div class="small text-muted mt-1">review={{ entry.review_state_label }}</div>
+            </td>
+            <td>
+              {% if entry.alg_impl_id %}
+              <code>{{ entry.alg_impl_id }}</code>
+              {% else %}
+              <span class="text-muted">None</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No catalog entries matched the current search.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Unresolved</div><div class="fs-3 fw-semibold">{{ summary.unresolved_count }}</div></div></div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Needs review</div><div class="fs-3 fw-semibold">{{ summary.needs_review_count }}</div></div></div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm h-100"><div class="card-body"><div class="small text-muted">Broken links</div><div class="fs-3 fw-semibold">{{ summary.broken_link_count }}</div></div></div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body d-flex justify-content-between align-items-start gap-3 flex-wrap">
+    <div>
+      <h2 class="h5 mb-1">Latest import</h2>
+      {% if latest_run %}
+      <p class="text-muted mb-1">Completed: <code>{{ latest_run.completed_at }}</code> · created={{ latest_run.rows_created }} updated={{ latest_run.rows_updated }} unchanged={{ latest_run.rows_unchanged }}</p>
+      <p class="text-muted mb-0">File: <code>{{ latest_run.source_filename or 'unknown' }}</code> · version={{ latest_run.source_version }}</p>
+      {% else %}
+      <p class="text-muted mb-0">No import runs recorded yet. Upload a catalog source file to create the first import run.</p>
+      {% endif %}
+    </div>
+    <div class="catalog-admin-actions">
+      <form method="post" action="{{ url_for('administration.import_algorithm_catalog') }}" enctype="multipart/form-data" class="catalog-admin-actions__form catalog-admin-actions__form--upload">
+        <div>
+          <label class="form-label mb-1" for="catalog-file">Catalog source file</label>
+          <input id="catalog-file" class="form-control" type="file" name="catalog_file" accept=".md,.html,.htm" required>
+        </div>
+        <button class="btn btn-primary" type="submit">Upload and import</button>
+      </form>
+      <form method="post" action="{{ url_for('administration.sync_algorithm_catalog_links') }}" class="catalog-admin-actions__form catalog-admin-actions__form--sync">
+        <button class="btn btn-outline-primary" type="submit">Sync implementation linkages</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% macro render_entry_table(title, payload, empty_message, page_param_name, nav_label, other_pages) -%}
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h2 class="h5 mb-1">{{ title }}</h2>
+        <p class="text-muted mb-0">{{ payload['total_count'] }} items</p>
+      </div>
+      {% if payload['total_pages'] > 1 %}
+      <span class="badge text-bg-light">Page {{ payload['page'] }} / {{ payload['total_pages'] }}</span>
+      {% endif %}
+    </div>
+    {% if payload['items'] %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Current link</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in payload['items'] %}
+          <tr>
+            <td>{{ entry.catalog_number }}</td>
+            <td>
+              <div class="fw-semibold">{{ entry.name }}</div>
+              <div class="small text-muted">{{ entry.category }} · {{ entry.catalog_type|replace('_', ' ') }}</div>
+            </td>
+            <td>
+              <span class="badge {{ 'text-bg-success' if entry.implementation_status == 'implemented' else 'text-bg-warning' if entry.implementation_status in ['broken_link', 'implementation_needs_review'] else 'text-bg-secondary' }}">{{ entry.implementation_label }}</span>
+              {% if entry.alg_impl_link %}
+              <div class="small text-muted mt-1">review={{ entry.alg_impl_link.review_state or 'n/a' }}</div>
+              <div class="small text-muted">source={{ entry.link_source_label }} · confidence={{ entry.alg_impl_link.match_confidence }}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if entry.alg_impl_id %}
+              <code>{{ entry.alg_impl_id }}</code>
+              {% if entry.alg_impl_link %}
+              <div class="small text-muted mt-1">{{ entry.alg_impl_link.match_reason or entry.alg_impl_link.match_type }}</div>
+              {% endif %}
+              {% else %}
+              <span class="text-muted">None</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if payload['total_pages'] > 1 %}
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mt-3">
+      <p class="text-muted mb-0">
+        Showing page {{ payload['page'] }} of {{ payload['total_pages'] }}
+        ({{ payload['page_size'] }} items per page).
+      </p>
+      <nav aria-label="{{ nav_label }}">
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item {% if payload['page'] <= 1 %}disabled{% endif %}">
+            <a
+              class="page-link"
+              href="{{ url_for('administration.algorithm_catalog_admin', q=filters.search_text, status=filters.implementation_status, review_state=filters.review_state, category=filters.category, catalog_type=filters.catalog_type, advanced_label=filters.advanced_label, linked=filters.linked, only_broken='true' if filters.only_broken else None, only_unresolved='true' if filters.only_unresolved else None, unresolved_page=other_pages.unresolved_page if page_param_name != 'unresolved_page' else payload['page'] - 1, broken_page=other_pages.broken_page if page_param_name != 'broken_page' else payload['page'] - 1, review_page=other_pages.review_page if page_param_name != 'review_page' else payload['page'] - 1, page=other_pages.page if page_param_name != 'page' else payload['page'] - 1) }}"
+              aria-label="Previous page"
+            >Previous</a>
+          </li>
+          <li class="page-item disabled"><span class="page-link">Page {{ payload['page'] }} / {{ payload['total_pages'] }}</span></li>
+          <li class="page-item {% if payload['page'] >= payload['total_pages'] %}disabled{% endif %}">
+            <a
+              class="page-link"
+              href="{{ url_for('administration.algorithm_catalog_admin', q=filters.search_text, status=filters.implementation_status, review_state=filters.review_state, category=filters.category, catalog_type=filters.catalog_type, advanced_label=filters.advanced_label, linked=filters.linked, only_broken='true' if filters.only_broken else None, only_unresolved='true' if filters.only_unresolved else None, unresolved_page=other_pages.unresolved_page if page_param_name != 'unresolved_page' else payload['page'] + 1, broken_page=other_pages.broken_page if page_param_name != 'broken_page' else payload['page'] + 1, review_page=other_pages.review_page if page_param_name != 'review_page' else payload['page'] + 1, page=other_pages.page if page_param_name != 'page' else payload['page'] + 1) }}"
+              aria-label="Next page"
+            >Next</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="text-muted mb-0">{{ empty_message }}</p>
+    {% endif %}
+  </div>
+</div>
+{%- endmacro %}
+
+{{ render_entry_table('Needs review', review_payload, 'No review-needed entries right now.', 'review_page', 'Needs review pagination', filters) }}
+{{ render_entry_table('Unresolved entries', unresolved_payload, 'No unresolved entries right now.', 'unresolved_page', 'Unresolved entries pagination', filters) }}
+{{ render_entry_table('Broken links', broken_payload, 'No broken links right now.', 'broken_page', 'Broken links pagination', filters) }}
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h2 class="h5 mb-1">Filtered queue snapshot</h2>
+        <p class="text-muted mb-0">Server-side paginated queue from the admin API for unresolved and review workflows.</p>
+      </div>
+      <span class="badge text-bg-light">{{ queue_payload['total_count'] }} items</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm" data-admin-queue-table>
+        <thead>
+          <tr><th>#</th><th>Name</th><th>Status</th><th>Link</th><th>Review</th></tr>
+        </thead>
+        <tbody>
+          {% for entry in queue_payload['items'] %}
+          <tr>
+            <td>{{ entry.catalog_number }}</td>
+            <td>{{ entry.name }}</td>
+            <td>{{ entry.implementation_label }}</td>
+            <td>{% if entry.alg_impl_id %}<code>{{ entry.alg_impl_id }}</code>{% else %}<span class="text-muted">None</span>{% endif %}</td>
+            <td>{{ entry.review_state_label }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if queue_payload['total_pages'] > 1 %}
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mt-3">
+      <p class="text-muted mb-0">
+        Showing page {{ queue_payload['page'] }} of {{ queue_payload['total_pages'] }}
+        ({{ queue_payload['page_size'] }} items per page).
+      </p>
+      <nav aria-label="Filtered queue pagination">
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item {% if queue_payload['page'] <= 1 %}disabled{% endif %}">
+            <a
+              class="page-link"
+              href="{{ url_for('administration.algorithm_catalog_admin', q=filters.search_text, status=filters.implementation_status, review_state=filters.review_state, category=filters.category, catalog_type=filters.catalog_type, advanced_label=filters.advanced_label, linked=filters.linked, only_broken='true' if filters.only_broken else None, only_unresolved='true' if filters.only_unresolved else None, unresolved_page=filters.unresolved_page, broken_page=filters.broken_page, review_page=filters.review_page, page=queue_payload['page'] - 1) }}"
+              aria-label="Previous queue page"
+            >Previous</a>
+          </li>
+          <li class="page-item disabled"><span class="page-link">Page {{ queue_payload['page'] }} / {{ queue_payload['total_pages'] }}</span></li>
+          <li class="page-item {% if queue_payload['page'] >= queue_payload['total_pages'] %}disabled{% endif %}">
+            <a
+              class="page-link"
+              href="{{ url_for('administration.algorithm_catalog_admin', q=filters.search_text, status=filters.implementation_status, review_state=filters.review_state, category=filters.category, catalog_type=filters.catalog_type, advanced_label=filters.advanced_label, linked=filters.linked, only_broken='true' if filters.only_broken else None, only_unresolved='true' if filters.only_unresolved else None, unresolved_page=filters.unresolved_page, broken_page=filters.broken_page, review_page=filters.review_page, page=queue_payload['page'] + 1) }}"
+              aria-label="Next queue page"
+            >Next</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card shadow-sm" data-admin-import-history>
+  <div class="card-body">
+    <h2 class="h5 mb-3">Import history</h2>
+    {% if import_runs %}
+    <div class="table-responsive">
+      <table class="table table-sm">
+        <thead><tr><th>Completed</th><th>File</th><th>Status</th><th>Created</th><th>Updated</th><th>Unchanged</th><th>Deactivated</th><th>Links</th><th></th></tr></thead>
+        <tbody>
+          {% for run in import_runs %}
+          <tr>
+            <td><code>{{ run.completed_at }}</code></td>
+            <td><code>{{ run.source_filename or 'unknown' }}</code></td>
+            <td>{{ run.status }}</td>
+            <td>{{ run.rows_created }}</td>
+            <td>{{ run.rows_updated }}</td>
+            <td>{{ run.rows_unchanged }}</td>
+            <td>{{ run.rows_deactivated }}</td>
+            <td>{{ run.links_written }}</td>
+            <td><a class="btn btn-outline-primary btn-sm" href="{{ url_for('administration.algorithm_catalog_import_detail', run_id=run.id) }}">Details</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted mb-0">No import history yet.</p>
+    {% endif %}
+  </div>
+</div>
+ </div>
+{% endblock %}

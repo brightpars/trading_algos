@@ -31,17 +31,6 @@ bp = Blueprint("experiments", __name__, url_prefix="/experiments")
 _EXPERIMENT_FORM_COOKIE = "trading_algos_dashboard_experiment_form"
 
 
-def _has_legacy_selected_algorithms(selected_algorithms: object) -> bool:
-    if not isinstance(selected_algorithms, list):
-        return False
-    for algorithm in selected_algorithms:
-        if not isinstance(algorithm, dict):
-            return True
-        if "alg_key" not in algorithm or "alg_param" not in algorithm:
-            return True
-    return False
-
-
 def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str]:
     default_algorithms = "[]"
     if catalog:
@@ -94,9 +83,6 @@ def _serialize_recent_experiment(experiment: dict[str, object]) -> dict[str, str
         "algorithms_json": json.dumps(serialized_algorithms),
         "algorithm_count": str(len(serialized_algorithms)),
         "created_at_label": created_at_label,
-        "has_legacy_selected_algorithms": "true"
-        if _has_legacy_selected_algorithms(selected_algorithms)
-        else "false",
     }
 
 
@@ -114,20 +100,14 @@ def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
 
     selected_algorithms = experiment.get("selected_algorithms")
     if isinstance(selected_algorithms, list) and len(selected_algorithms) > 0:
-        normalized_algorithms = []
-        for algorithm in selected_algorithms:
-            if isinstance(algorithm, dict) and isinstance(
-                algorithm.get("alg_key"), str
-            ):
-                normalized_algorithms.append(
-                    {
-                        "alg_key": algorithm.get("alg_key"),
-                        "alg_param": algorithm.get("alg_param", {}),
-                    }
-                )
-                continue
-            if isinstance(algorithm, str):
-                normalized_algorithms.append({"legacy_alg_key": algorithm})
+        normalized_algorithms = [
+            {
+                "alg_key": algorithm.get("alg_key"),
+                "alg_param": algorithm.get("alg_param", {}),
+            }
+            for algorithm in selected_algorithms
+            if isinstance(algorithm, dict) and isinstance(algorithm.get("alg_key"), str)
+        ]
         if normalized_algorithms:
             signature_payload["input_kind"] = "single_algorithm"
             signature_payload["algorithms"] = normalized_algorithms
@@ -172,9 +152,6 @@ def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
 
 def _decorate_experiment(experiment: dict[str, object]) -> dict[str, object]:
     decorated = dict(experiment)
-    decorated["has_legacy_selected_algorithms"] = _has_legacy_selected_algorithms(
-        decorated.get("selected_algorithms")
-    )
     started_at = decorated.get("started_at")
     if isinstance(started_at, datetime) and started_at.tzinfo is None:
         started_at = started_at.replace(tzinfo=timezone.utc)
@@ -198,55 +175,6 @@ def _serialize_experiment_runtime(experiment: dict[str, object]) -> dict[str, ob
                 value = value.replace(tzinfo=timezone.utc)
             serialized[field] = value.astimezone(timezone.utc).isoformat()
     return serialized
-
-
-def _cleanup_selected_algorithms_payload(
-    selected_algorithms: object,
-) -> tuple[list[dict[str, object]], int]:
-    if not isinstance(selected_algorithms, list):
-        raise ValueError("selected_algorithms must be a list")
-
-    cleaned_algorithms: list[dict[str, object]] = []
-    cleaned_count = 0
-    catalog_service = current_app.extensions["algorithm_catalog_service"]
-
-    for index, algorithm in enumerate(selected_algorithms, start=1):
-        if isinstance(algorithm, dict):
-            if "alg_key" not in algorithm or "alg_param" not in algorithm:
-                raise ValueError(
-                    f"Algorithm #{index} cannot be cleaned automatically because it is missing alg_key or alg_param"
-                )
-            cleaned_algorithms.append(
-                {
-                    "alg_key": algorithm["alg_key"],
-                    "alg_param": algorithm["alg_param"],
-                }
-            )
-            continue
-
-        if isinstance(algorithm, str):
-            catalog_entry = next(
-                (item for item in catalog_service() if item.get("key") == algorithm),
-                None,
-            )
-            if catalog_entry is None:
-                raise ValueError(
-                    f"Algorithm #{index} cannot be cleaned automatically because '{algorithm}' is not in the catalog"
-                )
-            cleaned_algorithms.append(
-                {
-                    "alg_key": algorithm,
-                    "alg_param": catalog_entry["default_param"],
-                }
-            )
-            cleaned_count += 1
-            continue
-
-        raise ValueError(
-            f"Algorithm #{index} cannot be cleaned automatically because its value is unsupported"
-        )
-
-    return cleaned_algorithms, cleaned_count
 
 
 def _recent_experiment_presets() -> list[dict[str, str]]:
@@ -291,23 +219,49 @@ def _load_configuration_preset(draft_id: str | None) -> dict[str, str] | None:
     }
 
 
+def _load_algorithm_preset(alg_key: str | None) -> dict[str, str] | None:
+    if not alg_key:
+        return None
+    algorithm_catalog_service = current_app.extensions["algorithm_catalog_service"]
+    try:
+        algorithm_spec = algorithm_catalog_service.get_algorithm_implementation(alg_key)
+    except ValueError:
+        return None
+    return {
+        "algorithms_json": json.dumps(
+            [
+                {
+                    "alg_key": str(algorithm_spec["key"]),
+                    "alg_param": algorithm_spec.get("default_param", {}),
+                }
+            ]
+        )
+    }
+
+
 def _render_new_experiment(
     *,
     status_code: int = 200,
     form_data: dict[str, str] | None = None,
 ) -> Response:
-    catalog = current_app.extensions["algorithm_catalog_service"]()
+    catalog = current_app.extensions[
+        "algorithm_catalog_service"
+    ].list_algorithm_implementations()
 
     effective_form_data = _experiment_form_defaults(catalog)
     effective_form_data.update(
         load_form_state(request.cookies.get(_EXPERIMENT_FORM_COOKIE))
     )
     selected_configuration = _load_configuration_preset(request.args.get("draft_id"))
+    selected_algorithm = _load_algorithm_preset(request.args.get("alg_key"))
     if selected_configuration is not None:
         effective_form_data["configuration_json"] = selected_configuration[
             "configuration_json"
         ]
         effective_form_data["algorithms_json"] = "[]"
+    elif selected_algorithm is not None:
+        effective_form_data["algorithms_json"] = selected_algorithm["algorithms_json"]
+        effective_form_data["configuration_json"] = ""
     if form_data is not None:
         effective_form_data.update(form_data)
 
@@ -353,24 +307,6 @@ def history():
 @bp.get("/new")
 def new_experiment():
     return _render_new_experiment()
-
-
-@bp.post("/<experiment_id>/cleanup-selected-algorithms")
-def cleanup_selected_algorithms(experiment_id: str):
-    repo = current_app.extensions["experiment_repository"]
-    experiment = repo.get_experiment(experiment_id)
-    if experiment is None:
-        abort(404)
-
-    selected_algorithms = experiment.get("selected_algorithms")
-    if not isinstance(selected_algorithms, list) or len(selected_algorithms) == 0:
-        flash("No saved selected algorithm config was found to clean.", "info")
-        return redirect(request.referrer or url_for("experiments.history"))
-
-    repo.clear_selected_algorithms(experiment_id)
-    flash("Removed saved selected algorithm config.", "success")
-
-    return redirect(request.referrer or url_for("experiments.history"))
 
 
 @bp.post("/<experiment_id>/cancel")

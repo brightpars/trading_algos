@@ -60,9 +60,6 @@
             <div class="small mt-2"><strong>Notes:</strong> {{ experiment.notes }}</div>
             {% endif %}
           </button>
-          <form method="post" action="{{ url_for('experiments.cleanup_selected_algorithms', experiment_id=experiment.experiment_id) }}">
-            <button class="btn btn-outline-warning btn-sm" type="submit">Clean selected algos</button>
-          </form>
         </div>
       </div>
     </div>

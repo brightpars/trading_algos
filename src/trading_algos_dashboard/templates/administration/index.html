@@ -13,6 +13,49 @@
 </div>
 
 <div class="row g-4">
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <h2 class="h5 mb-1">Algorithm catalog</h2>
+            <p class="text-muted mb-2">Algorithm catalog workflow now lives in the dedicated catalog workspace. Use Administration only for summary and destructive maintenance.</p>
+            <p class="small text-muted mb-0">
+              Entries: <strong>{{ algorithm_catalog_summary.entry_count }}</strong>
+              · Links: <strong>{{ algorithm_catalog_summary.link_count }}</strong>
+              {% if algorithm_catalog_summary.latest_run %}
+              · Latest import: <code>{{ algorithm_catalog_summary.latest_run.completed_at }}</code>
+              {% endif %}
+            </p>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <a class="btn btn-outline-secondary" href="{{ url_for('algorithms.list_algorithms') }}">Open Algorithm Catalog</a>
+          </div>
+        </div>
+        <div class="border-top mt-4 pt-4">
+          <h3 class="h6 text-danger">Danger zone</h3>
+          <p class="text-muted small mb-2">This permanently deletes all catalog entries and materialized catalog links from the database. Implemented algorithm registrations in code are not affected.</p>
+          <form method="post" action="{{ url_for('administration.delete_algorithm_catalog_content') }}" class="row g-2 align-items-end">
+            <div class="col-12 col-lg-8">
+              <label class="form-label" for="algorithm-catalog-delete-confirmation">Type <code>{{ 'DELETE ALL ALGORITHM CATALOG ENTRIES' }}</code> to confirm</label>
+              <input
+                id="algorithm-catalog-delete-confirmation"
+                class="form-control"
+                type="text"
+                name="confirmation_text"
+                autocomplete="off"
+                spellcheck="false"
+                required
+              >
+            </div>
+            <div class="col-12 col-lg-4">
+              <button class="btn btn-outline-danger w-100" type="submit">Delete all catalog entries</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
   {% for item in content_summary %}
   <div class="col-12 col-lg-6">
     <div class="card h-100 shadow-sm">
@@ -25,9 +68,13 @@
           <span class="badge text-bg-secondary fs-6">{{ item.record_count }}</span>
         </div>
         <p class="small text-muted">Collection key: <code>{{ item.key }}</code></p>
+        {% if item.action_endpoint %}
         <form method="post" action="{{ url_for(item.action_endpoint) }}" class="mt-auto">
           <button class="btn btn-outline-danger" type="submit">{{ item.action_label }}</button>
         </form>
+        {% else %}
+        <div class="mt-auto text-muted small">{{ item.action_label }}</div>
+        {% endif %}
       </div>
     </div>
   </div>

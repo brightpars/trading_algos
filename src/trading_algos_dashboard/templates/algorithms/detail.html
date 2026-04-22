@@ -1,12 +1,108 @@
 {% extends "base.html" %}
+{% block title %}{{ algorithm.name }} · Algorithm Catalog{% endblock %}
 {% block content %}
-<h1>{{ algorithm.name }}</h1>
-<dl class="row">
-  <dt class="col-sm-3">Key</dt><dd class="col-sm-9"><code>{{ algorithm.key }}</code></dd>
-  <dt class="col-sm-3">Description</dt><dd class="col-sm-9">{{ algorithm.description }}</dd>
-  <dt class="col-sm-3">Category</dt><dd class="col-sm-9">{{ algorithm.category }}</dd>
-  <dt class="col-sm-3">Tags</dt><dd class="col-sm-9">{{ algorithm.tags|join(', ') }}</dd>
-  <dt class="col-sm-3">Default params</dt><dd class="col-sm-9"><code>{{ algorithm.default_param }}</code></dd>
-</dl>
-<a class="btn btn-primary" href="{{ url_for('experiments.new_experiment') }}">Run this algorithm</a>
+<div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+  <div>
+    <h1>{{ algorithm.name }}</h1>
+    <div class="d-flex gap-2 flex-wrap mt-2">
+      <span class="badge {{ 'text-bg-success' if algorithm.execution_status == 'runnable' else 'text-bg-secondary' if algorithm.execution_status == 'not_runnable' else 'text-bg-warning' }}">{{ algorithm.execution_label }}</span>
+      <span class="badge text-bg-light">{{ algorithm.category }}</span>
+      <span class="badge text-bg-light">{{ algorithm.catalog_type | replace('_', ' ') | title }}</span>
+      <span class="badge text-bg-light">{{ algorithm.review_state_label }}</span>
+      {% if algorithm.alg_impl_id %}<span class="badge text-bg-light"><code>{{ algorithm.alg_impl_id }}</code></span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a class="btn btn-outline-secondary" href="{{ url_for('algorithms.list_algorithms') }}">Back to catalog</a>
+    {% if algorithm.is_runnable and algorithm.alg_impl_spec %}<a class="btn btn-primary" href="{{ url_for('experiments.new_experiment', alg_key=algorithm.alg_impl_spec.key) }}">Run this algorithm</a>{% endif %}
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-12 col-xl-7">
+    <form method="post" class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+          <h2 class="h5 mb-0">Edit catalog fields</h2>
+          <div class="small text-muted">Catalog #{{ algorithm.catalog_number }} · {{ algorithm.catalog_type | replace('_', ' ') | title }}</div>
+        </div>
+        <div class="row g-3">
+          <div class="col-12 col-md-8"><label class="form-label">Name</label><input class="form-control" type="text" name="name" value="{{ algorithm.name }}" required></div>
+          <div class="col-12 col-md-4"><label class="form-label">Advanced label</label><input class="form-control" type="text" name="advanced_label" value="{{ algorithm.advanced_label }}"></div>
+          <div class="col-12 col-md-6"><label class="form-label">Category</label><input class="form-control" type="text" name="category" value="{{ algorithm.category }}"></div>
+          <div class="col-12 col-md-6"><label class="form-label">Subcategory</label><input class="form-control" type="text" name="subcategory" value="{{ algorithm.subcategory }}"></div>
+          <div class="col-12 col-md-8"><label class="form-label">Best use / horizon</label><input class="form-control" type="text" name="best_use_horizon" value="{{ algorithm.best_use_horizon }}"></div>
+          <div class="col-12 col-md-4"><label class="form-label">Home suitability score</label><input class="form-control" type="number" min="0" max="10" name="home_suitability_score" value="{{ algorithm.home_suitability_score }}"></div>
+          <div class="col-12"><label class="form-label">Core idea</label><textarea class="form-control" name="core_idea" rows="3">{{ algorithm.core_idea }}</textarea></div>
+          <div class="col-12"><label class="form-label">Typical inputs</label><textarea class="form-control" name="typical_inputs" rows="2">{{ algorithm.typical_inputs }}</textarea></div>
+          <div class="col-12"><label class="form-label">Signal style</label><textarea class="form-control" name="signal_style" rows="2">{{ algorithm.signal_style }}</textarea></div>
+          <div class="col-12"><label class="form-label">Extended implementation details</label><textarea class="form-control" name="extended_implementation_details" rows="4">{{ algorithm.extended_implementation_details }}</textarea></div>
+          <div class="col-12 col-md-6"><label class="form-label">Initial reference</label><input class="form-control" type="text" name="initial_reference" value="{{ algorithm.initial_reference }}"></div>
+          <div class="col-12 col-md-6"><label class="form-label">Implementation decision</label><input class="form-control" type="text" name="implementation_decision" value="{{ algorithm.implementation_decision }}"></div>
+          <div class="col-12"><label class="form-label">Implementation notes</label><textarea class="form-control" name="implementation_notes" rows="3">{{ algorithm.implementation_notes }}</textarea></div>
+          <div class="col-12"><label class="form-label">Admin annotations</label><textarea class="form-control" name="admin_annotations" rows="3">{{ algorithm.admin_annotations }}</textarea></div>
+        </div>
+      </div>
+      <div class="card-footer d-flex justify-content-end gap-2 flex-wrap">
+        <button class="btn btn-primary" type="submit">Save changes</button>
+      </div>
+    </form>
+  </div>
+  <div class="col-12 col-xl-5">
+    <form method="post" class="card shadow-sm h-100">
+      <div class="card-body">
+        <h2 class="h5">Implementation mapping and status</h2>
+        <dl class="row mb-3">
+          <dt class="col-sm-5">Origin</dt><dd class="col-sm-7">{{ algorithm.origin_label }}</dd>
+          <dt class="col-sm-5">Implementation source</dt><dd class="col-sm-7">{{ algorithm.link_source_label }}</dd>
+          <dt class="col-sm-5">Linked implementation</dt><dd class="col-sm-7">{% if algorithm.alg_impl_id %}<code>{{ algorithm.alg_impl_id }}</code>{% else %}<span class="text-muted">None</span>{% endif %}</dd>
+          <dt class="col-sm-5">Review state</dt><dd class="col-sm-7">{{ algorithm.review_state_label }}</dd>
+          <dt class="col-sm-5">Source version</dt><dd class="col-sm-7">{{ algorithm.source_version }}</dd>
+          <dt class="col-sm-5">Last import</dt><dd class="col-sm-7"><code>{{ algorithm.last_import_timestamp }}</code></dd>
+          {% if algorithm.alg_impl_link %}
+          <dt class="col-sm-5">Match confidence</dt><dd class="col-sm-7">{{ algorithm.alg_impl_link.match_confidence }}</dd>
+          <dt class="col-sm-5">Catalog ref</dt><dd class="col-sm-7"><code>{{ algorithm.alg_impl_spec.catalog_ref if algorithm.alg_impl_spec else algorithm.alg_impl_link.catalog_ref }}</code></dd>
+          {% endif %}
+        </dl>
+        <div class="row g-3 mb-4">
+          <div class="col-12">
+            <label class="form-label">Review state</label>
+            <select class="form-select" name="review_state">
+              {% for state in review_states %}
+              <option value="{{ state.value }}" {% if algorithm.alg_impl_link and algorithm.alg_impl_link.review_state == state.value %}selected{% endif %}>{{ state.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        {% if algorithm.alg_impl_spec %}
+        <h3 class="h6 mt-4">Implemented algorithm details</h3>
+        <dl class="row mb-0">
+          <dt class="col-sm-5">Implementation ID</dt><dd class="col-sm-7"><code>{{ algorithm.alg_impl_spec.key }}</code></dd>
+          <dt class="col-sm-5">Builder</dt><dd class="col-sm-7"><code>{{ algorithm.implementation_builder_name }}</code></dd>
+          <dt class="col-sm-5">Module</dt><dd class="col-sm-7"><code>{{ algorithm.implementation_builder_module }}</code></dd>
+          <dt class="col-sm-5">Source file</dt><dd class="col-sm-7"><code>{{ algorithm.implementation_source_file }}</code></dd>
+          <dt class="col-sm-5">Implementation status</dt><dd class="col-sm-7">{{ algorithm.alg_impl_spec.status }}</dd>
+          <dt class="col-sm-5">Asset scope</dt><dd class="col-sm-7">{{ algorithm.alg_impl_spec.asset_scope }}</dd>
+          <dt class="col-sm-5">Input domains</dt><dd class="col-sm-7">{{ algorithm.alg_impl_spec.input_domains | join(', ') }}</dd>
+          <dt class="col-sm-5">Output modes</dt><dd class="col-sm-7">{{ algorithm.alg_impl_spec.output_modes | join(', ') }}</dd>
+          <dt class="col-sm-5">Warmup</dt><dd class="col-sm-7">{{ algorithm.alg_impl_spec.warmup_period }}</dd>
+        </dl>
+        {% else %}
+        <p class="text-muted mb-0">This catalog entry is not currently linked to a live algorithm implementation.</p>
+        {% endif %}
+      </div>
+      <div class="card-footer d-flex justify-content-end">
+        <button class="btn btn-primary" type="submit">Save review state</button>
+      </div>
+    </form>
+  </div>
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5">Extended implementation details</h2>
+        <p class="mb-0">{{ algorithm.extended_implementation_details }}</p>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}

@@ -64,6 +64,7 @@ def register_composite_alert_algorithms() -> None:
         AlertAlgorithmSpec(
             key="aggregate_boundary_and_channel",
             name="Aggregate Boundary and Channel",
+            catalog_ref="algorithm:93",
             builder=_build_aggregate_boundary_and_channel,
             default_param={"window": 30},
             param_normalizer=require_window_param,
@@ -88,6 +89,7 @@ def register_composite_alert_algorithms() -> None:
         AlertAlgorithmSpec(
             key="aggregate_channel_dual_window",
             name="Aggregate Channel Dual Window",
+            catalog_ref="algorithm:93",
             builder=_build_aggregate_channel_dual_window,
             default_param={"buy_window": 20, "sell_window": 30},
             param_normalizer=require_buy_sell_window_param,

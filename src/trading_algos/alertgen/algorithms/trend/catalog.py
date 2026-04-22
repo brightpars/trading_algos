@@ -47,6 +47,7 @@ def register_trend_alert_algorithms() -> None:
         AlertAlgorithmSpec(
             key="boundary_breakout",
             name="Boundary Breakout",
+            catalog_ref="algorithm:6",
             builder=_build_boundary_breakout,
             default_param={"period": 5},
             param_normalizer=require_period_param,
@@ -70,6 +71,7 @@ def register_trend_alert_algorithms() -> None:
         AlertAlgorithmSpec(
             key="double_red_confirmation",
             name="Double Red Confirmation",
+            catalog_ref="algorithm:7",
             builder=_build_double_red_confirmation,
             default_param={"period": 5},
             param_normalizer=require_period_param,
@@ -93,6 +95,7 @@ def register_trend_alert_algorithms() -> None:
         AlertAlgorithmSpec(
             key="low_anchored_boundary_breakout",
             name="Low-Anchored Boundary Breakout",
+            catalog_ref="algorithm:6",
             builder=_build_low_anchored_boundary_breakout,
             default_param={"period": 5},
             param_normalizer=require_period_param,
@@ -116,6 +119,7 @@ def register_trend_alert_algorithms() -> None:
         AlertAlgorithmSpec(
             key="rolling_channel_breakout",
             name="Rolling Channel Breakout",
+            catalog_ref="algorithm:7",
             builder=_build_rolling_channel_breakout,
             default_param={"window": 20},
             param_normalizer=require_window_param,
@@ -139,6 +143,7 @@ def register_trend_alert_algorithms() -> None:
         AlertAlgorithmSpec(
             key="close_high_channel_breakout",
             name="Close/High Channel Breakout",
+            catalog_ref="algorithm:7",
             builder=_build_close_high_channel_breakout,
             default_param={"window": 20},
             param_normalizer=require_window_param,

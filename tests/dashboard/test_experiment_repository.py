@@ -33,10 +33,18 @@ class _Collection:
             ]
         )
 
-    def update_one(self, query, update):
+    def update_one(self, query, update, upsert=False):
         for doc in self.docs:
             if all(doc.get(k) == v for k, v in query.items()):
                 doc.update(update["$set"])
+                return None
+
+        if upsert:
+            payload = dict(query)
+            if "$set" in update:
+                payload.update(update["$set"])
+            self.docs.append(payload)
+        return None
 
 
 def test_experiment_repository_round_trip():

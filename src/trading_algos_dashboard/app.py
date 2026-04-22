@@ -26,12 +26,21 @@ from trading_algos_dashboard.repositories.configuration_draft_repository import 
 from trading_algos_dashboard.repositories.configuration_revision_repository import (
     ConfigurationRevisionRepository,
 )
+from trading_algos_dashboard.repositories.algorithm_catalog_import_run_repository import (
+    AlgorithmCatalogImportRunRepository,
+)
+from trading_algos_dashboard.repositories.algorithm_catalog_repository import (
+    AlgorithmCatalogRepository,
+)
 from trading_algos_dashboard.repositories.publication_record_repository import (
     PublicationRecordRepository,
 )
 from trading_algos_dashboard.repositories.result_repository import ResultRepository
 from trading_algos_dashboard.services.algorithm_catalog_service import (
-    list_algorithm_catalog,
+    AlgorithmCatalogService,
+)
+from trading_algos_dashboard.services.algorithm_catalog_import_service import (
+    AlgorithmCatalogImportService,
 )
 from trading_algos_dashboard.services.administration_service import (
     AdministrationService,
@@ -78,6 +87,10 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     configuration_revision_repository = ConfigurationRevisionRepository(mongo.db)
     publication_record_repository = PublicationRecordRepository(mongo.db)
     data_source_settings_repository = DataSourceSettingsRepository(mongo.db)
+    algorithm_catalog_repository = AlgorithmCatalogRepository(mongo.db)
+    algorithm_catalog_import_run_repository = AlgorithmCatalogImportRunRepository(
+        mongo.db
+    )
     data_source_settings_service = DataSourceSettingsService(
         repository=data_source_settings_repository
     )
@@ -95,10 +108,21 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         data_source_service=data_source_service,
         report_base_path=cfg.report_base_path,
     )
+    algorithm_catalog_service = AlgorithmCatalogService(
+        catalog_repository=algorithm_catalog_repository,
+    )
     administration_service = AdministrationService(
         experiment_repository=experiment_repository,
         result_repository=result_repository,
+        algorithm_catalog_repository=algorithm_catalog_repository,
+        algorithm_catalog_import_run_repository=algorithm_catalog_import_run_repository,
+        algorithm_catalog_service=algorithm_catalog_service,
     )
+    algorithm_catalog_import_service = AlgorithmCatalogImportService(
+        catalog_repository=algorithm_catalog_repository,
+        import_run_repository=algorithm_catalog_import_run_repository,
+    )
+    administration_service.rebuild_algorithm_catalog_links()
     report_service = ReportService(result_repository=result_repository)
     configuration_builder_service = ConfigurationBuilderService(
         draft_repository=configuration_draft_repository,
@@ -121,14 +145,21 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     )
     app.extensions["publication_record_repository"] = publication_record_repository
     app.extensions["data_source_settings_repository"] = data_source_settings_repository
+    app.extensions["algorithm_catalog_repository"] = algorithm_catalog_repository
+    app.extensions["algorithm_catalog_import_run_repository"] = (
+        algorithm_catalog_import_run_repository
+    )
     app.extensions["data_source_settings_service"] = data_source_settings_service
     app.extensions["data_source_service"] = data_source_service
     app.extensions["experiment_service"] = experiment_service
     app.extensions["administration_service"] = administration_service
+    app.extensions["algorithm_catalog_service"] = algorithm_catalog_service
+    app.extensions["algorithm_catalog_import_service"] = (
+        algorithm_catalog_import_service
+    )
     app.extensions["report_service"] = report_service
     app.extensions["configuration_builder_service"] = configuration_builder_service
     app.extensions["configuration_publish_service"] = configuration_publish_service
-    app.extensions["algorithm_catalog_service"] = list_algorithm_catalog
 
     app.register_blueprint(home_bp)
     app.register_blueprint(algorithms_bp)
