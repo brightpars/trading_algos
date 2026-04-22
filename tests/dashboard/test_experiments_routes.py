@@ -6,6 +6,7 @@ from trading_algos_dashboard.app import create_app
 from trading_algos_dashboard.config import DashboardConfig
 from trading_algos_dashboard.services.data_source_service import (
     DataSourceUnavailableError,
+    MarketDataFetchResult,
     MarketDataUnavailableError,
     SmarttradeDataSourceService,
 )
@@ -713,29 +714,37 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
     monkeypatch.setattr(
         app.extensions["data_source_service"],
         "fetch_candles",
-        lambda **_kwargs: [
-            {
-                "ts": "2025-01-01 10:00:00",
-                "Open": 10,
-                "High": 11,
-                "Low": 9,
-                "Close": 10.5,
-            },
-            {
-                "ts": "2025-01-01 10:00:01",
-                "Open": 11,
-                "High": 12,
-                "Low": 10,
-                "Close": 11.5,
-            },
-            {
-                "ts": "2025-01-01 10:00:02",
-                "Open": 12,
-                "High": 13,
-                "Low": 11,
-                "Close": 12.5,
-            },
-        ],
+        lambda **_kwargs: MarketDataFetchResult(
+            candles=[
+                {
+                    "ts": "2025-01-01 10:00:00",
+                    "Open": 10,
+                    "High": 11,
+                    "Low": 9,
+                    "Close": 10.5,
+                },
+                {
+                    "ts": "2025-01-01 10:00:01",
+                    "Open": 11,
+                    "High": 12,
+                    "Low": 10,
+                    "Close": 11.5,
+                },
+                {
+                    "ts": "2025-01-01 10:00:02",
+                    "Open": 12,
+                    "High": 13,
+                    "Low": 11,
+                    "Close": 12.5,
+                },
+            ],
+            cache_hit=False,
+            source_kind="dataserver",
+            symbol="AAPL",
+            start=datetime.fromisoformat("2024-01-01T09:30"),
+            end=datetime.fromisoformat("2024-01-31T16:00"),
+            candle_count=3,
+        ),
     )
     monkeypatch.setattr(
         app.extensions["data_source_service"],
@@ -787,6 +796,10 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
         "ip": "10.0.0.5",
         "port": 7003,
         "endpoint": "10.0.0.5:7003",
+        "cache": {
+            "source_kind": "dataserver",
+            "cache_hit": False,
+        },
     }
     assert stored_experiments[0]["repo_revision"] == "abc123def456"
     assert isinstance(stored_experiments[0]["started_at"], datetime)
@@ -1443,11 +1456,12 @@ def test_fetch_candles_skips_missing_timestamps_when_other_data_exists():
 
     service._data_proxy = lambda: _Proxy()  # type: ignore[method-assign]
 
-    candles = service.fetch_candles(
+    fetch_result = service.fetch_candles(
         symbol="AAPL",
         start=datetime.fromisoformat("2024-01-01T09:30"),
         end=datetime.fromisoformat("2024-01-01T09:32"),
     )
+    candles = fetch_result.candles
 
     assert len(candles) == 2
     assert [item["ts"] for item in candles] == [

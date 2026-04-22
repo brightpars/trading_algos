@@ -9,6 +9,7 @@ from trading_algos_dashboard.repositories.experiment_repository import (
     ExperimentRepository,
 )
 from trading_algos_dashboard.repositories.result_repository import ResultRepository
+from trading_algos_dashboard.services.data_source_service import MarketDataFetchResult
 from trading_algos_dashboard.services.experiment_service import ExperimentService
 
 
@@ -84,16 +85,24 @@ class _FakeDataSourceService:
             "endpoint": "127.0.0.1:7003",
         }
 
-    def fetch_candles(self, **_kwargs):
-        return [
-            {
-                "ts": "2025-01-01 10:00:00",
-                "Open": 10,
-                "High": 11,
-                "Low": 9,
-                "Close": 10.5,
-            }
-        ]
+    def fetch_candles(self, *, symbol: str, start: datetime, end: datetime):
+        return MarketDataFetchResult(
+            candles=[
+                {
+                    "ts": "2025-01-01 10:00:00",
+                    "Open": 10,
+                    "High": 11,
+                    "Low": 9,
+                    "Close": 10.5,
+                }
+            ],
+            cache_hit=False,
+            source_kind="dataserver",
+            symbol=symbol,
+            start=start,
+            end=end,
+            candle_count=1,
+        )
 
 
 class _DeferredTaskHandle:
@@ -107,6 +116,67 @@ class _DeferredTaskHandle:
     def run_and_finish(self):
         self._job()
         self._done.set()
+
+
+class _ExperimentRepositoryStub:
+    def __init__(self) -> None:
+        self.docs: dict[str, dict[str, Any]] = {}
+
+    def create_experiment(self, payload: dict[str, Any]) -> None:
+        self.docs[str(payload["experiment_id"])] = dict(payload)
+
+    def update_experiment(self, experiment_id: str, payload: dict[str, Any]) -> None:
+        self.docs[experiment_id].update(payload)
+
+    def get_experiment(self, experiment_id: str) -> dict[str, Any] | None:
+        doc = self.docs.get(experiment_id)
+        return None if doc is None else dict(doc)
+
+    def get_running_experiment(self) -> dict[str, Any] | None:
+        return None
+
+    def get_next_queued_experiment(self) -> dict[str, Any] | None:
+        return None
+
+    def list_queued_experiments(self) -> list[dict[str, Any]]:
+        return []
+
+
+class _ResultRepositoryStub:
+    def __init__(self) -> None:
+        self.results: list[dict[str, Any]] = []
+
+    def insert_result(self, payload: dict[str, Any]) -> None:
+        self.results.append(dict(payload))
+
+    def list_results_for_experiment(self, experiment_id: str) -> list[dict[str, Any]]:
+        return [r for r in self.results if r.get("experiment_id") == experiment_id]
+
+    def delete_results_for_experiment(self, experiment_id: str) -> None:
+        self.results = [
+            r for r in self.results if r.get("experiment_id") != experiment_id
+        ]
+
+
+class _CacheAwareDataSourceService:
+    def __init__(self, *, cache_hit: bool) -> None:
+        self.cache_hit = cache_hit
+
+    def get_market_data_server_details(self) -> dict[str, Any]:
+        return {"kind": "smarttrade_dataserver", "endpoint": "127.0.0.2:6010"}
+
+    def fetch_candles(
+        self, *, symbol: str, start: datetime, end: datetime
+    ) -> MarketDataFetchResult:
+        return MarketDataFetchResult(
+            candles=[{"ts": "2024-01-01 09:30:00", "Close": 10.5}],
+            cache_hit=self.cache_hit,
+            source_kind="cache" if self.cache_hit else "dataserver",
+            symbol=symbol,
+            start=start,
+            end=end,
+            candle_count=1,
+        )
 
 
 def _build_service(
@@ -161,7 +231,11 @@ def test_back_to_back_queued_experiments_advance_automatically(monkeypatch, tmp_
                     "metadata": {"candle_count": len(kwargs["candles"])},
                 }
             ],
-            "report": {"report_version": "1.0", "schema_version": "1.0", "charts": []},
+            "report": {
+                "report_version": "1.0",
+                "schema_version": "1.0",
+                "charts": [],
+            },
         },
     )
 
@@ -229,3 +303,55 @@ def test_back_to_back_queued_experiments_advance_automatically(monkeypatch, tmp_
     second_result = service.result_repository.list_results_for_experiment(second_id)
     assert len(first_result) == 1
     assert len(second_result) == 1
+
+
+def test_run_experiment_job_records_datasource_cache_metadata(monkeypatch, tmp_path):
+    experiment_repository = _ExperimentRepositoryStub()
+    result_repository = _ResultRepositoryStub()
+    service = ExperimentService(
+        experiment_repository=cast(Any, experiment_repository),
+        result_repository=cast(Any, result_repository),
+        data_source_service=cast(Any, _CacheAwareDataSourceService(cache_hit=True)),
+        report_base_path=str(tmp_path),
+    )
+    experiment_repository.create_experiment({"experiment_id": "exp_1"})
+
+    monkeypatch.setattr(
+        "trading_algos_dashboard.services.experiment_service.run_alert_algorithm",
+        lambda **_kwargs: {
+            "execution_steps": [],
+            "alg_key": "boundary_breakout",
+            "alg_name": "Boundary Breakout",
+            "report": {},
+        },
+    )
+    monkeypatch.setattr(service, "dispatch_next_experiment", lambda: None)
+
+    service._run_experiment_job(
+        experiment_id="exp_1",
+        created_at=datetime.now(timezone.utc),
+        started_at=datetime.now(timezone.utc),
+        symbol="AAPL",
+        start_dt=datetime.fromisoformat("2024-01-01T09:30"),
+        end_dt=datetime.fromisoformat("2024-01-01T09:30"),
+        normalized_algorithms=[
+            {
+                "symbol": "AAPL",
+                "alg_key": "boundary_breakout",
+                "alg_param": {},
+                "buy": True,
+                "sell": True,
+            }
+        ],
+        configuration_payload=None,
+        report_dir=Path(tmp_path),
+    )
+
+    experiment = experiment_repository.get_experiment("exp_1")
+
+    assert experiment is not None
+    assert experiment["dataset_source"]["cache"]["cache_hit"] is True
+    assert experiment["dataset_source"]["cache"]["source_kind"] == "cache"
+    assert experiment["execution_steps"][0]["step"] == "read_candles"
+    assert experiment["execution_steps"][0]["metadata"]["cache_hit"] is True
+    assert experiment["execution_steps"][0]["metadata"]["source_kind"] == "cache"

@@ -105,3 +105,4 @@ def test_create_app_registers_core_routes(monkeypatch):
     assert b"Market data server" in response.data
     assert b'value="127.0.0.2"' in response.data
     assert b'value="6010"' in response.data
+    assert app.extensions["market_data_cache"].enabled is True

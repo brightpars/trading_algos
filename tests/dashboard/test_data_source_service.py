@@ -3,6 +3,7 @@ from xmlrpc.client import Fault
 
 from trading_algos_dashboard.services.data_source_service import (
     DataSourceUnavailableError,
+    MarketDataFetchResult,
     MarketDataUnavailableError,
     SmarttradeDataSourceService,
 )
@@ -155,13 +156,23 @@ def test_fetch_candles_reads_via_proxy_minute_by_minute(monkeypatch):
 
     monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
 
-    candles = service.fetch_candles(
+    fetch_result = service.fetch_candles(
         symbol="AAPL",
         start=datetime.fromisoformat("2024-01-01T09:30"),
         end=datetime.fromisoformat("2024-01-01T09:32"),
     )
+    candles = fetch_result.candles
 
     assert len(candles) == 2
+    assert fetch_result == MarketDataFetchResult(
+        candles=candles,
+        cache_hit=False,
+        source_kind="dataserver",
+        symbol="AAPL",
+        start=datetime.fromisoformat("2024-01-01T09:30"),
+        end=datetime.fromisoformat("2024-01-01T09:32"),
+        candle_count=2,
+    )
     assert [item["ts"] for item in candles] == [
         "2024-01-01 09:30:00",
         "2024-01-01 09:32:00",
@@ -206,16 +217,18 @@ def test_fetch_candles_prefers_bulk_candles_proxy_method_when_available(monkeypa
 
     monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
 
-    candles = service.fetch_candles(
+    fetch_result = service.fetch_candles(
         symbol="AAPL",
         start=datetime.fromisoformat("2024-01-01T09:30"),
         end=datetime.fromisoformat("2024-01-01T09:32"),
     )
+    candles = fetch_result.candles
 
     assert [item["ts"] for item in candles] == [
         "2024-01-01 09:30:00",
         "2024-01-01 09:32:00",
     ]
+    assert fetch_result.cache_hit is False
     assert all("_id" not in item for item in candles)
 
 
@@ -268,11 +281,12 @@ def test_fetch_candles_logs_selected_proxy_mode(monkeypatch, caplog):
     monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
 
     with caplog.at_level("INFO"):
-        candles = service.fetch_candles(
+        fetch_result = service.fetch_candles(
             symbol="AAPL",
             start=datetime.fromisoformat("2024-01-01T09:30"),
             end=datetime.fromisoformat("2024-01-01T09:30"),
         )
+        candles = fetch_result.candles
 
     assert len(candles) == 1
     assert (
@@ -301,11 +315,12 @@ def test_fetch_candles_logs_proxy_completion(monkeypatch, caplog):
     monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
 
     with caplog.at_level("INFO"):
-        candles = service.fetch_candles(
+        fetch_result = service.fetch_candles(
             symbol="AAPL",
             start=datetime.fromisoformat("2024-01-01T09:30"),
             end=datetime.fromisoformat("2024-01-01T09:30"),
         )
+        candles = fetch_result.candles
 
     assert len(candles) == 1
     assert "proxy_fetch_completed" in caplog.text
@@ -324,11 +339,102 @@ def test_fetch_candles_logs_bulk_proxy_completion(monkeypatch, caplog):
     monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
 
     with caplog.at_level("INFO"):
-        candles = service.fetch_candles(
+        fetch_result = service.fetch_candles(
+            symbol="AAPL",
+            start=datetime.fromisoformat("2024-01-01T09:30"),
+            end=datetime.fromisoformat("2024-01-01T09:30"),
+        )
+        candles = fetch_result.candles
+
+    assert len(candles) == 1
+    assert "proxy_bulk_candle_fetch_completed" in caplog.text
+
+
+def test_fetch_candles_uses_cache_for_identical_request(monkeypatch):
+    service = SmarttradeDataSourceService(
+        smarttrade_path="/tmp/smarttrade",
+        user_id=1,
+    )
+    calls: list[str] = []
+
+    class _Proxy:
+        def get_candles(self, symbol, _start, _end):
+            calls.append(symbol)
+            return [{"ts": "2024-01-01 09:30:00", "Close": 10.5}]
+
+    monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
+
+    first = service.fetch_candles(
+        symbol="aapl",
+        start=datetime.fromisoformat("2024-01-01T09:30"),
+        end=datetime.fromisoformat("2024-01-01T09:30"),
+    )
+    second = service.fetch_candles(
+        symbol=" AAPL ",
+        start=datetime.fromisoformat("2024-01-01T09:30"),
+        end=datetime.fromisoformat("2024-01-01T09:30"),
+    )
+
+    assert calls == ["AAPL"]
+    assert first.cache_hit is False
+    assert second.cache_hit is True
+    assert second.source_kind == "cache"
+    assert second.candles == first.candles
+
+
+def test_fetch_candles_returns_fresh_copies_for_cache_hits(monkeypatch):
+    service = SmarttradeDataSourceService(
+        smarttrade_path="/tmp/smarttrade",
+        user_id=1,
+    )
+
+    class _Proxy:
+        def get_candles(self, _symbol, _start, _end):
+            return [{"ts": "2024-01-01 09:30:00", "Close": 10.5}]
+
+    monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
+
+    first = service.fetch_candles(
+        symbol="AAPL",
+        start=datetime.fromisoformat("2024-01-01T09:30"),
+        end=datetime.fromisoformat("2024-01-01T09:30"),
+    )
+    first.candles[0]["Close"] = 99.0
+
+    second = service.fetch_candles(
+        symbol="AAPL",
+        start=datetime.fromisoformat("2024-01-01T09:30"),
+        end=datetime.fromisoformat("2024-01-01T09:30"),
+    )
+
+    assert second.cache_hit is True
+    assert second.candles[0]["Close"] == 10.5
+
+
+def test_fetch_candles_logs_cache_events(monkeypatch, caplog):
+    service = SmarttradeDataSourceService(
+        smarttrade_path="/tmp/smarttrade",
+        user_id=1,
+    )
+
+    class _Proxy:
+        def get_candles(self, _symbol, _start, _end):
+            return [{"ts": "2024-01-01 09:30:00", "Close": 10.5}]
+
+    monkeypatch.setattr(service, "_data_proxy", lambda: _Proxy())
+
+    with caplog.at_level("INFO"):
+        service.fetch_candles(
+            symbol="AAPL",
+            start=datetime.fromisoformat("2024-01-01T09:30"),
+            end=datetime.fromisoformat("2024-01-01T09:30"),
+        )
+        service.fetch_candles(
             symbol="AAPL",
             start=datetime.fromisoformat("2024-01-01T09:30"),
             end=datetime.fromisoformat("2024-01-01T09:30"),
         )
 
-    assert len(candles) == 1
-    assert "proxy_bulk_candle_fetch_completed" in caplog.text
+    assert "market_data_cache: miss; symbol=AAPL" in caplog.text
+    assert "market_data_cache: store; symbol=AAPL" in caplog.text
+    assert "market_data_cache: hit; symbol=AAPL" in caplog.text

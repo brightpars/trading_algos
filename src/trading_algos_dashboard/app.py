@@ -58,6 +58,7 @@ from trading_algos_dashboard.services.configuration_publish_service import (
     ConfigurationPublishService,
 )
 from trading_algos_dashboard.services.experiment_service import ExperimentService
+from trading_algos_dashboard.services.market_data_cache import InMemoryMarketDataCache
 from trading_algos_dashboard.services.report_service import ReportService
 
 
@@ -94,6 +95,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     data_source_settings_service = DataSourceSettingsService(
         repository=data_source_settings_repository
     )
+    market_data_cache = InMemoryMarketDataCache(enabled=True)
     data_source_service = SmarttradeDataSourceService(
         smarttrade_path=cfg.smarttrade_path,
         user_id=cfg.smarttrade_user_id,
@@ -101,6 +103,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
             data_source_settings_service.get_effective_settings()["ip"],
             data_source_settings_service.get_effective_settings()["port"],
         ),
+        market_data_cache=market_data_cache,
     )
     experiment_service = ExperimentService(
         experiment_repository=experiment_repository,
@@ -150,6 +153,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         algorithm_catalog_import_run_repository
     )
     app.extensions["data_source_settings_service"] = data_source_settings_service
+    app.extensions["market_data_cache"] = market_data_cache
     app.extensions["data_source_service"] = data_source_service
     app.extensions["experiment_service"] = experiment_service
     app.extensions["administration_service"] = administration_service

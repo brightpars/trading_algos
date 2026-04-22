@@ -5,6 +5,7 @@ import logging
 import sys
 from collections.abc import Iterable
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import perf_counter
@@ -16,6 +17,7 @@ from trading_algos_dashboard.services.data_source_settings_service import (
     DEFAULT_DATA_SERVER_IP,
     DEFAULT_DATA_SERVER_PORT,
 )
+from trading_algos_dashboard.services.market_data_cache import InMemoryMarketDataCache
 
 
 DEFAULT_CONNECTION_CHECK_TIMEOUT_SECONDS = 2.0
@@ -31,6 +33,17 @@ class MarketDataUnavailableError(ValueError):
     """Raised when requested market data is not available for the given range."""
 
 
+@dataclass(frozen=True)
+class MarketDataFetchResult:
+    candles: list[dict[str, Any]]
+    cache_hit: bool
+    source_kind: str
+    symbol: str
+    start: datetime
+    end: datetime
+    candle_count: int
+
+
 class SmarttradeDataSourceService:
     def __init__(
         self,
@@ -38,10 +51,12 @@ class SmarttradeDataSourceService:
         smarttrade_path: str,
         user_id: int,
         endpoint_resolver: Any | None = None,
+        market_data_cache: InMemoryMarketDataCache | None = None,
     ):
         self.smarttrade_path = smarttrade_path
         self.user_id = user_id
         self.endpoint_resolver = endpoint_resolver
+        self.market_data_cache = market_data_cache or InMemoryMarketDataCache()
 
     def _is_proxy_server_up(
         self,
@@ -101,7 +116,15 @@ class SmarttradeDataSourceService:
             "ip": ip,
             "port": port,
             "endpoint": f"{ip}:{port}",
+            "cache": {
+                "enabled": self.market_data_cache.enabled,
+                "entry_count": self.market_data_cache.stats()["entry_count"],
+            },
         }
+
+    @staticmethod
+    def _clone_candles(candles: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+        return [dict(row) for row in candles]
 
     def _create_proxy(self, *, ip: str, port: int) -> Any:
         self._prepare_imports()
@@ -253,17 +276,41 @@ class SmarttradeDataSourceService:
         symbol: str,
         start: datetime,
         end: datetime,
-    ) -> list[dict[str, Any]]:
+    ) -> MarketDataFetchResult:
         if end < start:
             raise ValueError("End datetime must be after start datetime")
 
+        normalized_symbol = symbol.strip().upper()
+
         logger.info(
             "data_source: candle_fetch_mode_selected; mode=dataserver_bulk_rpc_with_proxy_fallback symbol=%s start=%s end=%s",
-            symbol,
+            normalized_symbol,
             start.isoformat(sep=" "),
             end.isoformat(sep=" "),
         )
-        result = self._fetch_candles_via_proxy(symbol=symbol, start=start, end=end)
+
+        cached = self.market_data_cache.get(
+            symbol=normalized_symbol,
+            start=start,
+            end=end,
+        )
+        if cached is not None:
+            candles = self._clone_candles(cached.candles)
+            return MarketDataFetchResult(
+                candles=candles,
+                cache_hit=True,
+                source_kind="cache",
+                symbol=normalized_symbol,
+                start=start,
+                end=end,
+                candle_count=len(candles),
+            )
+
+        result = self._fetch_candles_via_proxy(
+            symbol=normalized_symbol,
+            start=start,
+            end=end,
+        )
 
         if not result:
             raise MarketDataUnavailableError(
@@ -271,7 +318,23 @@ class SmarttradeDataSourceService:
                 "Please choose a range that contains market data."
             )
 
-        return result
+        self.market_data_cache.put(
+            symbol=normalized_symbol,
+            start=start,
+            end=end,
+            candles=result,
+        )
+
+        candles = self._clone_candles(result)
+        return MarketDataFetchResult(
+            candles=candles,
+            cache_hit=False,
+            source_kind="dataserver",
+            symbol=normalized_symbol,
+            start=start,
+            end=end,
+            candle_count=len(candles),
+        )
 
 
 def parse_date_range(

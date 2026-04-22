@@ -235,12 +235,18 @@ class ExperimentService:
             dataset_source = self.data_source_service.get_market_data_server_details()
             read_started_at = datetime.now(timezone.utc)
             read_started_at_perf = perf_counter()
-            candles = self.data_source_service.fetch_candles(
+            fetch_result = self.data_source_service.fetch_candles(
                 symbol=symbol,
                 start=start_dt,
                 end=end_dt,
             )
+            candles = fetch_result.candles
             read_finished_at = datetime.now(timezone.utc)
+            dataset_source["cache"] = {
+                **dict(dataset_source.get("cache") or {}),
+                "source_kind": fetch_result.source_kind,
+                "cache_hit": fetch_result.cache_hit,
+            }
             execution_steps.append(
                 {
                     "step": "read_candles",
@@ -250,7 +256,11 @@ class ExperimentService:
                     "duration_seconds": perf_counter() - read_started_at_perf,
                     "metadata": {
                         "symbol": symbol,
-                        "candle_count": len(candles),
+                        "candle_count": fetch_result.candle_count,
+                        "cache_hit": fetch_result.cache_hit,
+                        "source_kind": fetch_result.source_kind,
+                        "start": fetch_result.start,
+                        "end": fetch_result.end,
                     },
                 }
             )
