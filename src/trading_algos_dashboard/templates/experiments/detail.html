@@ -7,7 +7,7 @@
 <p><strong>Symbol:</strong> {{ experiment.symbol }} | <strong>Candles:</strong> {{ experiment.candle_count if experiment.candle_count is not none else 'Loading…' }}</p>
 <p><strong>Input kind:</strong> {{ experiment.input_kind or 'single_algorithm' }}</p>
 
-{% if experiment.is_running or experiment.is_cancelling or experiment.is_failed or experiment.is_cancelled %}
+{% if experiment.is_queued or experiment.is_running or experiment.is_cancelling or experiment.is_failed or experiment.is_cancelled %}
 <section
   class="experiment-runtime-panel mb-4"
   data-experiment-runtime='{{ experiment_runtime_payload|tojson }}'
@@ -18,7 +18,9 @@
       <div>
         <div class="experiment-runtime-label">Experiment status</div>
         <h2 class="h4 mb-2 experiment-runtime-status">
-          {% if experiment.is_running %}
+          {% if experiment.is_queued %}
+          Queued for execution
+          {% elif experiment.is_running %}
           Running experiment…
           {% elif experiment.is_cancelling %}
           Cancelling experiment…
@@ -29,7 +31,9 @@
           {% endif %}
         </h2>
         <p class="text-muted mb-0 experiment-runtime-message">
-          {% if experiment.is_running %}
+          {% if experiment.is_queued %}
+          This experiment is waiting in the FIFO queue and will start automatically when earlier jobs finish.
+          {% elif experiment.is_running %}
           Your algorithm run is in progress. This page updates automatically every second.
           {% elif experiment.is_cancelling %}
           Stop requested. The run will finish its current safe checkpoint and then stop.
@@ -52,17 +56,21 @@
       </div>
     </div>
 
-    {% if experiment.is_running or experiment.is_cancelling %}
+    {% if experiment.is_queued or experiment.is_running or experiment.is_cancelling %}
     <div class="mt-3">
       <form method="post" action="{{ url_for('experiments.cancel_experiment', experiment_id=experiment.experiment_id) }}">
         <button class="btn btn-outline-danger" type="submit" {% if experiment.is_cancelling %}disabled{% endif %}>
-          {% if experiment.is_cancelling %}Stopping…{% else %}Stop experiment{% endif %}
+          {% if experiment.is_queued %}Remove from queue{% elif experiment.is_cancelling %}Stopping…{% else %}Stop experiment{% endif %}
         </button>
       </form>
     </div>
     {% endif %}
 
     <div class="builder-summary-grid mt-4">
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Queued at</span>
+        <div data-runtime-field="queue_enqueued_at">{{ experiment.queue_enqueued_at or experiment.created_at or '—' }}</div>
+      </div>
       <div class="builder-summary-item">
         <span class="builder-summary-label">Started</span>
         <div data-runtime-field="started_at">{{ experiment.started_at or experiment.created_at or '—' }}</div>
@@ -83,6 +91,16 @@
         <span class="builder-summary-label">Time range</span>
         <div>{{ experiment.time_range.start if experiment.time_range else '—' }} → {{ experiment.time_range.end if experiment.time_range else '—' }}</div>
       </div>
+      {% if experiment.is_queued %}
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Queue position</span>
+        <div data-runtime-field="queue_position">{{ experiment.queue_position or '—' }}</div>
+      </div>
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Items ahead</span>
+        <div data-runtime-field="queue_items_ahead">{{ experiment.queue_items_ahead if experiment.queue_items_ahead is not none else '—' }}</div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="mt-4">

@@ -190,6 +190,12 @@ def experiment(experiment_id: str):
     return jsonify(_serialize_experiment_payload(payload))
 
 
+@bp.get("/experiments/queue")
+def experiment_queue():
+    payload = current_app.extensions["experiment_service"].get_queue_overview()
+    return jsonify(_serialize_experiment_payload(payload))
+
+
 @bp.get("/configurations/<draft_id>")
 def configuration(draft_id: str):
     payload = current_app.extensions["configuration_builder_service"].get_draft_detail(

@@ -277,6 +277,36 @@ pre {
   background: linear-gradient(180deg, #fff 0%, #f7fbff 100%);
 }
 
+.queue-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.queue-card {
+  position: relative;
+}
+
+.queue-card--running {
+  border-color: #b6d4fe;
+}
+
+.queue-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.queue-position-badge {
+  background: #e7f1ff;
+  border-radius: 999px;
+  color: #0d6efd;
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+}
+
 .experiment-runtime-label {
   color: #6c757d;
   font-size: 0.8rem;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from datetime import datetime, timezone
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from trading_algos_dashboard.repositories.mongo_base import MongoRepository
@@ -46,6 +47,28 @@ class ExperimentRepository(MongoRepository):
             self.collection.find_one({"experiment_id": experiment_id})
         )
 
+    def get_running_experiment(self) -> dict[str, Any] | None:
+        running = self._list_documents({"status": "running"})
+        if not running:
+            return None
+        return running[0]
+
+    def list_queued_experiments(self) -> list[dict[str, Any]]:
+        queued = self._list_documents({"status": "queued"})
+        return sorted(queued, key=self._queued_sort_key)
+
+    def get_next_queued_experiment(self) -> dict[str, Any] | None:
+        queued = self.list_queued_experiments()
+        if not queued:
+            return None
+        return queued[0]
+
+    def count_queued_before(self, experiment_id: str) -> int:
+        for index, experiment in enumerate(self.list_queued_experiments()):
+            if experiment.get("experiment_id") == experiment_id:
+                return index
+        return 0
+
     def update_input_snapshot(
         self, experiment_id: str, *, input_kind: str, input_snapshot: dict[str, Any]
     ) -> None:
@@ -57,11 +80,8 @@ class ExperimentRepository(MongoRepository):
     def list_experiments(
         self, filters: Mapping[str, Any] | None = None
     ) -> list[dict[str, Any]]:
-        query = dict(filters or {})
-        return [
-            self._without_id(doc) or {}
-            for doc in self.collection.find(query).sort("created_at", -1)
-        ]
+        experiments = self._list_documents(filters)
+        return sorted(experiments, key=self._created_at_sort_key, reverse=True)
 
     def count_experiments(self) -> int:
         return self._count_documents()
@@ -72,3 +92,69 @@ class ExperimentRepository(MongoRepository):
 
     def delete_all_experiments(self) -> int:
         return self._delete_many()
+
+    @staticmethod
+    def _created_at_sort_key(document: Mapping[str, Any]) -> tuple[datetime, str]:
+        created_at = ExperimentRepository._normalize_datetime(
+            document.get("created_at")
+        )
+        fallback = datetime.min.replace(tzinfo=timezone.utc)
+        return created_at or fallback, str(document.get("experiment_id", ""))
+
+    @staticmethod
+    def _queued_sort_key(document: Mapping[str, Any]) -> tuple[datetime, datetime, str]:
+        enqueued_at = ExperimentRepository._normalize_datetime(
+            document.get("queue_enqueued_at")
+        )
+        created_at = ExperimentRepository._normalize_datetime(
+            document.get("created_at")
+        )
+        fallback = datetime.min.replace(tzinfo=timezone.utc)
+        return (
+            enqueued_at or created_at or fallback,
+            created_at or fallback,
+            str(document.get("experiment_id", "")),
+        )
+
+    @staticmethod
+    def _normalize_datetime(value: object) -> datetime | None:
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc)
+            return value.astimezone(timezone.utc)
+        if isinstance(value, str):
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                return None
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=timezone.utc)
+            return parsed.astimezone(timezone.utc)
+        return None
+
+    @staticmethod
+    def _iter_documents(cursor: object) -> list[Mapping[str, Any]]:
+        if isinstance(cursor, list):
+            return [doc for doc in cursor if isinstance(doc, Mapping)]
+        if isinstance(cursor, Iterable):
+            return [doc for doc in cursor if isinstance(doc, Mapping)]
+        docs = getattr(cursor, "docs", None)
+        if isinstance(docs, list):
+            return [doc for doc in docs if isinstance(doc, Mapping)]
+        return []
+
+    def _list_documents(
+        self, filters: Mapping[str, Any] | None = None
+    ) -> list[dict[str, Any]]:
+        query = dict(filters or {})
+        documents = [
+            self._without_id(doc) or {}
+            for doc in self._iter_documents(self.collection.find(query))
+        ]
+        if query:
+            documents = [
+                doc
+                for doc in documents
+                if all(doc.get(key) == value for key, value in query.items())
+            ]
+        return documents

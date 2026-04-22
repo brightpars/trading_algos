@@ -1,6 +1,62 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Experiment history</h1>
+{% if running_experiment %}
+<section class="mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h5 mb-0">Currently running</h2>
+    <span class="builder-meta-pill">1 active</span>
+  </div>
+  <div class="builder-card queue-card queue-card--running">
+    <div class="d-flex justify-content-between gap-3 flex-wrap align-items-start">
+      <div>
+        <div class="fw-semibold"><code>{{ running_experiment.experiment_id }}</code> — {{ running_experiment.symbol }}</div>
+        <div class="text-muted small">{{ running_experiment.input_kind or 'single_algorithm' }} • started {{ running_experiment.started_at or running_experiment.created_at }}</div>
+      </div>
+      <div class="queue-card-actions">
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('experiments.detail', experiment_id=running_experiment.experiment_id) }}">Open</a>
+        <form method="post" action="{{ url_for('experiments.cancel_experiment', experiment_id=running_experiment.experiment_id) }}">
+          <button class="btn btn-sm btn-outline-danger" type="submit">Stop</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h2 class="h5 mb-0">Execution queue</h2>
+    <span class="builder-meta-pill">{{ queued_experiments|length }} queued</span>
+  </div>
+  {% if queued_experiments %}
+  <div class="queue-list">
+    {% for item in queued_experiments %}
+    <div class="builder-card queue-card">
+      <div class="d-flex justify-content-between gap-3 flex-wrap align-items-start">
+        <div>
+          <div class="queue-position-badge">#{{ loop.index }}</div>
+          <div class="fw-semibold mt-2"><code>{{ item.experiment_id }}</code> — {{ item.symbol }}</div>
+          <div class="text-muted small">{{ item.input_kind or 'single_algorithm' }} • queued {{ item.queue_enqueued_at or item.created_at }}</div>
+          {% if item.notes %}<div class="small mt-2">{{ item.notes }}</div>{% endif %}
+        </div>
+        <div class="queue-card-actions">
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('experiments.detail', experiment_id=item.experiment_id) }}">Open</a>
+          <form method="post" action="{{ url_for('experiments.cancel_experiment', experiment_id=item.experiment_id) }}">
+            <button class="btn btn-sm btn-outline-danger" type="submit">Remove</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="builder-card text-muted">Queue is empty.</div>
+  {% endif %}
+</section>
+
+<section>
+  <h2 class="h5">Past experiments</h2>
 <table class="table table-striped">
   <thead><tr><th>ID</th><th>Symbol</th><th>Input</th><th>Status</th><th>Candles</th><th>Started</th><th>Duration (s)</th><th>Git</th><th>Data server</th><th></th></tr></thead>
   <tbody>
@@ -27,4 +83,5 @@
     {% endfor %}
   </tbody>
 </table>
+</section>
 {% endblock %}

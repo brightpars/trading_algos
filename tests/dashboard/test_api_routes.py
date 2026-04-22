@@ -345,3 +345,33 @@ def test_experiment_api_returns_running_status_metadata(monkeypatch):
     assert payload["experiment"]["duration_seconds"] is None
     assert payload["experiment"]["dataset_source"] is None
     assert isinstance(payload["experiment"]["started_at_epoch_ms"], int)
+
+
+def test_experiment_queue_api_returns_running_and_queued_items(monkeypatch):
+    app = _build_app(monkeypatch)
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_running",
+            "created_at": "2024-02-03T12:00:00Z",
+            "started_at": "2024-02-03T12:01:00Z",
+            "status": "running",
+            "symbol": "AAPL",
+        }
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_queued",
+            "created_at": "2024-02-03T12:02:00Z",
+            "queue_enqueued_at": "2024-02-03T12:02:00Z",
+            "status": "queued",
+            "symbol": "MSFT",
+        }
+    )
+
+    response = app.test_client().get("/api/experiments/queue")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["running_experiment"]["experiment_id"] == "exp_running"
+    assert payload["queued_experiments"][0]["experiment_id"] == "exp_queued"
+    assert payload["queue_summary"]["queued_count"] == 1

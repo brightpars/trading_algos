@@ -44,6 +44,10 @@ document.addEventListener("DOMContentLoaded", () => {
       typeof runtime.started_at_epoch_ms === "number"
         ? runtime.started_at_epoch_ms
         : null;
+    const queuedAtEpochMs =
+      typeof runtime.queue_enqueued_at_epoch_ms === "number"
+        ? runtime.queue_enqueued_at_epoch_ms
+        : null;
 
     if (timerElement) {
       if (runtime.duration_seconds != null) {
@@ -52,20 +56,35 @@ document.addEventListener("DOMContentLoaded", () => {
         timerElement.textContent = formatDuration(
           (Date.now() - startedAtEpochMs) / 1000,
         );
+      } else if (queuedAtEpochMs != null) {
+        timerElement.textContent = formatDuration(
+          (Date.now() - queuedAtEpochMs) / 1000,
+        );
       } else {
         timerElement.textContent = "00:00:00";
       }
     }
 
+    updateField("queue_enqueued_at", formatTimestamp(runtime.queue_enqueued_at || runtime.created_at));
     updateField("started_at", formatTimestamp(runtime.started_at || runtime.created_at));
     updateField("finished_at", formatTimestamp(runtime.finished_at));
     updateField("status", runtime.status || "unknown");
+    updateField("queue_position", runtime.queue_position ?? "—");
+    updateField("queue_items_ahead", runtime.queue_items_ahead ?? "—");
     updateField(
       "dataset_endpoint",
       runtime.dataset_source?.endpoint || "Loading…",
     );
 
-    if (runtime.status === "running") {
+    if (runtime.status === "queued") {
+      statusHeading.textContent = "Queued for execution";
+      statusMessage.textContent = "This experiment is waiting in the FIFO queue and will start automatically when earlier jobs finish.";
+      runtimeCard?.classList.remove("is-failed");
+      if (cancelButton) {
+        cancelButton.disabled = false;
+        cancelButton.textContent = "Remove from queue";
+      }
+    } else if (runtime.status === "running") {
       statusHeading.textContent = "Running experiment…";
       statusMessage.textContent = "Your algorithm run is in progress. This page updates automatically every second.";
       runtimeCard?.classList.remove("is-failed");
@@ -119,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const payload = await response.json();
       runtime = payload.experiment || runtime;
       render();
-      if (runtime.status !== "running") {
+      if (runtime.status !== "running" && runtime.status !== "queued") {
         window.clearInterval(timerId);
       }
     } catch (_error) {

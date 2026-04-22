@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import subprocess
 import multiprocessing
 import os
 import signal
+import subprocess
 import threading
 from collections.abc import Callable
 from datetime import datetime, timezone
@@ -47,6 +47,11 @@ class ExperimentService:
         self.task_launcher = task_launcher or self._launch_background_task
         self._active_runs: dict[str, Any] = {}
         self._active_runs_lock = threading.Lock()
+        self._dispatch_lock = threading.RLock()
+
+    class _InlineTaskHandle:
+        def join(self) -> None:
+            return None
 
     def create_experiment(
         self,
@@ -62,7 +67,6 @@ class ExperimentService:
     ) -> str:
         experiment_id = f"exp_{uuid4().hex[:12]}"
         created_at = datetime.now(timezone.utc)
-        started_at = created_at
 
         if configuration_payload is None and (
             not isinstance(algorithms, list) or len(algorithms) == 0
@@ -101,9 +105,10 @@ class ExperimentService:
             {
                 "experiment_id": experiment_id,
                 "created_at": created_at,
-                "updated_at": started_at,
-                "status": "running",
-                "started_at": started_at,
+                "updated_at": created_at,
+                "status": "queued",
+                "queue_enqueued_at": created_at,
+                "started_at": None,
                 "finished_at": None,
                 "duration_seconds": None,
                 "repo_revision": repo_revision,
@@ -140,36 +145,69 @@ class ExperimentService:
                 "process_pid": None,
             }
         )
-        task_handle = self.task_launcher(
-            lambda: self._run_experiment_job(
-                experiment_id=experiment_id,
-                created_at=created_at,
-                started_at=started_at,
-                symbol=symbol,
-                start_dt=start_dt,
-                end_dt=end_dt,
-                normalized_algorithms=normalized_algorithms,
-                configuration_payload=configuration_payload,
-                report_dir=report_dir,
-            )
-        )
-        if task_handle is not None:
-            with self._active_runs_lock:
-                self._active_runs[experiment_id] = task_handle
-            process_pid = getattr(task_handle, "pid", None)
-            if isinstance(process_pid, int):
-                self.experiment_repository.update_experiment(
-                    experiment_id,
-                    {
-                        "process_pid": process_pid,
-                        "updated_at": datetime.now(timezone.utc),
-                    },
-                )
+        self.dispatch_next_experiment()
         return experiment_id
+
+    def dispatch_next_experiment(self) -> str | None:
+        with self._dispatch_lock:
+            running_experiment = self.experiment_repository.get_running_experiment()
+            if running_experiment is not None:
+                return str(running_experiment.get("experiment_id"))
+
+            experiment = self.experiment_repository.get_next_queued_experiment()
+            if experiment is None:
+                return None
+
+            experiment_id = str(experiment["experiment_id"])
+            started_at = datetime.now(timezone.utc)
+            start_dt, end_dt = self._require_time_range(experiment)
+            report_dir = Path(str(experiment["report_base_path"]))
+            normalized_algorithms = self._normalized_algorithms_from_experiment(
+                experiment
+            )
+            configuration_payload = self._configuration_payload_from_experiment(
+                experiment
+            )
+            created_at = self._normalize_runtime_datetime(experiment.get("created_at"))
+            if created_at is None:
+                created_at = started_at
+
+            self.experiment_repository.update_experiment(
+                experiment_id,
+                {
+                    "status": "running",
+                    "started_at": started_at,
+                    "updated_at": started_at,
+                    "finished_at": None,
+                    "duration_seconds": None,
+                    "cancelled_at": None,
+                    "error_message": None,
+                },
+            )
+            task_handle = self.task_launcher(
+                lambda: self._run_experiment_job(
+                    experiment_id=experiment_id,
+                    created_at=created_at,
+                    started_at=started_at,
+                    symbol=str(experiment.get("symbol", "")),
+                    start_dt=start_dt,
+                    end_dt=end_dt,
+                    normalized_algorithms=normalized_algorithms,
+                    configuration_payload=configuration_payload,
+                    report_dir=report_dir,
+                )
+            )
+            self._track_active_run(
+                experiment_id=experiment_id,
+                task_handle=task_handle,
+            )
+            return experiment_id
 
     def delete_experiment(self, experiment_id: str) -> bool:
         experiment = self.experiment_repository.get_experiment(experiment_id)
         if experiment is None:
+            return False
+        if experiment.get("status") == "running":
             return False
         self.result_repository.delete_results_for_experiment(experiment_id)
         self.experiment_repository.delete_experiment(experiment_id)
@@ -297,7 +335,6 @@ class ExperimentService:
                 "process_pid": None,
             },
         )
-        self._discard_active_run(experiment_id)
 
     def request_cancel(self, experiment_id: str) -> bool:
         experiment = self.experiment_repository.get_experiment(experiment_id)
@@ -305,6 +342,9 @@ class ExperimentService:
             raise ValueError("Experiment was not found")
 
         status = experiment.get("status")
+        if status == "queued":
+            self._mark_queued_cancelled(experiment_id=experiment_id)
+            return True
         if status != "running":
             return False
 
@@ -315,6 +355,7 @@ class ExperimentService:
 
         self._terminate_active_run(experiment_id, experiment)
         self._mark_cancelled(experiment_id=experiment_id, started_at=started_at)
+        self.dispatch_next_experiment()
         return True
 
     def _terminate_active_run(
@@ -340,6 +381,36 @@ class ExperimentService:
         with self._active_runs_lock:
             self._active_runs.pop(experiment_id, None)
 
+    def _track_active_run(self, *, experiment_id: str, task_handle: Any | None) -> None:
+        effective_task_handle = task_handle or self._InlineTaskHandle()
+        with self._active_runs_lock:
+            self._active_runs[experiment_id] = effective_task_handle
+        process_pid = getattr(effective_task_handle, "pid", None)
+        if isinstance(process_pid, int):
+            self.experiment_repository.update_experiment(
+                experiment_id,
+                {
+                    "process_pid": process_pid,
+                    "updated_at": datetime.now(timezone.utc),
+                },
+            )
+        watcher = threading.Thread(
+            target=self._await_run_completion,
+            kwargs={
+                "experiment_id": experiment_id,
+                "task_handle": effective_task_handle,
+            },
+            daemon=True,
+        )
+        watcher.start()
+
+    def _await_run_completion(self, *, experiment_id: str, task_handle: Any) -> None:
+        join = getattr(task_handle, "join", None)
+        if callable(join):
+            join()
+        self._discard_active_run(experiment_id)
+        self.dispatch_next_experiment()
+
     def _mark_cancelled(self, *, experiment_id: str, started_at: datetime) -> None:
         cancelled_at = datetime.now(timezone.utc)
         self._discard_active_run(experiment_id)
@@ -351,6 +422,21 @@ class ExperimentService:
                 "finished_at": cancelled_at,
                 "cancelled_at": cancelled_at,
                 "duration_seconds": (cancelled_at - started_at).total_seconds(),
+                "error_message": None,
+                "process_pid": None,
+            },
+        )
+
+    def _mark_queued_cancelled(self, *, experiment_id: str) -> None:
+        cancelled_at = datetime.now(timezone.utc)
+        self.experiment_repository.update_experiment(
+            experiment_id,
+            {
+                "updated_at": cancelled_at,
+                "status": "cancelled",
+                "finished_at": cancelled_at,
+                "cancelled_at": cancelled_at,
+                "duration_seconds": None,
                 "error_message": None,
                 "process_pid": None,
             },
@@ -406,6 +492,13 @@ class ExperimentService:
         experiment = self.experiment_repository.get_experiment(experiment_id)
         if experiment is None:
             return None
+        queue_overview = self.get_queue_overview()
+        queue_position = self._queue_position_for_experiment(
+            experiment=experiment,
+            queued_experiments=queue_overview["queued_experiments"],
+        )
+        experiment["queue_position"] = queue_position
+        experiment["queue_items_ahead"] = queue_position - 1 if queue_position else None
         results = self.result_repository.list_results_for_experiment(experiment_id)
         experiment_summary = self._build_experiment_summary(experiment)
         for result in results:
@@ -418,6 +511,19 @@ class ExperimentService:
         return {
             "experiment": experiment,
             "results": results,
+            "queue_overview": queue_overview,
+        }
+
+    def get_queue_overview(self) -> dict[str, Any]:
+        running_experiment = self.experiment_repository.get_running_experiment()
+        queued_experiments = self.experiment_repository.list_queued_experiments()
+        return {
+            "running_experiment": running_experiment,
+            "queued_experiments": queued_experiments,
+            "queue_summary": {
+                "queued_count": len(queued_experiments),
+                "has_running": running_experiment is not None,
+            },
         }
 
     @staticmethod
@@ -441,6 +547,64 @@ class ExperimentService:
             "time_range": time_range,
             "report_generated_at": datetime.now(timezone.utc).isoformat(),
         }
+
+    @staticmethod
+    def _queue_position_for_experiment(
+        *, experiment: dict[str, Any], queued_experiments: list[dict[str, Any]]
+    ) -> int | None:
+        if experiment.get("status") != "queued":
+            return None
+        experiment_id = experiment.get("experiment_id")
+        for index, queued in enumerate(queued_experiments, start=1):
+            if queued.get("experiment_id") == experiment_id:
+                return index
+        return None
+
+    def _normalized_algorithms_from_experiment(
+        self, experiment: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        selected_algorithms = experiment.get("selected_algorithms")
+        if not isinstance(selected_algorithms, list):
+            return []
+        normalized: list[dict[str, Any]] = []
+        symbol = str(experiment.get("symbol", ""))
+        for index, algorithm in enumerate(selected_algorithms, start=1):
+            algorithm_config = self._require_algorithm_config(algorithm, index=index)
+            normalized.append(
+                normalize_alertgen_sensor_config(
+                    {
+                        "symbol": symbol,
+                        "alg_key": algorithm_config["alg_key"],
+                        "alg_param": algorithm_config["alg_param"],
+                        "buy": algorithm_config.get("buy", True),
+                        "sell": algorithm_config.get("sell", True),
+                    }
+                )
+            )
+        return normalized
+
+    @staticmethod
+    def _configuration_payload_from_experiment(
+        experiment: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        if experiment.get("input_kind") != "configuration":
+            return None
+        input_snapshot = experiment.get("input_snapshot")
+        if isinstance(input_snapshot, dict):
+            return input_snapshot
+        return None
+
+    def _require_time_range(
+        self, experiment: dict[str, Any]
+    ) -> tuple[datetime, datetime]:
+        time_range = experiment.get("time_range")
+        if not isinstance(time_range, dict):
+            raise ValueError("Experiment time range is invalid")
+        start_dt = self._normalize_runtime_datetime(time_range.get("start"))
+        end_dt = self._normalize_runtime_datetime(time_range.get("end"))
+        if start_dt is None or end_dt is None:
+            raise ValueError("Experiment time range is invalid")
+        return start_dt, end_dt
 
     @staticmethod
     def _result_execution_steps(result: dict[str, Any]) -> list[dict[str, Any]]:

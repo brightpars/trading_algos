@@ -778,6 +778,7 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
     stored_experiments = app.extensions["experiment_repository"].list_experiments()
     assert len(stored_experiments) == 1
     assert stored_experiments[0]["status"] == "completed"
+    assert stored_experiments[0]["queue_enqueued_at"] is not None
     assert stored_experiments[0]["selected_algorithms"] == [
         {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
     ]
@@ -801,7 +802,9 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
     assert stored_results[0]["report"]["charts"]
 
 
-def test_create_experiment_redirects_to_running_detail_page(monkeypatch, tmp_path):
+def test_create_experiment_redirects_to_queued_detail_page_when_dispatch_is_idle(
+    monkeypatch, tmp_path
+):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
@@ -815,7 +818,7 @@ def test_create_experiment_redirects_to_running_detail_page(monkeypatch, tmp_pat
             1,
         )
     )
-    app.extensions["experiment_service"].task_launcher = lambda _job: None
+    app.extensions["experiment_service"].dispatch_next_experiment = lambda: None
 
     response = app.test_client().post(
         "/experiments",
@@ -839,7 +842,9 @@ def test_create_experiment_redirects_to_running_detail_page(monkeypatch, tmp_pat
 
     stored_experiments = app.extensions["experiment_repository"].list_experiments()
     assert len(stored_experiments) == 1
-    assert stored_experiments[0]["status"] == "running"
+    assert stored_experiments[0]["status"] == "queued"
+    assert stored_experiments[0]["queue_enqueued_at"] is not None
+    assert stored_experiments[0]["started_at"] is None
     assert stored_experiments[0]["finished_at"] is None
     assert stored_experiments[0]["duration_seconds"] is None
 
@@ -1045,6 +1050,131 @@ def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
     assert b"Stop experiment" in response.data
 
 
+def test_queued_experiment_detail_shows_queue_panel(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_queued",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "queue_enqueued_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "started_at": None,
+            "finished_at": None,
+            "duration_seconds": None,
+            "repo_revision": "abc123",
+            "symbol": "AAPL",
+            "status": "queued",
+            "dataset_source": None,
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [
+                {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+            ],
+            "input_kind": "single_algorithm",
+            "input_snapshot": {
+                "algorithms": [
+                    {
+                        "alg_key": "close_high_channel_breakout",
+                        "alg_param": {"window": 2},
+                    }
+                ]
+            },
+            "notes": "queued payload",
+            "candle_count": None,
+        }
+    )
+
+    response = app.test_client().get("/experiments/exp_queued")
+
+    assert response.status_code == 200
+    assert b"Queued for execution" in response.data
+    assert b"Remove from queue" in response.data
+    assert b"Queue position" in response.data
+
+
+def test_experiment_history_shows_queue_sections(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_running",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "started_at": datetime(2024, 2, 3, 12, 1, tzinfo=timezone.utc),
+            "status": "running",
+            "symbol": "AAPL",
+        }
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_queued",
+            "created_at": datetime(2024, 2, 3, 12, 2, tzinfo=timezone.utc),
+            "queue_enqueued_at": datetime(2024, 2, 3, 12, 2, tzinfo=timezone.utc),
+            "status": "queued",
+            "symbol": "MSFT",
+        }
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_done",
+            "created_at": datetime(2024, 2, 3, 11, 0, tzinfo=timezone.utc),
+            "started_at": datetime(2024, 2, 3, 11, 0, tzinfo=timezone.utc),
+            "finished_at": datetime(2024, 2, 3, 11, 5, tzinfo=timezone.utc),
+            "status": "completed",
+            "symbol": "NVDA",
+        }
+    )
+
+    response = app.test_client().get("/experiments")
+
+    assert response.status_code == 200
+    assert b"Currently running" in response.data
+    assert b"Execution queue" in response.data
+    assert b"Past experiments" in response.data
+    assert b"exp_queued" in response.data
+
+
+def test_cancel_queued_experiment_removes_it_from_queue(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_queued",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "queue_enqueued_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "status": "queued",
+            "symbol": "AAPL",
+            "input_kind": "single_algorithm",
+            "input_snapshot": {"algorithms": []},
+            "selected_algorithms": [],
+        }
+    )
+
+    response = app.test_client().post(
+        "/experiments/exp_queued/cancel",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"removed from execution queue" in response.data
+    stored = app.extensions["experiment_repository"].get_experiment("exp_queued")
+    assert stored is not None
+    assert stored["status"] == "cancelled"
+
+
 def test_cancel_experiment_requests_graceful_stop(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
@@ -1084,7 +1214,7 @@ def test_cancel_experiment_requests_graceful_stop(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert b"Experiment cancellation requested." in response.data
+    assert b"removed from execution queue" in response.data
     stored = app.extensions["experiment_repository"].get_experiment("exp_running")
     assert stored is not None
     assert stored["status"] == "cancelled"

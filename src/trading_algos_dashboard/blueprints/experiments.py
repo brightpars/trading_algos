@@ -152,13 +152,23 @@ def _recent_experiment_signature(experiment: dict[str, object]) -> str | None:
 
 def _decorate_experiment(experiment: dict[str, object]) -> dict[str, object]:
     decorated = dict(experiment)
+    queue_enqueued_at = decorated.get("queue_enqueued_at")
+    if isinstance(queue_enqueued_at, datetime) and queue_enqueued_at.tzinfo is None:
+        queue_enqueued_at = queue_enqueued_at.replace(tzinfo=timezone.utc)
+        decorated["queue_enqueued_at"] = queue_enqueued_at
     started_at = decorated.get("started_at")
     if isinstance(started_at, datetime) and started_at.tzinfo is None:
         started_at = started_at.replace(tzinfo=timezone.utc)
         decorated["started_at"] = started_at
+    decorated["queue_enqueued_at_epoch_ms"] = (
+        int(queue_enqueued_at.timestamp() * 1000)
+        if isinstance(queue_enqueued_at, datetime)
+        else None
+    )
     decorated["started_at_epoch_ms"] = (
         int(started_at.timestamp() * 1000) if isinstance(started_at, datetime) else None
     )
+    decorated["is_queued"] = decorated.get("status") == "queued"
     decorated["is_running"] = decorated.get("status") == "running"
     decorated["is_cancelling"] = decorated.get("status") == "cancelling"
     decorated["is_failed"] = decorated.get("status") == "failed"
@@ -168,7 +178,13 @@ def _decorate_experiment(experiment: dict[str, object]) -> dict[str, object]:
 
 def _serialize_experiment_runtime(experiment: dict[str, object]) -> dict[str, object]:
     serialized = dict(experiment)
-    for field in ("created_at", "updated_at", "started_at", "finished_at"):
+    for field in (
+        "created_at",
+        "updated_at",
+        "queue_enqueued_at",
+        "started_at",
+        "finished_at",
+    ):
         value = serialized.get(field)
         if isinstance(value, datetime):
             if value.tzinfo is None:
@@ -299,9 +315,29 @@ def _render_new_experiment(
 
 @bp.get("")
 def history():
+    service = current_app.extensions["experiment_service"]
     repo = current_app.extensions["experiment_repository"]
     experiments = [_decorate_experiment(item) for item in repo.list_experiments()]
-    return render_template("experiments/history.html", experiments=experiments)
+    queue_overview = service.get_queue_overview()
+    running_experiment = queue_overview.get("running_experiment")
+    queued_experiments = queue_overview.get("queued_experiments") or []
+    history_experiments = [
+        experiment
+        for experiment in experiments
+        if experiment.get("status") not in {"queued", "running"}
+    ]
+    return render_template(
+        "experiments/history.html",
+        experiments=history_experiments,
+        running_experiment=_decorate_experiment(running_experiment)
+        if isinstance(running_experiment, dict)
+        else None,
+        queued_experiments=[
+            _decorate_experiment(item)
+            for item in queued_experiments
+            if isinstance(item, dict)
+        ],
+    )
 
 
 @bp.get("/new")
@@ -318,9 +354,18 @@ def cancel_experiment(experiment_id: str):
         abort(404)
 
     if was_requested:
-        flash("Experiment cancellation requested.", "info")
+        flash("Experiment removed from execution queue.", "info")
+        experiment = service.get_experiment_detail(experiment_id)
+        if (
+            experiment is not None
+            and experiment["experiment"].get("status") == "cancelled"
+        ):
+            return redirect(url_for("experiments.detail", experiment_id=experiment_id))
     else:
-        flash("Experiment is no longer running and cannot be cancelled.", "warning")
+        flash(
+            "Experiment is no longer queued or running and cannot be cancelled.",
+            "warning",
+        )
 
     return redirect(url_for("experiments.detail", experiment_id=experiment_id))
 
@@ -331,7 +376,8 @@ def delete_experiment(experiment_id: str):
         experiment_id
     )
     if not deleted:
-        abort(404)
+        flash("Running experiments cannot be deleted.", "warning")
+        return redirect(url_for("experiments.detail", experiment_id=experiment_id))
     flash(f"Experiment deleted; experiment_id={experiment_id}", "success")
     return redirect(url_for("experiments.history"))
 

@@ -106,7 +106,8 @@
     <textarea class="form-control" rows="3" name="notes">{{ form_data.notes }}</textarea>
   </div>
   <div class="col-12">
-    <button class="btn btn-success" type="submit">Run experiment</button>
+    <button class="btn btn-success" type="submit">Add to execution queue</button>
+    <div class="form-text">Experiments are queued and executed one by one from the head of the queue.</div>
   </div>
 </form>
 {% endblock %}
