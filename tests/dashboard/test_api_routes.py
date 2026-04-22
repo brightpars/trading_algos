@@ -98,7 +98,15 @@ def _build_app(monkeypatch):
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
     return create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            "reports",
+            "/tmp/smarttrade",
+            1,
+            experiment_max_concurrent_runs=2,
+        )
     )
 
 
@@ -372,6 +380,8 @@ def test_experiment_queue_api_returns_running_and_queued_items(monkeypatch):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["running_experiment"]["experiment_id"] == "exp_running"
+    assert payload["running_experiments"][0]["experiment_id"] == "exp_running"
     assert payload["queued_experiments"][0]["experiment_id"] == "exp_queued"
+    assert payload["queue_summary"]["running_count"] == 1
+    assert payload["queue_summary"]["max_concurrent_experiments"] == 2
     assert payload["queue_summary"]["queued_count"] == 1

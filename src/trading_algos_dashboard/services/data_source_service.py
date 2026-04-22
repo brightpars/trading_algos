@@ -3,24 +3,34 @@ from __future__ import annotations
 import importlib
 import logging
 import sys
+from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import perf_counter
+from time import sleep
 from typing import Any
 from typing import cast
+from uuid import uuid4
+from xmlrpc.client import DateTime as XmlRpcDateTime
 from xmlrpc.client import Fault
 
 from trading_algos_dashboard.services.data_source_settings_service import (
     DEFAULT_DATA_SERVER_IP,
     DEFAULT_DATA_SERVER_PORT,
 )
-from trading_algos_dashboard.services.market_data_cache import InMemoryMarketDataCache
+from trading_algos_dashboard.services.market_data_cache import (
+    InMemoryMarketDataCache,
+    LayeredMarketDataCache,
+)
 
 
 DEFAULT_CONNECTION_CHECK_TIMEOUT_SECONDS = 2.0
+DEFAULT_CACHE_FILL_LEASE_SECONDS = 10
+DEFAULT_CACHE_FILL_WAIT_SECONDS = 0.5
+DEFAULT_CACHE_FILL_POLL_INTERVAL_SECONDS = 0.05
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +61,16 @@ class SmarttradeDataSourceService:
         smarttrade_path: str,
         user_id: int,
         endpoint_resolver: Any | None = None,
-        market_data_cache: InMemoryMarketDataCache | None = None,
+        market_data_cache: LayeredMarketDataCache | None = None,
+        sleep_fn: Callable[[float], None] | None = None,
     ):
         self.smarttrade_path = smarttrade_path
         self.user_id = user_id
         self.endpoint_resolver = endpoint_resolver
-        self.market_data_cache = market_data_cache or InMemoryMarketDataCache()
+        self.market_data_cache = market_data_cache or LayeredMarketDataCache(
+            memory_cache=InMemoryMarketDataCache(enabled=True)
+        )
+        self.sleep_fn = sleep_fn or sleep
 
     def _is_proxy_server_up(
         self,
@@ -116,10 +130,12 @@ class SmarttradeDataSourceService:
             "ip": ip,
             "port": port,
             "endpoint": f"{ip}:{port}",
-            "cache": {
-                "enabled": self.market_data_cache.enabled,
-                "entry_count": self.market_data_cache.stats()["entry_count"],
-            },
+            "cache": (
+                {
+                    "enabled": self.market_data_cache.enabled,
+                    **self.market_data_cache.stats(),
+                }
+            ),
         }
 
     @staticmethod
@@ -161,6 +177,32 @@ class SmarttradeDataSourceService:
         )
 
     @staticmethod
+    def _normalize_xmlrpc_value(value: Any) -> Any:
+        if isinstance(value, XmlRpcDateTime):
+            parsed = datetime.strptime(value.value, "%Y%m%dT%H:%M:%S")
+            return parsed.replace(tzinfo=timezone.utc)
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc)
+            return value.astimezone(timezone.utc)
+        if isinstance(value, Mapping):
+            return {
+                str(key): SmarttradeDataSourceService._normalize_xmlrpc_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, tuple):
+            return tuple(
+                SmarttradeDataSourceService._normalize_xmlrpc_value(item)
+                for item in value
+            )
+        if isinstance(value, list):
+            return [
+                SmarttradeDataSourceService._normalize_xmlrpc_value(item)
+                for item in value
+            ]
+        return value
+
+    @staticmethod
     def _normalize_candle_row(row: Any) -> dict[str, Any]:
         if isinstance(row, dict):
             mapping: dict[str, Any] = dict(cast(Mapping[str, Any], row))
@@ -175,7 +217,10 @@ class SmarttradeDataSourceService:
             else:
                 raise TypeError("Unsupported candle row type")
         mapping.pop("_id", None)
-        return mapping
+        normalized = SmarttradeDataSourceService._normalize_xmlrpc_value(mapping)
+        if not isinstance(normalized, dict):
+            raise TypeError("Normalized candle row must be a mapping")
+        return normalized
 
     def _fetch_candles_via_proxy(
         self,
@@ -299,18 +344,57 @@ class SmarttradeDataSourceService:
             return MarketDataFetchResult(
                 candles=candles,
                 cache_hit=True,
-                source_kind="cache",
+                source_kind=cached.source_kind,
                 symbol=normalized_symbol,
                 start=start,
                 end=end,
                 candle_count=len(candles),
             )
 
-        result = self._fetch_candles_via_proxy(
-            symbol=normalized_symbol,
-            start=start,
-            end=end,
-        )
+        owner_id = f"cache_fill_{uuid4().hex}"
+        shared_cache = self.market_data_cache.shared_cache
+        has_fill_claim = False
+        if shared_cache is not None:
+            has_fill_claim = shared_cache.try_claim_fill(
+                symbol=normalized_symbol,
+                start=start,
+                end=end,
+                owner_id=owner_id,
+                lease_until=datetime.now(timezone.utc)
+                + timedelta(seconds=DEFAULT_CACHE_FILL_LEASE_SECONDS),
+            )
+            if not has_fill_claim:
+                waited = self._wait_for_shared_cache_fill(
+                    symbol=normalized_symbol,
+                    start=start,
+                    end=end,
+                )
+                if waited is not None:
+                    candles = self._clone_candles(waited.candles)
+                    return MarketDataFetchResult(
+                        candles=candles,
+                        cache_hit=True,
+                        source_kind=waited.source_kind,
+                        symbol=normalized_symbol,
+                        start=start,
+                        end=end,
+                        candle_count=len(candles),
+                    )
+
+        try:
+            result = self._fetch_candles_via_proxy(
+                symbol=normalized_symbol,
+                start=start,
+                end=end,
+            )
+        finally:
+            if has_fill_claim and shared_cache is not None:
+                shared_cache.release_fill_claim(
+                    symbol=normalized_symbol,
+                    start=start,
+                    end=end,
+                    owner_id=owner_id,
+                )
 
         if not result:
             raise MarketDataUnavailableError(
@@ -335,6 +419,21 @@ class SmarttradeDataSourceService:
             end=end,
             candle_count=len(candles),
         )
+
+    def _wait_for_shared_cache_fill(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+    ) -> Any | None:
+        deadline = perf_counter() + DEFAULT_CACHE_FILL_WAIT_SECONDS
+        while perf_counter() < deadline:
+            cached = self.market_data_cache.get(symbol=symbol, start=start, end=end)
+            if cached is not None and cached.source_kind == "shared_cache":
+                return cached
+            self.sleep_fn(DEFAULT_CACHE_FILL_POLL_INTERVAL_SECONDS)
+        return None
 
 
 def parse_date_range(

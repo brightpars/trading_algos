@@ -24,6 +24,7 @@ class CachedMarketData:
     candles: tuple[dict[str, Any], ...]
     stored_at: datetime
     candle_count: int
+    source_kind: str = "memory_cache"
 
 
 class InMemoryMarketDataCache:
@@ -76,6 +77,7 @@ class InMemoryMarketDataCache:
             candles=tuple(dict(row) for row in candles),
             stored_at=datetime.now(timezone.utc),
             candle_count=len(candles),
+            source_kind="memory_cache",
         )
         with self._lock:
             self._entries[key] = entry
@@ -97,3 +99,167 @@ class InMemoryMarketDataCache:
     def stats(self) -> dict[str, int]:
         with self._lock:
             return {"entry_count": len(self._entries)}
+
+
+class MongoMarketDataCache:
+    def __init__(
+        self,
+        *,
+        repository: Any,
+        enabled: bool = True,
+    ) -> None:
+        self.repository = repository
+        self.enabled = enabled
+
+    def get(
+        self, *, symbol: str, start: datetime, end: datetime
+    ) -> CachedMarketData | None:
+        if not self.enabled:
+            return None
+        document = self.repository.get_entry(symbol=symbol, start=start, end=end)
+        if not isinstance(document, dict):
+            return None
+        candles = document.get("candles")
+        stored_at = document.get("stored_at")
+        if not isinstance(candles, list) or not isinstance(stored_at, datetime):
+            return None
+        key = MarketDataCacheKey(symbol=symbol.strip().upper(), start=start, end=end)
+        return CachedMarketData(
+            key=key,
+            candles=tuple(dict(row) for row in candles if isinstance(row, Mapping)),
+            stored_at=stored_at,
+            candle_count=int(document.get("candle_count", len(candles))),
+            source_kind="shared_cache",
+        )
+
+    def put(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+        candles: Sequence[Mapping[str, Any]],
+    ) -> CachedMarketData:
+        payload = self.repository.put_entry(
+            symbol=symbol,
+            start=start,
+            end=end,
+            candles=[dict(row) for row in candles],
+        )
+        key = MarketDataCacheKey(symbol=symbol.strip().upper(), start=start, end=end)
+        stored_at = payload.get("stored_at")
+        if not isinstance(stored_at, datetime):
+            stored_at = datetime.now(timezone.utc)
+        return CachedMarketData(
+            key=key,
+            candles=tuple(dict(row) for row in candles),
+            stored_at=stored_at,
+            candle_count=len(candles),
+            source_kind="shared_cache",
+        )
+
+    def stats(self) -> dict[str, int]:
+        return {"entry_count": self.repository._count_documents({})}
+
+    def try_claim_fill(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+        owner_id: str,
+        lease_until: datetime,
+    ) -> bool:
+        return bool(
+            self.repository.try_claim_fill(
+                symbol=symbol,
+                start=start,
+                end=end,
+                owner_id=owner_id,
+                lease_until=lease_until,
+            )
+        )
+
+    def release_fill_claim(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+        owner_id: str,
+    ) -> None:
+        self.repository.release_fill_claim(
+            symbol=symbol,
+            start=start,
+            end=end,
+            owner_id=owner_id,
+        )
+
+
+class LayeredMarketDataCache:
+    def __init__(
+        self,
+        *,
+        memory_cache: InMemoryMarketDataCache,
+        shared_cache: MongoMarketDataCache | None = None,
+    ) -> None:
+        self.memory_cache = memory_cache
+        self.shared_cache = shared_cache
+        self.enabled = memory_cache.enabled or bool(
+            shared_cache and shared_cache.enabled
+        )
+
+    def get(
+        self, *, symbol: str, start: datetime, end: datetime
+    ) -> CachedMarketData | None:
+        cached = self.memory_cache.get(symbol=symbol, start=start, end=end)
+        if cached is not None:
+            return cached
+        if self.shared_cache is None:
+            return None
+        cached = self.shared_cache.get(symbol=symbol, start=start, end=end)
+        if cached is None:
+            return None
+        self.memory_cache.put(
+            symbol=symbol,
+            start=start,
+            end=end,
+            candles=cached.candles,
+        )
+        return cached
+
+    def put(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+        candles: Sequence[Mapping[str, Any]],
+    ) -> CachedMarketData:
+        if self.shared_cache is not None:
+            self.shared_cache.put(
+                symbol=symbol,
+                start=start,
+                end=end,
+                candles=candles,
+            )
+        return self.memory_cache.put(
+            symbol=symbol,
+            start=start,
+            end=end,
+            candles=candles,
+        )
+
+    def stats(self) -> dict[str, int | bool | str]:
+        shared_entry_count = 0
+        shared_enabled = False
+        if self.shared_cache is not None:
+            shared_enabled = self.shared_cache.enabled
+            shared_entry_count = self.shared_cache.stats()["entry_count"]
+        memory_stats = self.memory_cache.stats()
+        return {
+            "memory_entry_count": memory_stats["entry_count"],
+            "shared_entry_count": shared_entry_count,
+            "shared_enabled": shared_enabled,
+            "shared_backend": "mongo" if self.shared_cache is not None else "none",
+        }

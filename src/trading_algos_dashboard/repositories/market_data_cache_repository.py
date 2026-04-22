@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+import hashlib
+from collections.abc import Mapping
+from datetime import datetime, timezone
+from typing import Any
+
+from trading_algos_dashboard.repositories.mongo_base import MongoRepository
+
+
+class MarketDataCacheRepository(MongoRepository):
+    def __init__(self, db: Any):
+        super().__init__(db, "dashboard_market_data_cache")
+
+    @staticmethod
+    def build_cache_key(*, symbol: str, start: datetime, end: datetime) -> str:
+        normalized_symbol = symbol.strip().upper()
+        digest = hashlib.sha256(
+            f"{normalized_symbol}|{start.isoformat()}|{end.isoformat()}".encode()
+        ).hexdigest()
+        return digest
+
+    def get_entry(
+        self, *, symbol: str, start: datetime, end: datetime
+    ) -> dict[str, Any] | None:
+        cache_key = self.build_cache_key(symbol=symbol, start=start, end=end)
+        return self._without_id(self.collection.find_one({"cache_key": cache_key}))
+
+    def put_entry(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+        candles: list[dict[str, Any]],
+        stored_at: datetime | None = None,
+    ) -> dict[str, Any]:
+        normalized_symbol = symbol.strip().upper()
+        effective_stored_at = stored_at or datetime.now(timezone.utc)
+        cache_key = self.build_cache_key(
+            symbol=normalized_symbol,
+            start=start,
+            end=end,
+        )
+        payload = {
+            "cache_key": cache_key,
+            "symbol": normalized_symbol,
+            "start": start,
+            "end": end,
+            "candles": [dict(row) for row in candles],
+            "candle_count": len(candles),
+            "stored_at": effective_stored_at,
+        }
+        self.collection.update_one(
+            {"cache_key": cache_key},
+            {"$set": payload},
+            upsert=True,
+        )
+        stored = self.collection.find_one({"cache_key": cache_key})
+        if isinstance(stored, Mapping):
+            return self._without_id(stored) or {}
+        return payload
+
+    def try_claim_fill(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+        owner_id: str,
+        lease_until: datetime,
+    ) -> bool:
+        cache_key = self.build_cache_key(symbol=symbol, start=start, end=end)
+        find_one = getattr(self.collection, "find_one", None)
+        update_one = getattr(self.collection, "update_one", None)
+        if not callable(find_one) or not callable(update_one):
+            return False
+
+        existing = find_one({"cache_key": cache_key})
+        now = datetime.now(timezone.utc)
+        if isinstance(existing, Mapping):
+            current_owner = existing.get("fill_owner_id")
+            expires_at = existing.get("fill_expires_at")
+            has_candles = isinstance(existing.get("candles"), list) and bool(
+                existing.get("candles")
+            )
+            if has_candles:
+                return False
+            if isinstance(current_owner, str) and isinstance(expires_at, datetime):
+                if expires_at > now and current_owner != owner_id:
+                    return False
+
+        update_one(
+            {"cache_key": cache_key},
+            {
+                "$set": {
+                    "cache_key": cache_key,
+                    "symbol": symbol.strip().upper(),
+                    "start": start,
+                    "end": end,
+                    "fill_owner_id": owner_id,
+                    "fill_expires_at": lease_until,
+                }
+            },
+            upsert=True,
+        )
+        claimed = find_one({"cache_key": cache_key})
+        return bool(
+            isinstance(claimed, Mapping) and claimed.get("fill_owner_id") == owner_id
+        )
+
+    def release_fill_claim(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+        owner_id: str,
+    ) -> None:
+        cache_key = self.build_cache_key(symbol=symbol, start=start, end=end)
+        document = self.collection.find_one({"cache_key": cache_key})
+        if not isinstance(document, Mapping):
+            return
+        if document.get("fill_owner_id") != owner_id:
+            return
+        self.collection.update_one(
+            {"cache_key": cache_key},
+            {"$set": {"fill_owner_id": None, "fill_expires_at": None}},
+        )

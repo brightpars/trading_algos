@@ -11,11 +11,19 @@ from trading_algos_dashboard.repositories.algorithm_catalog_repository import (
     AlgorithmCatalogRepository,
 )
 from trading_algos_dashboard.repositories.result_repository import ResultRepository
+from trading_algos_dashboard.repositories.market_data_cache_repository import (
+    MarketDataCacheRepository,
+)
+from trading_algos_dashboard.repositories.experiment_scheduler_lease_repository import (
+    ExperimentSchedulerLeaseRepository,
+)
 
 __all__ = [
     "AlgorithmCatalogImportRunRepository",
     "AlgorithmCatalogLinkRepository",
     "AlgorithmCatalogRepository",
     "ExperimentRepository",
+    "ExperimentSchedulerLeaseRepository",
+    "MarketDataCacheRepository",
     "ResultRepository",
 ]

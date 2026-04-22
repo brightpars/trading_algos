@@ -16,12 +16,35 @@ class _Collection:
     def __init__(self):
         self.docs = []
 
+    @staticmethod
+    def _matches_query(doc, query):
+        for key, value in query.items():
+            if key == "$or":
+                if not any(_Collection._matches_query(doc, item) for item in value):
+                    return False
+                continue
+            if isinstance(value, dict):
+                if "$lte" in value:
+                    doc_value = doc.get(key)
+                    if doc_value is None or doc_value > value["$lte"]:
+                        return False
+                    continue
+            if doc.get(key) != value:
+                return False
+        return True
+
     class _DeleteResult:
         def __init__(self, deleted_count):
             self.deleted_count = deleted_count
 
-    def find(self, *_args, **_kwargs):
-        return self
+    def find(self, query=None, **_kwargs):
+        effective_query = dict(query or {})
+        filtered = [
+            doc
+            for doc in self.docs
+            if all(doc.get(k) == v for k, v in effective_query.items())
+        ]
+        return _Cursor(filtered)
 
     def sort(self, *_args, **_kwargs):
         return self
@@ -46,6 +69,35 @@ class _Collection:
             doc.update(update["$set"])
         return None
 
+    def count_documents(self, query):
+        return sum(
+            1 for doc in self.docs if all(doc.get(k) == v for k, v in query.items())
+        )
+
+    def find_one_and_update(
+        self, query, update, sort=None, return_document=None, upsert=False
+    ):
+        matches = [doc for doc in self.docs if self._matches_query(doc, query)]
+        if sort:
+            for key, direction in reversed(sort):
+                matches.sort(key=lambda item: item.get(key), reverse=direction == -1)
+        if not matches:
+            if not upsert:
+                return None
+            doc = {}
+            for key, value in query.items():
+                if key.startswith("$") or isinstance(value, dict):
+                    continue
+                doc[key] = value
+            if "$set" in update and isinstance(update["$set"], dict):
+                doc.update(update["$set"])
+            self.docs.append(doc)
+            return dict(doc)
+        doc = matches[0]
+        if "$set" in update and isinstance(update["$set"], dict):
+            doc.update(update["$set"])
+        return dict(doc)
+
     def delete_one(self, query):
         for index, doc in enumerate(self.docs):
             if all(doc.get(k) == v for k, v in query.items()):
@@ -61,6 +113,28 @@ class _Collection:
             if not all(doc.get(k) == v for k, v in query.items())
         ]
         return self._DeleteResult(original_count - len(self.docs))
+
+    def __iter__(self):
+        return iter(self.docs)
+
+
+class _Cursor:
+    def __init__(self, docs):
+        self.docs = docs
+
+    def sort(self, key=None, direction=None):
+        if key is None:
+            return self
+        reverse = direction == -1
+        return _Cursor(
+            sorted(
+                self.docs,
+                key=lambda item: (
+                    str(item.get(key, "")) if isinstance(item, dict) else ""
+                ),
+                reverse=reverse,
+            )
+        )
 
     def __iter__(self):
         return iter(self.docs)
@@ -95,6 +169,49 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b'name="symbol"' in response.data
     assert b'name="start_time"' in response.data
     assert b'name="end_time"' in response.data
+    assert b'name="max_concurrent_experiments"' in response.data
+    assert b"executed up to the configured concurrency limit" in response.data
+
+
+def test_create_experiment_updates_runtime_concurrency_setting(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+            "/tmp/smarttrade",
+            1,
+            experiment_max_concurrent_runs=2,
+        )
+    )
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
+
+    response = app.test_client().post(
+        "/experiments",
+        data={
+            "symbol": "AAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-31",
+            "end_time": "16:00",
+            "algorithms_json": (
+                '[{"alg_key":"close_high_channel_breakout","alg_param":{"window":2}}]'
+            ),
+            "notes": "runtime setting",
+            "max_concurrent_experiments": "5",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    settings = app.extensions[
+        "experiment_runtime_settings_service"
+    ].get_effective_settings()
+    assert settings["max_concurrent_experiments"] == 5
 
 
 def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypatch):
@@ -831,7 +948,7 @@ def test_create_experiment_redirects_to_queued_detail_page_when_dispatch_is_idle
             1,
         )
     )
-    app.extensions["experiment_service"].dispatch_next_experiment = lambda: None
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
 
     response = app.test_client().post(
         "/experiments",

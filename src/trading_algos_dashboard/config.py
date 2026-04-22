@@ -12,6 +12,7 @@ class DashboardConfig:
     report_base_path: str
     smarttrade_path: str
     smarttrade_user_id: int
+    experiment_max_concurrent_runs: int = 1
     smarttrade_api_base_url: str = "http://127.0.0.1:5000"
     smarttrade_api_token: str = ""
     smarttrade_api_timeout_secs: int = 10
@@ -34,6 +35,12 @@ class DashboardConfig:
             ),
             smarttrade_user_id=int(
                 os.environ.get("TRADING_ALGOS_DASHBOARD_SMARTTRADE_USER_ID", "1")
+            ),
+            experiment_max_concurrent_runs=int(
+                os.environ.get(
+                    "TRADING_ALGOS_DASHBOARD_EXPERIMENT_MAX_CONCURRENT_RUNS",
+                    "1",
+                )
             ),
             smarttrade_api_base_url=os.environ.get(
                 "TRADING_ALGOS_DASHBOARD_SMARTTRADE_API_BASE_URL",

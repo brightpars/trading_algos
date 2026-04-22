@@ -4,6 +4,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, cast
+from xmlrpc.client import DateTime as XmlRpcDateTime
 
 from trading_algos_dashboard.repositories.experiment_repository import (
     ExperimentRepository,
@@ -135,8 +136,39 @@ class _ExperimentRepositoryStub:
     def get_running_experiment(self) -> dict[str, Any] | None:
         return None
 
+    def list_running_experiments(self) -> list[dict[str, Any]]:
+        return [
+            dict(doc) for doc in self.docs.values() if doc.get("status") == "running"
+        ]
+
+    def count_running_experiments(self) -> int:
+        return len(self.list_running_experiments())
+
     def get_next_queued_experiment(self) -> dict[str, Any] | None:
         return None
+
+    def claim_next_queued_experiment(
+        self, *, started_at: datetime
+    ) -> dict[str, Any] | None:
+        queued = sorted(
+            [doc for doc in self.docs.values() if doc.get("status") == "queued"],
+            key=lambda item: str(item.get("experiment_id", "")),
+        )
+        if not queued:
+            return None
+        doc = queued[0]
+        doc.update(
+            {
+                "status": "running",
+                "started_at": started_at,
+                "updated_at": started_at,
+                "finished_at": None,
+                "duration_seconds": None,
+                "cancelled_at": None,
+                "error_message": None,
+            }
+        )
+        return dict(doc)
 
     def list_queued_experiments(self) -> list[dict[str, Any]]:
         return []
@@ -199,6 +231,22 @@ def _build_service(
         task_launcher=_task_launcher,
     )
     return service
+
+
+class _SchedulerLeaseManager:
+    def __init__(self, *, granted: bool) -> None:
+        self.granted = granted
+        self.acquire_calls = 0
+        self.release_calls = 0
+
+    def try_acquire_lease(self, *, owner_id: str) -> bool:
+        assert owner_id
+        self.acquire_calls += 1
+        return self.granted
+
+    def release_lease(self, *, owner_id: str) -> None:
+        assert owner_id
+        self.release_calls += 1
 
 
 def _wait_for(condition, *, timeout=2.0):
@@ -325,7 +373,7 @@ def test_run_experiment_job_records_datasource_cache_metadata(monkeypatch, tmp_p
             "report": {},
         },
     )
-    monkeypatch.setattr(service, "dispatch_next_experiment", lambda: None)
+    monkeypatch.setattr(service, "dispatch_available_experiments", lambda: [])
 
     service._run_experiment_job(
         experiment_id="exp_1",
@@ -355,3 +403,251 @@ def test_run_experiment_job_records_datasource_cache_metadata(monkeypatch, tmp_p
     assert experiment["execution_steps"][0]["step"] == "read_candles"
     assert experiment["execution_steps"][0]["metadata"]["cache_hit"] is True
     assert experiment["execution_steps"][0]["metadata"]["source_kind"] == "cache"
+
+
+def test_run_experiment_job_normalizes_xmlrpc_datetime_values_in_persisted_payloads(
+    monkeypatch, tmp_path
+):
+    experiment_repository = _ExperimentRepositoryStub()
+    result_repository = _ResultRepositoryStub()
+
+    class _XmlRpcDataSourceService:
+        def get_market_data_server_details(self) -> dict[str, Any]:
+            return {"kind": "smarttrade_dataserver", "endpoint": "127.0.0.2:6010"}
+
+        def fetch_candles(
+            self, *, symbol: str, start: datetime, end: datetime
+        ) -> MarketDataFetchResult:
+            return MarketDataFetchResult(
+                candles=[
+                    {
+                        "ts": XmlRpcDateTime("20260402T09:30:00"),
+                        "Close": 10.5,
+                    }
+                ],
+                cache_hit=False,
+                source_kind="dataserver",
+                symbol=symbol,
+                start=cast(Any, XmlRpcDateTime("20260402T09:30:00")),
+                end=cast(Any, XmlRpcDateTime("20260402T09:30:00")),
+                candle_count=1,
+            )
+
+    service = ExperimentService(
+        experiment_repository=cast(Any, experiment_repository),
+        result_repository=cast(Any, result_repository),
+        data_source_service=cast(Any, _XmlRpcDataSourceService()),
+        report_base_path=str(tmp_path),
+    )
+    experiment_repository.create_experiment({"experiment_id": "exp_xmlrpc"})
+
+    monkeypatch.setattr(
+        "trading_algos_dashboard.services.experiment_service.run_alert_algorithm",
+        lambda **kwargs: {
+            "execution_steps": [
+                {
+                    "step": "run_algorithm",
+                    "label": "Run algorithm",
+                    "started_at": XmlRpcDateTime("20260402T09:30:00"),
+                    "finished_at": XmlRpcDateTime("20260402T09:31:00"),
+                    "duration_seconds": 60.0,
+                    "metadata": {"last_candle_ts": kwargs["candles"][0]["ts"]},
+                }
+            ],
+            "alg_key": "boundary_breakout",
+            "alg_name": "Boundary Breakout",
+            "report": {
+                "generated_at": XmlRpcDateTime("20260402T09:31:00"),
+            },
+        },
+    )
+    monkeypatch.setattr(service, "dispatch_available_experiments", lambda: [])
+
+    service._run_experiment_job(
+        experiment_id="exp_xmlrpc",
+        created_at=datetime.now(timezone.utc),
+        started_at=datetime.now(timezone.utc),
+        symbol="AAPL",
+        start_dt=datetime.fromisoformat("2026-04-02T09:30"),
+        end_dt=datetime.fromisoformat("2026-04-02T09:30"),
+        normalized_algorithms=[
+            {
+                "symbol": "AAPL",
+                "alg_key": "boundary_breakout",
+                "alg_param": {},
+                "buy": True,
+                "sell": True,
+            }
+        ],
+        configuration_payload=None,
+        report_dir=Path(tmp_path),
+    )
+
+    experiment = experiment_repository.get_experiment("exp_xmlrpc")
+    assert experiment is not None
+    assert experiment["status"] == "completed"
+    assert experiment["execution_steps"][0]["metadata"][
+        "start"
+    ] == datetime.fromisoformat("2026-04-02T09:30:00+00:00")
+    assert experiment["execution_steps"][0]["metadata"][
+        "end"
+    ] == datetime.fromisoformat("2026-04-02T09:30:00+00:00")
+    assert experiment["execution_steps"][1]["started_at"] == datetime.fromisoformat(
+        "2026-04-02T09:30:00+00:00"
+    )
+
+    persisted_result = result_repository.results[0]
+    assert persisted_result["report"]["generated_at"] == datetime.fromisoformat(
+        "2026-04-02T09:31:00+00:00"
+    )
+    assert persisted_result["execution_steps"][0]["metadata"][
+        "last_candle_ts"
+    ] == datetime.fromisoformat("2026-04-02T09:30:00+00:00")
+
+
+def test_dispatch_available_experiments_starts_up_to_capacity(tmp_path):
+    db = _Db()
+    experiment_repository = ExperimentRepository(db)
+    result_repository = ResultRepository(db)
+    launched: list[str] = []
+
+    service = ExperimentService(
+        experiment_repository=experiment_repository,
+        result_repository=result_repository,
+        data_source_service=_CacheAwareDataSourceService(cache_hit=False),
+        report_base_path=str(tmp_path),
+        max_concurrent_experiments=2,
+        task_launcher=lambda job: launched.append("launched") or None,
+    )
+    for experiment_id in ("exp_a", "exp_b", "exp_c"):
+        experiment_repository.create_experiment(
+            {
+                "experiment_id": experiment_id,
+                "status": "queued",
+                "symbol": "AAPL",
+                "report_base_path": str(tmp_path / experiment_id),
+                "time_range": {
+                    "start": datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc),
+                    "end": datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc),
+                },
+                "selected_algorithms": [],
+                "created_at": datetime.now(timezone.utc),
+            }
+        )
+
+    launched_ids = service.dispatch_available_experiments()
+
+    assert len(launched_ids) == 2
+    assert len(launched) == 2
+
+
+def test_get_queue_overview_reports_parallel_capacity(tmp_path):
+    db = _Db()
+    experiment_repository = ExperimentRepository(db)
+    result_repository = ResultRepository(db)
+    service = ExperimentService(
+        experiment_repository=experiment_repository,
+        result_repository=result_repository,
+        data_source_service=_CacheAwareDataSourceService(cache_hit=False),
+        report_base_path=str(tmp_path),
+        max_concurrent_experiments=3,
+    )
+    experiment_repository.create_experiment(
+        {"experiment_id": "exp_running", "status": "running"}
+    )
+    experiment_repository.create_experiment(
+        {"experiment_id": "exp_queued", "status": "queued"}
+    )
+
+    overview = service.get_queue_overview()
+
+    assert overview["queue_summary"]["running_count"] == 1
+    assert overview["queue_summary"]["max_concurrent_experiments"] == 3
+    assert overview["queue_summary"]["available_slots"] == 2
+
+
+def test_queue_overview_uses_runtime_concurrency_provider(tmp_path):
+    db = _Db()
+    experiment_repository = ExperimentRepository(db)
+    result_repository = ResultRepository(db)
+    service = ExperimentService(
+        experiment_repository=experiment_repository,
+        result_repository=result_repository,
+        data_source_service=_CacheAwareDataSourceService(cache_hit=False),
+        report_base_path=str(tmp_path),
+        max_concurrent_experiments=1,
+        max_concurrent_experiments_provider=lambda: 4,
+    )
+    overview = service.get_queue_overview()
+
+    assert overview["queue_summary"]["max_concurrent_experiments"] == 4
+    assert overview["queue_summary"]["available_slots"] == 4
+
+
+def test_dispatch_available_experiments_returns_empty_when_lease_not_acquired(tmp_path):
+    db = _Db()
+    experiment_repository = ExperimentRepository(db)
+    result_repository = ResultRepository(db)
+    lease_manager = _SchedulerLeaseManager(granted=False)
+    service = ExperimentService(
+        experiment_repository=experiment_repository,
+        result_repository=result_repository,
+        data_source_service=_CacheAwareDataSourceService(cache_hit=False),
+        report_base_path=str(tmp_path),
+        scheduler_lease_manager=lease_manager,
+    )
+    experiment_repository.create_experiment(
+        {
+            "experiment_id": "exp_a",
+            "status": "queued",
+            "symbol": "AAPL",
+            "report_base_path": str(tmp_path / "exp_a"),
+            "time_range": {
+                "start": datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc),
+                "end": datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc),
+            },
+            "selected_algorithms": [],
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+
+    launched = service.dispatch_available_experiments()
+
+    assert launched == []
+    assert lease_manager.acquire_calls == 1
+    assert lease_manager.release_calls == 0
+
+
+def test_dispatch_available_experiments_releases_lease_after_dispatch(tmp_path):
+    db = _Db()
+    experiment_repository = ExperimentRepository(db)
+    result_repository = ResultRepository(db)
+    lease_manager = _SchedulerLeaseManager(granted=True)
+    service = ExperimentService(
+        experiment_repository=experiment_repository,
+        result_repository=result_repository,
+        data_source_service=_CacheAwareDataSourceService(cache_hit=False),
+        report_base_path=str(tmp_path),
+        scheduler_lease_manager=lease_manager,
+        task_launcher=lambda _job: None,
+    )
+    experiment_repository.create_experiment(
+        {
+            "experiment_id": "exp_a",
+            "status": "queued",
+            "symbol": "AAPL",
+            "report_base_path": str(tmp_path / "exp_a"),
+            "time_range": {
+                "start": datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc),
+                "end": datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc),
+            },
+            "selected_algorithms": [],
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+
+    launched = service.dispatch_available_experiments()
+
+    assert launched == ["exp_a"]
+    assert lease_manager.acquire_calls == 1
+    assert lease_manager.release_calls == 1

@@ -71,6 +71,8 @@ document.addEventListener("DOMContentLoaded", () => {
     updateField("status", runtime.status || "unknown");
     updateField("queue_position", runtime.queue_position ?? "—");
     updateField("queue_items_ahead", runtime.queue_items_ahead ?? "—");
+    updateField("running_count", runtime.running_count ?? "—");
+    updateField("max_concurrent_experiments", runtime.max_concurrent_experiments ?? "—");
     updateField(
       "dataset_endpoint",
       runtime.dataset_source?.endpoint || "Loading…",
@@ -78,7 +80,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (runtime.status === "queued") {
       statusHeading.textContent = "Queued for execution";
-      statusMessage.textContent = "This experiment is waiting in the FIFO queue and will start automatically when earlier jobs finish.";
+      statusMessage.textContent = "This experiment is waiting in the FIFO queue and will start automatically when a parallel execution slot becomes available.";
       runtimeCard?.classList.remove("is-failed");
       if (cancelButton) {
         cancelButton.disabled = false;

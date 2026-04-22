@@ -36,6 +36,15 @@ from trading_algos_dashboard.repositories.publication_record_repository import (
     PublicationRecordRepository,
 )
 from trading_algos_dashboard.repositories.result_repository import ResultRepository
+from trading_algos_dashboard.repositories.market_data_cache_repository import (
+    MarketDataCacheRepository,
+)
+from trading_algos_dashboard.repositories.experiment_runtime_settings_repository import (
+    ExperimentRuntimeSettingsRepository,
+)
+from trading_algos_dashboard.repositories.experiment_scheduler_lease_repository import (
+    ExperimentSchedulerLeaseRepository,
+)
 from trading_algos_dashboard.services.algorithm_catalog_service import (
     AlgorithmCatalogService,
 )
@@ -58,7 +67,17 @@ from trading_algos_dashboard.services.configuration_publish_service import (
     ConfigurationPublishService,
 )
 from trading_algos_dashboard.services.experiment_service import ExperimentService
-from trading_algos_dashboard.services.market_data_cache import InMemoryMarketDataCache
+from trading_algos_dashboard.services.experiment_runtime_settings_service import (
+    ExperimentRuntimeSettingsService,
+)
+from trading_algos_dashboard.services.experiment_scheduler_lease_service import (
+    ExperimentSchedulerLeaseService,
+)
+from trading_algos_dashboard.services.market_data_cache import (
+    InMemoryMarketDataCache,
+    LayeredMarketDataCache,
+    MongoMarketDataCache,
+)
 from trading_algos_dashboard.services.report_service import ReportService
 
 
@@ -77,6 +96,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         REPORT_BASE_PATH=cfg.report_base_path,
         SMARTTRADE_PATH=cfg.smarttrade_path,
         SMARTTRADE_USER_ID=cfg.smarttrade_user_id,
+        EXPERIMENT_MAX_CONCURRENT_RUNS=cfg.experiment_max_concurrent_runs,
     )
 
     mongo.client = MongoClient(cfg.mongo_uri)
@@ -89,13 +109,31 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     publication_record_repository = PublicationRecordRepository(mongo.db)
     data_source_settings_repository = DataSourceSettingsRepository(mongo.db)
     algorithm_catalog_repository = AlgorithmCatalogRepository(mongo.db)
+    market_data_cache_repository = MarketDataCacheRepository(mongo.db)
+    experiment_runtime_settings_repository = ExperimentRuntimeSettingsRepository(
+        mongo.db
+    )
+    experiment_scheduler_lease_repository = ExperimentSchedulerLeaseRepository(mongo.db)
     algorithm_catalog_import_run_repository = AlgorithmCatalogImportRunRepository(
         mongo.db
     )
     data_source_settings_service = DataSourceSettingsService(
         repository=data_source_settings_repository
     )
-    market_data_cache = InMemoryMarketDataCache(enabled=True)
+    experiment_runtime_settings_service = ExperimentRuntimeSettingsService(
+        repository=experiment_runtime_settings_repository,
+        default_max_concurrent_experiments=cfg.experiment_max_concurrent_runs,
+    )
+    experiment_scheduler_lease_service = ExperimentSchedulerLeaseService(
+        repository=experiment_scheduler_lease_repository,
+    )
+    market_data_cache = LayeredMarketDataCache(
+        memory_cache=InMemoryMarketDataCache(enabled=True),
+        shared_cache=MongoMarketDataCache(
+            repository=market_data_cache_repository,
+            enabled=True,
+        ),
+    )
     data_source_service = SmarttradeDataSourceService(
         smarttrade_path=cfg.smarttrade_path,
         user_id=cfg.smarttrade_user_id,
@@ -110,6 +148,13 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         result_repository=result_repository,
         data_source_service=data_source_service,
         report_base_path=cfg.report_base_path,
+        max_concurrent_experiments=cfg.experiment_max_concurrent_runs,
+        max_concurrent_experiments_provider=lambda: (
+            experiment_runtime_settings_service.get_effective_settings()[
+                "max_concurrent_experiments"
+            ]
+        ),
+        scheduler_lease_manager=experiment_scheduler_lease_service,
     )
     algorithm_catalog_service = AlgorithmCatalogService(
         catalog_repository=algorithm_catalog_repository,
@@ -149,10 +194,23 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["publication_record_repository"] = publication_record_repository
     app.extensions["data_source_settings_repository"] = data_source_settings_repository
     app.extensions["algorithm_catalog_repository"] = algorithm_catalog_repository
+    app.extensions["market_data_cache_repository"] = market_data_cache_repository
+    app.extensions["experiment_runtime_settings_repository"] = (
+        experiment_runtime_settings_repository
+    )
+    app.extensions["experiment_scheduler_lease_repository"] = (
+        experiment_scheduler_lease_repository
+    )
     app.extensions["algorithm_catalog_import_run_repository"] = (
         algorithm_catalog_import_run_repository
     )
     app.extensions["data_source_settings_service"] = data_source_settings_service
+    app.extensions["experiment_runtime_settings_service"] = (
+        experiment_runtime_settings_service
+    )
+    app.extensions["experiment_scheduler_lease_service"] = (
+        experiment_scheduler_lease_service
+    )
     app.extensions["market_data_cache"] = market_data_cache
     app.extensions["data_source_service"] = data_source_service
     app.extensions["experiment_service"] = experiment_service

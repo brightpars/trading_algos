@@ -91,6 +91,7 @@ def test_create_app_registers_core_routes(monkeypatch):
             report_base_path="reports",
             smarttrade_path="/tmp/smarttrade",
             smarttrade_user_id=1,
+            experiment_max_concurrent_runs=2,
         )
     )
 
@@ -106,3 +107,13 @@ def test_create_app_registers_core_routes(monkeypatch):
     assert b'value="127.0.0.2"' in response.data
     assert b'value="6010"' in response.data
     assert app.extensions["market_data_cache"].enabled is True
+    assert app.extensions["market_data_cache"].stats()["shared_backend"] == "mongo"
+    assert app.config["EXPERIMENT_MAX_CONCURRENT_RUNS"] == 2
+    assert app.extensions["experiment_service"].max_concurrent_experiments == 2
+    assert (
+        app.extensions["experiment_runtime_settings_service"].get_effective_settings()[
+            "max_concurrent_experiments"
+        ]
+        == 2
+    )
+    assert app.extensions["experiment_scheduler_lease_service"] is not None

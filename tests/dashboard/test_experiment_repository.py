@@ -17,6 +17,23 @@ class _Collection:
     def __init__(self):
         self.docs = []
 
+    @staticmethod
+    def _matches_query(doc, query):
+        for key, value in query.items():
+            if key == "$or":
+                if not any(_Collection._matches_query(doc, item) for item in value):
+                    return False
+                continue
+            if isinstance(value, dict):
+                if "$lte" in value:
+                    doc_value = doc.get(key)
+                    if doc_value is None or doc_value > value["$lte"]:
+                        return False
+                    continue
+            if doc.get(key) != value:
+                return False
+        return True
+
     def insert_one(self, payload):
         self.docs.append(dict(payload))
 
@@ -47,6 +64,34 @@ class _Collection:
                 payload.update(update["$set"])
             self.docs.append(payload)
         return None
+
+    def count_documents(self, query):
+        return sum(
+            1 for doc in self.docs if all(doc.get(k) == v for k, v in query.items())
+        )
+
+    def find_one_and_update(
+        self, query, update, sort=None, return_document=None, upsert=False
+    ):
+        matches = [doc for doc in self.docs if self._matches_query(doc, query)]
+        if sort:
+            for key, direction in reversed(sort):
+                matches.sort(key=lambda item: item.get(key), reverse=direction == -1)
+        if not matches:
+            if not upsert:
+                return None
+            doc = {}
+            for key, value in query.items():
+                if key.startswith("$") or isinstance(value, dict):
+                    continue
+                doc[key] = value
+            if "$set" in update and isinstance(update["$set"], dict):
+                doc.update(update["$set"])
+            self.docs.append(doc)
+            return dict(doc)
+        doc = matches[0]
+        doc.update(update["$set"])
+        return dict(doc)
 
     def delete_one(self, query):
         for index, doc in enumerate(self.docs):
@@ -129,3 +174,46 @@ def test_experiment_repository_get_running_experiment_returns_running_item():
 
     assert running is not None
     assert running["experiment_id"] == "exp_running"
+
+
+def test_experiment_repository_counts_and_lists_running_experiments():
+    collection = _Collection()
+    repo = ExperimentRepository({"dashboard_experiments": collection})
+    repo.create_experiment({"experiment_id": "exp_1", "status": "running"})
+    repo.create_experiment({"experiment_id": "exp_2", "status": "running"})
+    repo.create_experiment({"experiment_id": "exp_3", "status": "queued"})
+
+    assert repo.count_running_experiments() == 2
+    assert [item["experiment_id"] for item in repo.list_running_experiments()] == [
+        "exp_1",
+        "exp_2",
+    ]
+
+
+def test_experiment_repository_claims_next_queued_experiment_in_fifo_order():
+    collection = _Collection()
+    repo = ExperimentRepository({"dashboard_experiments": collection})
+    repo.create_experiment(
+        {
+            "experiment_id": "exp_b",
+            "status": "queued",
+            "created_at": datetime(2024, 2, 1, 12, 1, tzinfo=timezone.utc),
+            "queue_enqueued_at": datetime(2024, 2, 1, 12, 1, tzinfo=timezone.utc),
+        }
+    )
+    repo.create_experiment(
+        {
+            "experiment_id": "exp_a",
+            "status": "queued",
+            "created_at": datetime(2024, 2, 1, 12, 0, tzinfo=timezone.utc),
+            "queue_enqueued_at": datetime(2024, 2, 1, 12, 0, tzinfo=timezone.utc),
+        }
+    )
+
+    claimed = repo.claim_next_queued_experiment(
+        started_at=datetime(2024, 2, 1, 13, 0, tzinfo=timezone.utc)
+    )
+
+    assert claimed is not None
+    assert claimed["experiment_id"] == "exp_a"
+    assert claimed["status"] == "running"

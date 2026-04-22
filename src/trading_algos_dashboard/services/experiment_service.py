@@ -10,14 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+from xmlrpc.client import DateTime as XmlRpcDateTime
 from uuid import uuid4
 
 from trading_algos.alertgen.core.validation import normalize_alertgen_sensor_config
 
-from trading_algos_dashboard.repositories.experiment_repository import (
-    ExperimentRepository,
-)
-from trading_algos_dashboard.repositories.result_repository import ResultRepository
 from trading_algos_dashboard.services.algorithm_runner_service import (
     run_alert_algorithm,
 )
@@ -25,7 +22,6 @@ from trading_algos_dashboard.services.configuration_run_service import (
     run_configuration_payload,
 )
 from trading_algos_dashboard.services.data_source_service import (
-    SmarttradeDataSourceService,
     parse_date_range,
 )
 
@@ -34,20 +30,29 @@ class ExperimentService:
     def __init__(
         self,
         *,
-        experiment_repository: ExperimentRepository,
-        result_repository: ResultRepository,
-        data_source_service: SmarttradeDataSourceService,
+        experiment_repository: Any,
+        result_repository: Any,
+        data_source_service: Any,
         report_base_path: str,
+        max_concurrent_experiments: int = 1,
+        max_concurrent_experiments_provider: Callable[[], int] | None = None,
+        scheduler_lease_manager: Any | None = None,
         task_launcher: Callable[[Callable[[], None]], Any | None] | None = None,
     ):
+        if max_concurrent_experiments < 1:
+            raise ValueError("max_concurrent_experiments must be at least 1")
         self.experiment_repository = experiment_repository
         self.result_repository = result_repository
         self.data_source_service = data_source_service
         self.report_base_path = report_base_path
+        self.max_concurrent_experiments = max_concurrent_experiments
+        self.max_concurrent_experiments_provider = max_concurrent_experiments_provider
+        self.scheduler_lease_manager = scheduler_lease_manager
         self.task_launcher = task_launcher or self._launch_background_task
         self._active_runs: dict[str, Any] = {}
         self._active_runs_lock = threading.Lock()
         self._dispatch_lock = threading.RLock()
+        self._dispatch_owner_id = f"dispatcher_{uuid4().hex}"
 
     class _InlineTaskHandle:
         def join(self) -> None:
@@ -145,63 +150,83 @@ class ExperimentService:
                 "process_pid": None,
             }
         )
-        self.dispatch_next_experiment()
+        self.dispatch_available_experiments()
         return experiment_id
 
     def dispatch_next_experiment(self) -> str | None:
+        launched = self.dispatch_available_experiments()
+        if not launched:
+            return None
+        return launched[0]
+
+    def dispatch_available_experiments(self) -> list[str]:
         with self._dispatch_lock:
-            running_experiment = self.experiment_repository.get_running_experiment()
-            if running_experiment is not None:
-                return str(running_experiment.get("experiment_id"))
-
-            experiment = self.experiment_repository.get_next_queued_experiment()
-            if experiment is None:
-                return None
-
-            experiment_id = str(experiment["experiment_id"])
-            started_at = datetime.now(timezone.utc)
-            start_dt, end_dt = self._require_time_range(experiment)
-            report_dir = Path(str(experiment["report_base_path"]))
-            normalized_algorithms = self._normalized_algorithms_from_experiment(
-                experiment
-            )
-            configuration_payload = self._configuration_payload_from_experiment(
-                experiment
-            )
-            created_at = self._normalize_runtime_datetime(experiment.get("created_at"))
-            if created_at is None:
-                created_at = started_at
-
-            self.experiment_repository.update_experiment(
-                experiment_id,
-                {
-                    "status": "running",
-                    "started_at": started_at,
-                    "updated_at": started_at,
-                    "finished_at": None,
-                    "duration_seconds": None,
-                    "cancelled_at": None,
-                    "error_message": None,
-                },
-            )
-            task_handle = self.task_launcher(
-                lambda: self._run_experiment_job(
-                    experiment_id=experiment_id,
-                    created_at=created_at,
-                    started_at=started_at,
-                    symbol=str(experiment.get("symbol", "")),
-                    start_dt=start_dt,
-                    end_dt=end_dt,
-                    normalized_algorithms=normalized_algorithms,
-                    configuration_payload=configuration_payload,
-                    report_dir=report_dir,
+            if not self._try_acquire_scheduler_lease():
+                return []
+            launched: list[str] = []
+            try:
+                running_count = self.experiment_repository.count_running_experiments()
+                available_slots = (
+                    self._current_max_concurrent_experiments() - running_count
                 )
-            )
-            self._track_active_run(
+                while available_slots > 0:
+                    started_at = datetime.now(timezone.utc)
+                    experiment = (
+                        self.experiment_repository.claim_next_queued_experiment(
+                            started_at=started_at
+                        )
+                    )
+                    if experiment is None:
+                        break
+                    launched.append(
+                        self._start_claimed_experiment(
+                            experiment=experiment,
+                            started_at=started_at,
+                        )
+                    )
+                    available_slots -= 1
+                return launched
+            finally:
+                self._release_scheduler_lease()
+
+    def _start_claimed_experiment(
+        self, *, experiment: dict[str, Any], started_at: datetime
+    ) -> str:
+        experiment_id = str(experiment["experiment_id"])
+        start_dt, end_dt = self._require_time_range(experiment)
+        report_dir = Path(str(experiment["report_base_path"]))
+        normalized_algorithms = self._normalized_algorithms_from_experiment(experiment)
+        configuration_payload = self._configuration_payload_from_experiment(experiment)
+        created_at = self._normalize_runtime_datetime(experiment.get("created_at"))
+        if created_at is None:
+            created_at = started_at
+
+        task_handle = self.task_launcher(
+            lambda: self._run_experiment_job(
                 experiment_id=experiment_id,
-                task_handle=task_handle,
+                created_at=created_at,
+                started_at=started_at,
+                symbol=str(experiment.get("symbol", "")),
+                start_dt=start_dt,
+                end_dt=end_dt,
+                normalized_algorithms=normalized_algorithms,
+                configuration_payload=configuration_payload,
+                report_dir=report_dir,
             )
-            return experiment_id
+        )
+        if task_handle is not None:
+            with self._active_runs_lock:
+                self._active_runs[experiment_id] = task_handle
+            process_pid = getattr(task_handle, "pid", None)
+            if isinstance(process_pid, int):
+                self.experiment_repository.update_experiment(
+                    experiment_id,
+                    {
+                        "process_pid": process_pid,
+                        "updated_at": datetime.now(timezone.utc),
+                    },
+                )
+        return experiment_id
 
     def delete_experiment(self, experiment_id: str) -> bool:
         experiment = self.experiment_repository.get_experiment(experiment_id)
@@ -248,21 +273,23 @@ class ExperimentService:
                 "cache_hit": fetch_result.cache_hit,
             }
             execution_steps.append(
-                {
-                    "step": "read_candles",
-                    "label": "Read candles",
-                    "started_at": read_started_at,
-                    "finished_at": read_finished_at,
-                    "duration_seconds": perf_counter() - read_started_at_perf,
-                    "metadata": {
-                        "symbol": symbol,
-                        "candle_count": fetch_result.candle_count,
-                        "cache_hit": fetch_result.cache_hit,
-                        "source_kind": fetch_result.source_kind,
-                        "start": fetch_result.start,
-                        "end": fetch_result.end,
-                    },
-                }
+                self._normalize_runtime_document(
+                    {
+                        "step": "read_candles",
+                        "label": "Read candles",
+                        "started_at": read_started_at,
+                        "finished_at": read_finished_at,
+                        "duration_seconds": perf_counter() - read_started_at_perf,
+                        "metadata": {
+                            "symbol": symbol,
+                            "candle_count": fetch_result.candle_count,
+                            "cache_hit": fetch_result.cache_hit,
+                            "source_kind": fetch_result.source_kind,
+                            "start": fetch_result.start,
+                            "end": fetch_result.end,
+                        },
+                    }
+                )
             )
             self.experiment_repository.update_experiment(
                 experiment_id,
@@ -290,7 +317,13 @@ class ExperimentService:
                     },
                 )
                 self.result_repository.insert_result(
-                    {"experiment_id": experiment_id, "created_at": created_at, **result}
+                    self._normalize_runtime_document(
+                        {
+                            "experiment_id": experiment_id,
+                            "created_at": created_at,
+                            **result,
+                        }
+                    )
                 )
             else:
                 for sensor_config in normalized_algorithms:
@@ -308,11 +341,13 @@ class ExperimentService:
                         },
                     )
                     self.result_repository.insert_result(
-                        {
-                            "experiment_id": experiment_id,
-                            "created_at": created_at,
-                            **result,
-                        }
+                        self._normalize_runtime_document(
+                            {
+                                "experiment_id": experiment_id,
+                                "created_at": created_at,
+                                **result,
+                            }
+                        )
                     )
         except Exception as exc:
             finished_at = datetime.now(timezone.utc)
@@ -329,6 +364,8 @@ class ExperimentService:
                     "process_pid": None,
                 },
             )
+            self._discard_active_run(experiment_id)
+            self.dispatch_available_experiments()
             return
 
         finished_at = datetime.now(timezone.utc)
@@ -345,6 +382,8 @@ class ExperimentService:
                 "process_pid": None,
             },
         )
+        self._discard_active_run(experiment_id)
+        self.dispatch_available_experiments()
 
     def request_cancel(self, experiment_id: str) -> bool:
         experiment = self.experiment_repository.get_experiment(experiment_id)
@@ -365,7 +404,7 @@ class ExperimentService:
 
         self._terminate_active_run(experiment_id, experiment)
         self._mark_cancelled(experiment_id=experiment_id, started_at=started_at)
-        self.dispatch_next_experiment()
+        self.dispatch_available_experiments()
         return True
 
     def _terminate_active_run(
@@ -454,6 +493,9 @@ class ExperimentService:
 
     @staticmethod
     def _normalize_runtime_datetime(value: object) -> datetime | None:
+        if isinstance(value, XmlRpcDateTime):
+            parsed = datetime.strptime(value.value, "%Y%m%dT%H:%M:%S")
+            return parsed.replace(tzinfo=timezone.utc)
         if isinstance(value, datetime):
             if value.tzinfo is None:
                 return value.replace(tzinfo=timezone.utc)
@@ -467,6 +509,29 @@ class ExperimentService:
                 return parsed.replace(tzinfo=timezone.utc)
             return parsed.astimezone(timezone.utc)
         return None
+
+    @classmethod
+    def _normalize_runtime_value(cls, value: Any) -> Any:
+        normalized_datetime = cls._normalize_runtime_datetime(value)
+        if normalized_datetime is not None:
+            return normalized_datetime
+        if isinstance(value, dict):
+            return {
+                str(key): cls._normalize_runtime_value(item)
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [cls._normalize_runtime_value(item) for item in value]
+        if isinstance(value, tuple):
+            return tuple(cls._normalize_runtime_value(item) for item in value)
+        return value
+
+    @classmethod
+    def _normalize_runtime_document(cls, document: dict[str, Any]) -> dict[str, Any]:
+        normalized = cls._normalize_runtime_value(document)
+        if not isinstance(normalized, dict):
+            raise TypeError("Normalized runtime document must be a mapping")
+        return normalized
 
     @staticmethod
     def _launch_background_task(job: Callable[[], None]) -> multiprocessing.Process:
@@ -525,16 +590,42 @@ class ExperimentService:
         }
 
     def get_queue_overview(self) -> dict[str, Any]:
-        running_experiment = self.experiment_repository.get_running_experiment()
+        running_experiments = self.experiment_repository.list_running_experiments()
         queued_experiments = self.experiment_repository.list_queued_experiments()
+        running_count = len(running_experiments)
+        max_concurrent_experiments = self._current_max_concurrent_experiments()
+        available_slots = max(0, max_concurrent_experiments - running_count)
         return {
-            "running_experiment": running_experiment,
+            "running_experiments": running_experiments,
             "queued_experiments": queued_experiments,
             "queue_summary": {
+                "running_count": running_count,
                 "queued_count": len(queued_experiments),
-                "has_running": running_experiment is not None,
+                "max_concurrent_experiments": max_concurrent_experiments,
+                "available_slots": available_slots,
+                "capacity_reached": available_slots == 0,
+                "has_running": running_count > 0,
             },
         }
+
+    def _current_max_concurrent_experiments(self) -> int:
+        if self.max_concurrent_experiments_provider is None:
+            return self.max_concurrent_experiments
+        return max(1, int(self.max_concurrent_experiments_provider()))
+
+    def _try_acquire_scheduler_lease(self) -> bool:
+        if self.scheduler_lease_manager is None:
+            return True
+        return bool(
+            self.scheduler_lease_manager.try_acquire_lease(
+                owner_id=self._dispatch_owner_id
+            )
+        )
+
+    def _release_scheduler_lease(self) -> None:
+        if self.scheduler_lease_manager is None:
+            return
+        self.scheduler_lease_manager.release_lease(owner_id=self._dispatch_owner_id)
 
     @staticmethod
     def _build_experiment_summary(experiment: dict[str, Any]) -> dict[str, Any]:
@@ -621,4 +712,8 @@ class ExperimentService:
         execution_steps = result.get("execution_steps")
         if not isinstance(execution_steps, list):
             return []
-        return [step for step in execution_steps if isinstance(step, dict)]
+        return [
+            ExperimentService._normalize_runtime_document(step)
+            for step in execution_steps
+            if isinstance(step, dict)
+        ]

@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from collections.abc import Iterable, Mapping
 from typing import Any
 
+from pymongo import ReturnDocument
+
 from trading_algos_dashboard.repositories.mongo_base import MongoRepository
 
 
@@ -48,10 +50,17 @@ class ExperimentRepository(MongoRepository):
         )
 
     def get_running_experiment(self) -> dict[str, Any] | None:
-        running = self._list_documents({"status": "running"})
+        running = self.list_running_experiments()
         if not running:
             return None
         return running[0]
+
+    def list_running_experiments(self) -> list[dict[str, Any]]:
+        running = self._list_documents({"status": "running"})
+        return sorted(running, key=self._running_sort_key)
+
+    def count_running_experiments(self) -> int:
+        return self._count_documents({"status": "running"})
 
     def list_queued_experiments(self) -> list[dict[str, Any]]:
         queued = self._list_documents({"status": "queued"})
@@ -62,6 +71,44 @@ class ExperimentRepository(MongoRepository):
         if not queued:
             return None
         return queued[0]
+
+    def claim_next_queued_experiment(
+        self, *, started_at: datetime
+    ) -> dict[str, Any] | None:
+        find_one_and_update = getattr(self.collection, "find_one_and_update", None)
+        update_values = {
+            "status": "running",
+            "started_at": started_at,
+            "updated_at": started_at,
+            "finished_at": None,
+            "duration_seconds": None,
+            "cancelled_at": None,
+            "error_message": None,
+        }
+        if callable(find_one_and_update):
+            document = find_one_and_update(
+                {"status": "queued"},
+                {"$set": update_values},
+                sort=[
+                    ("queue_enqueued_at", 1),
+                    ("created_at", 1),
+                    ("experiment_id", 1),
+                ],
+                return_document=ReturnDocument.AFTER,
+            )
+            if not isinstance(document, Mapping):
+                return None
+            return self._without_id(document)
+
+        queued = self.list_queued_experiments()
+        if not queued:
+            return None
+        experiment = queued[0]
+        experiment_id = str(experiment.get("experiment_id", ""))
+        if not experiment_id:
+            return None
+        self.update_experiment(experiment_id, update_values)
+        return self.get_experiment(experiment_id)
 
     def count_queued_before(self, experiment_id: str) -> int:
         for index, experiment in enumerate(self.list_queued_experiments()):
@@ -114,6 +161,19 @@ class ExperimentRepository(MongoRepository):
             enqueued_at or created_at or fallback,
             created_at or fallback,
             str(document.get("experiment_id", "")),
+        )
+
+    @staticmethod
+    def _running_sort_key(document: Mapping[str, Any]) -> tuple[datetime, str]:
+        started_at = ExperimentRepository._normalize_datetime(
+            document.get("started_at")
+        )
+        created_at = ExperimentRepository._normalize_datetime(
+            document.get("created_at")
+        )
+        fallback = datetime.min.replace(tzinfo=timezone.utc)
+        return started_at or created_at or fallback, str(
+            document.get("experiment_id", "")
         )
 
     @staticmethod

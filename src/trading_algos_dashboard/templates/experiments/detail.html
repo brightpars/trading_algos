@@ -32,7 +32,7 @@
         </h2>
         <p class="text-muted mb-0 experiment-runtime-message">
           {% if experiment.is_queued %}
-          This experiment is waiting in the FIFO queue and will start automatically when earlier jobs finish.
+          This experiment is waiting in the FIFO queue and will start automatically when a parallel execution slot becomes available.
           {% elif experiment.is_running %}
           Your algorithm run is in progress. This page updates automatically every second.
           {% elif experiment.is_cancelling %}
@@ -101,6 +101,10 @@
         <div data-runtime-field="queue_items_ahead">{{ experiment.queue_items_ahead if experiment.queue_items_ahead is not none else '—' }}</div>
       </div>
       {% endif %}
+      <div class="builder-summary-item">
+        <span class="builder-summary-label">Running slots</span>
+        <div><span data-runtime-field="running_count">{{ queue_overview.queue_summary.running_count if queue_overview and queue_overview.queue_summary else '—' }}</span> / <span data-runtime-field="max_concurrent_experiments">{{ queue_overview.queue_summary.max_concurrent_experiments if queue_overview and queue_overview.queue_summary else '—' }}</span></div>
+      </div>
     </div>
 
     <div class="mt-4">

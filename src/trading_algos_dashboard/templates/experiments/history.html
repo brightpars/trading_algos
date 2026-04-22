@@ -1,12 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Experiment history</h1>
-{% if running_experiment %}
+{% if running_experiments %}
 <section class="mb-4">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <h2 class="h5 mb-0">Currently running</h2>
-    <span class="builder-meta-pill">1 active</span>
+    <span class="builder-meta-pill">{{ queue_summary.running_count }} active / {{ queue_summary.max_concurrent_experiments }} slots</span>
   </div>
+  <div class="queue-list">
+  {% for running_experiment in running_experiments %}
   <div class="builder-card queue-card queue-card--running">
     <div class="d-flex justify-content-between gap-3 flex-wrap align-items-start">
       <div>
@@ -21,13 +23,15 @@
       </div>
     </div>
   </div>
+  {% endfor %}
+  </div>
 </section>
 {% endif %}
 
 <section class="mb-4">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <h2 class="h5 mb-0">Execution queue</h2>
-    <span class="builder-meta-pill">{{ queued_experiments|length }} queued</span>
+    <span class="builder-meta-pill">{{ queued_experiments|length }} queued • {{ queue_summary.available_slots }} slots free</span>
   </div>
   {% if queued_experiments %}
   <div class="queue-list">

@@ -32,6 +32,9 @@ _EXPERIMENT_FORM_COOKIE = "trading_algos_dashboard_experiment_form"
 
 
 def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str]:
+    runtime_settings = current_app.extensions[
+        "experiment_runtime_settings_service"
+    ].get_effective_settings()
     default_algorithms = "[]"
     if catalog:
         default_algorithms = json.dumps(
@@ -46,6 +49,11 @@ def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str
         "algorithms_json": default_algorithms,
         "configuration_json": "",
         "notes": "",
+        "max_concurrent_experiments": str(
+            runtime_settings["max_concurrent_experiments"]
+        )
+        if current_app
+        else "1",
     }
 
 
@@ -263,6 +271,9 @@ def _render_new_experiment(
     catalog = current_app.extensions[
         "algorithm_catalog_service"
     ].list_algorithm_implementations()
+    runtime_settings = current_app.extensions[
+        "experiment_runtime_settings_service"
+    ].get_effective_settings()
 
     effective_form_data = _experiment_form_defaults(catalog)
     effective_form_data.update(
@@ -308,6 +319,7 @@ def _render_new_experiment(
             recent_experiments=_recent_experiment_presets(),
             selected_configuration=selected_configuration,
             form_data=effective_form_data,
+            max_concurrent_experiments=runtime_settings["max_concurrent_experiments"],
         ),
         status=status_code,
     )
@@ -319,7 +331,7 @@ def history():
     repo = current_app.extensions["experiment_repository"]
     experiments = [_decorate_experiment(item) for item in repo.list_experiments()]
     queue_overview = service.get_queue_overview()
-    running_experiment = queue_overview.get("running_experiment")
+    running_experiments = queue_overview.get("running_experiments") or []
     queued_experiments = queue_overview.get("queued_experiments") or []
     history_experiments = [
         experiment
@@ -329,14 +341,17 @@ def history():
     return render_template(
         "experiments/history.html",
         experiments=history_experiments,
-        running_experiment=_decorate_experiment(running_experiment)
-        if isinstance(running_experiment, dict)
-        else None,
+        running_experiments=[
+            _decorate_experiment(item)
+            for item in running_experiments
+            if isinstance(item, dict)
+        ],
         queued_experiments=[
             _decorate_experiment(item)
             for item in queued_experiments
             if isinstance(item, dict)
         ],
+        queue_summary=queue_overview.get("queue_summary") or {},
     )
 
 
@@ -393,9 +408,21 @@ def create_experiment():
         "algorithms_json": request.form.get("algorithms_json", "[]"),
         "notes": request.form.get("notes", ""),
         "configuration_json": request.form.get("configuration_json", ""),
+        "max_concurrent_experiments": str(
+            current_app.config.get("EXPERIMENT_MAX_CONCURRENT_RUNS", 1)
+        ),
     }
     service = current_app.extensions["experiment_service"]
+    runtime_settings_service = current_app.extensions[
+        "experiment_runtime_settings_service"
+    ]
     try:
+        max_concurrent_experiments = int(
+            request.form.get("max_concurrent_experiments", "1")
+        )
+        runtime_settings_service.save_settings(
+            max_concurrent_experiments=max_concurrent_experiments
+        )
         algorithms = json.loads(submitted_form_data["algorithms_json"])
         configuration_payload = None
         if submitted_form_data["configuration_json"].strip():
@@ -470,7 +497,10 @@ def detail(experiment_id: str):
         abort(404)
     payload["experiment"] = _decorate_experiment(payload["experiment"])
     payload["experiment_runtime_payload"] = _serialize_experiment_runtime(
-        payload["experiment"]
+        {
+            **payload["experiment"],
+            **dict(payload.get("queue_overview", {}).get("queue_summary") or {}),
+        }
     )
     return render_template("experiments/detail.html", **payload)
 

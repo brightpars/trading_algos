@@ -88,6 +88,11 @@
     <label class="form-label">End time</label>
     <input class="form-control" type="time" name="end_time" value="{{ form_data.end_time }}" required>
   </div>
+  <div class="col-md-3">
+    <label class="form-label">Max concurrent experiments</label>
+    <input class="form-control" type="number" min="1" name="max_concurrent_experiments" value="{{ form_data.max_concurrent_experiments }}" required>
+    <div class="form-text">Scheduler runtime limit for how many experiments may run in parallel.</div>
+  </div>
   <div class="col-12">
     <label class="form-label">Algorithms JSON</label>
     <textarea class="form-control" rows="8" name="algorithms_json">{{ form_data.algorithms_json }}</textarea>
@@ -107,7 +112,7 @@
   </div>
   <div class="col-12">
     <button class="btn btn-success" type="submit">Add to execution queue</button>
-    <div class="form-text">Experiments are queued and executed one by one from the head of the queue.</div>
+    <div class="form-text">Experiments are queued in FIFO order and executed up to the configured concurrency limit of {{ max_concurrent_experiments }}.</div>
   </div>
 </form>
 {% endblock %}
