@@ -166,7 +166,104 @@ def test_administration_page_renders_with_database_counts(monkeypatch):
     assert b"Experiments" in response.data
     assert b"Results" in response.data
     assert b"Algorithm catalog" in response.data
+    assert b"Experiment scheduler settings" in response.data
     assert b">1<" in response.data
+
+
+def test_experiment_runtime_settings_page_renders(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().get("/administration/experiment-runtime-settings")
+
+    assert response.status_code == 200
+    assert b"Runtime settings" in response.data
+    assert b'name="max_concurrent_experiments"' in response.data
+    assert b"Save scheduler settings" in response.data
+    assert b"Market data server" in response.data
+    assert b'name="ip"' in response.data
+    assert b'name="port"' in response.data
+
+
+def test_experiment_runtime_settings_page_updates_global_limit(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/administration/experiment-runtime-settings",
+        data={"max_concurrent_experiments": "4"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith(
+        "/administration/experiment-runtime-settings"
+    )
+    assert (
+        app.extensions["experiment_runtime_settings_service"].get_effective_settings()[
+            "max_concurrent_experiments"
+        ]
+        == 4
+    )
+
+
+def test_experiment_runtime_settings_page_updates_data_source_settings(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/administration/data-source-settings",
+        data={"ip": "192.168.1.10", "port": "7010"},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"Data server settings saved." in response.data
+    settings = app.extensions["data_source_settings_service"].get_effective_settings()
+    assert settings["ip"] == "192.168.1.10"
+    assert settings["port"] == 7010
+
+
+def test_experiment_runtime_settings_page_checks_data_source_connection(monkeypatch):
+    app = _build_app(monkeypatch)
+    monkeypatch.setattr(
+        app.extensions["data_source_service"],
+        "check_connection",
+        lambda: {"status": "ok", "endpoint": "127.0.0.1:7003", "server_up": True},
+    )
+
+    response = app.test_client().post(
+        "/administration/data-source-settings/check",
+        data={"ip": "127.0.0.1", "port": "7003"},
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "status": "ok",
+        "endpoint": "127.0.0.1:7003",
+        "server_up": True,
+    }
+
+
+def test_experiment_runtime_settings_page_returns_data_source_error_json(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    def _raise_error():
+        from trading_algos_dashboard.services.data_source_service import (
+            DataSourceUnavailableError,
+        )
+
+        raise DataSourceUnavailableError("not responding")
+
+    monkeypatch.setattr(
+        app.extensions["data_source_service"], "check_connection", _raise_error
+    )
+
+    response = app.test_client().post(
+        "/administration/data-source-settings/check",
+        data={"ip": "127.0.0.1", "port": "7003"},
+    )
+
+    assert response.status_code == 503
+    assert response.get_json()["status"] == "error"
+    assert response.get_json()["message"] == "not responding"
 
 
 def test_import_algorithm_catalog_route_runs_import(monkeypatch):

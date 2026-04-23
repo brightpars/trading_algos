@@ -88,10 +88,19 @@
     <label class="form-label">End time</label>
     <input class="form-control" type="time" name="end_time" value="{{ form_data.end_time }}" required>
   </div>
-  <div class="col-md-3">
-    <label class="form-label">Max concurrent experiments</label>
-    <input class="form-control" type="number" min="1" name="max_concurrent_experiments" value="{{ form_data.max_concurrent_experiments }}" required>
-    <div class="form-text">Scheduler runtime limit for how many experiments may run in parallel.</div>
+  <div class="col-12">
+    <div class="alert alert-secondary mb-0" role="status">
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <div class="fw-semibold">Scheduler concurrency</div>
+          <div class="small text-muted">
+            The global runtime limit is currently <strong>{{ max_concurrent_experiments }}</strong> concurrent experiment(s).
+            This setting applies to the shared scheduler, not to this individual experiment.
+          </div>
+        </div>
+        <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('administration.experiment_runtime_settings') }}">Open scheduler settings</a>
+      </div>
+    </div>
   </div>
   <div class="col-12">
     <label class="form-label">Algorithms JSON</label>

@@ -169,11 +169,15 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b'name="symbol"' in response.data
     assert b'name="start_time"' in response.data
     assert b'name="end_time"' in response.data
-    assert b'name="max_concurrent_experiments"' in response.data
+    assert b'name="max_concurrent_experiments"' not in response.data
+    assert b"Scheduler concurrency" in response.data
+    assert b"Open scheduler settings" in response.data
     assert b"executed up to the configured concurrency limit" in response.data
 
 
-def test_create_experiment_updates_runtime_concurrency_setting(monkeypatch, tmp_path):
+def test_create_experiment_does_not_update_runtime_concurrency_setting(
+    monkeypatch, tmp_path
+):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
@@ -202,7 +206,6 @@ def test_create_experiment_updates_runtime_concurrency_setting(monkeypatch, tmp_
                 '[{"alg_key":"close_high_channel_breakout","alg_param":{"window":2}}]'
             ),
             "notes": "runtime setting",
-            "max_concurrent_experiments": "5",
         },
         follow_redirects=False,
     )
@@ -211,7 +214,7 @@ def test_create_experiment_updates_runtime_concurrency_setting(monkeypatch, tmp_
     settings = app.extensions[
         "experiment_runtime_settings_service"
     ].get_effective_settings()
-    assert settings["max_concurrent_experiments"] == 5
+    assert settings["max_concurrent_experiments"] == 2
 
 
 def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypatch):

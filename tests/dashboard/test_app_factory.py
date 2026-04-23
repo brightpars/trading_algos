@@ -103,9 +103,9 @@ def test_create_app_registers_core_routes(monkeypatch):
     assert client.get("/administration").status_code == 200
     assert client.get("/api/algorithms/catalog").status_code == 200
     response = client.get("/")
-    assert b"Market data server" in response.data
-    assert b'value="127.0.0.2"' in response.data
-    assert b'value="6010"' in response.data
+    assert b"Trading algorithm development dashboard" in response.data
+    assert b"Open runtime settings" in response.data
+    assert b"Market data server" not in response.data
     assert app.extensions["market_data_cache"].enabled is True
     assert app.extensions["market_data_cache"].stats()["shared_backend"] == "mongo"
     assert app.config["EXPERIMENT_MAX_CONCURRENT_RUNS"] == 2

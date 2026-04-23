@@ -413,16 +413,7 @@ def create_experiment():
         ),
     }
     service = current_app.extensions["experiment_service"]
-    runtime_settings_service = current_app.extensions[
-        "experiment_runtime_settings_service"
-    ]
     try:
-        max_concurrent_experiments = int(
-            request.form.get("max_concurrent_experiments", "1")
-        )
-        runtime_settings_service.save_settings(
-            max_concurrent_experiments=max_concurrent_experiments
-        )
         algorithms = json.loads(submitted_form_data["algorithms_json"])
         configuration_payload = None
         if submitted_form_data["configuration_json"].strip():

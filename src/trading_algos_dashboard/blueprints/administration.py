@@ -4,10 +4,15 @@ from flask import (
     Blueprint,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
     url_for,
+)
+
+from trading_algos_dashboard.services.data_source_service import (
+    DataSourceUnavailableError,
 )
 
 bp = Blueprint("administration", __name__, url_prefix="/administration")
@@ -16,11 +21,109 @@ bp = Blueprint("administration", __name__, url_prefix="/administration")
 @bp.get("")
 def administration_home():
     administration_service = current_app.extensions["administration_service"]
+    runtime_settings = current_app.extensions[
+        "experiment_runtime_settings_service"
+    ].get_effective_settings()
+    data_source_settings = current_app.extensions[
+        "data_source_settings_service"
+    ].get_effective_settings()
     return render_template(
         "administration/index.html",
         content_summary=administration_service.get_database_content_summary(),
         algorithm_catalog_summary=administration_service.get_algorithm_catalog_summary(),
+        experiment_runtime_settings=runtime_settings,
+        data_source_settings=data_source_settings,
     )
+
+
+@bp.get("/experiment-runtime-settings")
+def experiment_runtime_settings():
+    runtime_settings = current_app.extensions[
+        "experiment_runtime_settings_service"
+    ].get_effective_settings()
+    data_source_settings = current_app.extensions[
+        "data_source_settings_service"
+    ].get_effective_settings()
+    return render_template(
+        "administration/experiment_runtime_settings.html",
+        runtime_settings=runtime_settings,
+        data_source_settings=data_source_settings,
+    )
+
+
+@bp.post("/experiment-runtime-settings")
+def save_experiment_runtime_settings():
+    runtime_settings_service = current_app.extensions[
+        "experiment_runtime_settings_service"
+    ]
+    try:
+        max_concurrent_experiments = int(
+            request.form.get("max_concurrent_experiments", "1")
+        )
+        runtime_settings_service.save_settings(
+            max_concurrent_experiments=max_concurrent_experiments
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("administration.experiment_runtime_settings"))
+
+    flash(
+        "administration: experiment runtime settings updated; "
+        f"max_concurrent_experiments={max_concurrent_experiments}",
+        "success",
+    )
+    return redirect(url_for("administration.experiment_runtime_settings"))
+
+
+@bp.post("/data-source-settings")
+def save_data_source_settings():
+    ip = request.form.get("ip", "")
+    port_raw = request.form.get("port", "")
+    try:
+        port = int(port_raw)
+        current_app.extensions["data_source_settings_service"].save_settings(
+            ip=ip,
+            port=port,
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("Data server settings saved.", "success")
+    return redirect(url_for("administration.experiment_runtime_settings"))
+
+
+@bp.post("/data-source-settings/check")
+def check_data_source_settings():
+    service = current_app.extensions["data_source_service"]
+    form_ip = request.form.get("ip")
+    form_port = request.form.get("port")
+    original_resolver = service.endpoint_resolver
+    if (
+        form_ip is not None
+        and form_port is not None
+        and form_ip.strip()
+        and form_port.strip()
+    ):
+        try:
+            port_value = int(form_port)
+        except ValueError:
+            return jsonify(
+                {"status": "error", "message": "Port must be an integer."}
+            ), 400
+        service.endpoint_resolver = lambda: (form_ip.strip(), port_value)
+    try:
+        payload = service.check_connection()
+        return jsonify(payload)
+    except (ValueError, DataSourceUnavailableError) as exc:
+        return jsonify(
+            {
+                "status": "error",
+                "message": str(exc),
+                "endpoint": service._data_server_endpoint_label(),
+            }
+        ), 503
+    finally:
+        service.endpoint_resolver = original_resolver
 
 
 @bp.post("/experiments/clear")

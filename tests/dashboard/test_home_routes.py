@@ -85,66 +85,15 @@ def test_home_page_renders_saved_data_source_settings(monkeypatch):
     response = app.test_client().get("/")
 
     assert response.status_code == 200
-    assert b'value="10.0.0.5"' in response.data
-    assert b'value="7003"' in response.data
+    assert b"Trading algorithm development dashboard" in response.data
+    assert b"Market data server" not in response.data
+    assert b"Open runtime settings" in response.data
 
 
-def test_save_data_source_settings_persists_values(monkeypatch):
+def test_runtime_settings_link_is_present_on_home_page(monkeypatch):
     app = _build_app(monkeypatch)
 
-    response = app.test_client().post(
-        "/data-source-settings",
-        data={"ip": "192.168.1.10", "port": "7010"},
-        follow_redirects=True,
-    )
+    response = app.test_client().get("/")
 
     assert response.status_code == 200
-    assert b"Data server settings saved." in response.data
-    settings = app.extensions["data_source_settings_service"].get_effective_settings()
-    assert settings["ip"] == "192.168.1.10"
-    assert settings["port"] == 7010
-
-
-def test_check_data_source_settings_returns_success_json(monkeypatch):
-    app = _build_app(monkeypatch)
-    monkeypatch.setattr(
-        app.extensions["data_source_service"],
-        "check_connection",
-        lambda: {"status": "ok", "endpoint": "127.0.0.1:7003", "server_up": True},
-    )
-
-    response = app.test_client().post(
-        "/data-source-settings/check",
-        data={"ip": "127.0.0.1", "port": "7003"},
-    )
-
-    assert response.status_code == 200
-    assert response.get_json() == {
-        "status": "ok",
-        "endpoint": "127.0.0.1:7003",
-        "server_up": True,
-    }
-
-
-def test_check_data_source_settings_returns_error_json(monkeypatch):
-    app = _build_app(monkeypatch)
-
-    def _raise_error():
-        from trading_algos_dashboard.services.data_source_service import (
-            DataSourceUnavailableError,
-        )
-
-        raise DataSourceUnavailableError("not responding")
-
-    monkeypatch.setattr(
-        app.extensions["data_source_service"], "check_connection", _raise_error
-    )
-
-    response = app.test_client().post(
-        "/data-source-settings/check",
-        data={"ip": "127.0.0.1", "port": "7003"},
-    )
-
-    assert response.status_code == 503
-    assert response.get_json()["status"] == "error"
-    assert response.get_json()["message"] == "not responding"
+    assert b"/administration/experiment-runtime-settings" in response.data
