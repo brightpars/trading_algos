@@ -31,5 +31,9 @@ ignore_missing_imports = true
 module = ["utils_shared", "utils_shared.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = ["yaml", "yaml.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
