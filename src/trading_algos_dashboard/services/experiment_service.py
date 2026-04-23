@@ -215,17 +215,10 @@ class ExperimentService:
             )
         )
         if task_handle is not None:
-            with self._active_runs_lock:
-                self._active_runs[experiment_id] = task_handle
-            process_pid = getattr(task_handle, "pid", None)
-            if isinstance(process_pid, int):
-                self.experiment_repository.update_experiment(
-                    experiment_id,
-                    {
-                        "process_pid": process_pid,
-                        "updated_at": datetime.now(timezone.utc),
-                    },
-                )
+            self._track_active_run(
+                experiment_id=experiment_id,
+                task_handle=task_handle,
+            )
         return experiment_id
 
     def delete_experiment(self, experiment_id: str) -> bool:
@@ -364,8 +357,6 @@ class ExperimentService:
                     "process_pid": None,
                 },
             )
-            self._discard_active_run(experiment_id)
-            self.dispatch_available_experiments()
             return
 
         finished_at = datetime.now(timezone.utc)
@@ -382,8 +373,6 @@ class ExperimentService:
                 "process_pid": None,
             },
         )
-        self._discard_active_run(experiment_id)
-        self.dispatch_available_experiments()
 
     def request_cancel(self, experiment_id: str) -> bool:
         experiment = self.experiment_repository.get_experiment(experiment_id)
