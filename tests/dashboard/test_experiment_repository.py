@@ -262,3 +262,58 @@ def test_experiment_repository_lists_completed_experiments_for_exact_scope():
     )
 
     assert [item["experiment_id"] for item in matches] == ["exp_match"]
+
+
+def test_experiment_repository_lists_completed_experiment_cohorts_grouped_by_scope():
+    collection = _Collection()
+    repo = ExperimentRepository({"dashboard_experiments": collection})
+    start = datetime(2024, 2, 1, 9, 30, tzinfo=timezone.utc)
+    end = datetime(2024, 2, 3, 16, 0, tzinfo=timezone.utc)
+    later_end = datetime(2024, 2, 4, 16, 0, tzinfo=timezone.utc)
+    repo.create_experiment(
+        {
+            "experiment_id": "exp_1",
+            "status": "completed",
+            "symbol": "aapl",
+            "time_range": {"start": start, "end": end},
+            "finished_at": end,
+            "candle_count": 10,
+            "dataset_source": {"endpoint": "127.0.0.1:7003"},
+        }
+    )
+    repo.create_experiment(
+        {
+            "experiment_id": "exp_2",
+            "status": "completed",
+            "symbol": "AAPL",
+            "time_range": {"start": start, "end": end},
+            "finished_at": later_end,
+            "candle_count": 12,
+            "dataset_source": {"endpoint": "127.0.0.1:8000"},
+        }
+    )
+    repo.create_experiment(
+        {
+            "experiment_id": "exp_3",
+            "status": "completed",
+            "symbol": "AAPL",
+            "time_range": {"start": start, "end": later_end},
+            "finished_at": later_end,
+        }
+    )
+
+    cohorts = repo.list_completed_experiment_cohorts()
+
+    assert len(cohorts) == 2
+    assert cohorts[0]["symbol"] == "AAPL"
+    assert cohorts[0]["start"] == start
+    assert cohorts[0]["end"] == later_end
+    assert cohorts[0]["completed_run_count"] == 1
+
+    assert cohorts[1]["symbol"] == "AAPL"
+    assert cohorts[1]["start"] == start
+    assert cohorts[1]["end"] == end
+    assert cohorts[1]["completed_run_count"] == 2
+    assert cohorts[1]["candle_counts"] == [10, 12]
+    assert cohorts[1]["dataset_endpoints"] == ["127.0.0.1:7003", "127.0.0.1:8000"]
+    assert cohorts[1]["experiment_ids"] == ["exp_1", "exp_2"]

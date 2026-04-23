@@ -21,6 +21,40 @@ def test_evaluations_index_renders(monkeypatch):
     assert b"Find comparable runs" in response.data
 
 
+def test_evaluations_index_renders_comparable_cohort_list(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    start = datetime(2024, 2, 1, 9, 30, tzinfo=timezone.utc)
+    end = datetime(2024, 2, 3, 16, 0, tzinfo=timezone.utc)
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_eval_1",
+            "created_at": start,
+            "finished_at": end,
+            "status": "completed",
+            "symbol": "AAPL",
+            "time_range": {"start": start, "end": end},
+        }
+    )
+    app.extensions["result_repository"].insert_result(
+        {
+            "experiment_id": "exp_eval_1",
+            "alg_name": "Algo Eval",
+        }
+    )
+
+    response = app.test_client().get("/evaluations")
+
+    assert response.status_code == 200
+    assert b"Comparable experiment sets" in response.data
+    assert b"AAPL" in response.data
+    assert b"Compare" in response.data
+
+
 def test_evaluations_cohort_renders_matching_completed_runs(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()

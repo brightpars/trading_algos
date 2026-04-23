@@ -19,9 +19,13 @@ def _default_filters() -> dict[str, str]:
 
 @bp.get("")
 def index():
+    comparable_cohorts = current_app.extensions[
+        "evaluation_service"
+    ].list_comparable_run_cohorts()
     return render_template(
         "evaluations/index.html",
         form_data=_default_filters(),
+        comparable_cohorts=comparable_cohorts,
     )
 
 

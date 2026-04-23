@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from collections.abc import Iterable, Mapping
+from datetime import datetime, timezone
 from typing import Any
 
 from pymongo import ReturnDocument
@@ -154,6 +154,76 @@ class ExperimentRepository(MongoRepository):
             ):
                 matching.append(experiment)
         return matching
+
+    def list_completed_experiment_cohorts(self) -> list[dict[str, Any]]:
+        experiments = self.list_experiments({"status": "completed"})
+        cohorts_by_key: dict[tuple[str, datetime, datetime], dict[str, Any]] = {}
+        for experiment in experiments:
+            symbol = str(experiment.get("symbol", "")).strip().upper()
+            if not symbol:
+                continue
+            time_range = experiment.get("time_range")
+            if not isinstance(time_range, Mapping):
+                continue
+            start = self._normalize_datetime(time_range.get("start"))
+            end = self._normalize_datetime(time_range.get("end"))
+            if start is None or end is None:
+                continue
+            cohort_key = (symbol, start, end)
+            cohort = cohorts_by_key.setdefault(
+                cohort_key,
+                {
+                    "symbol": symbol,
+                    "start": start,
+                    "end": end,
+                    "completed_run_count": 0,
+                    "latest_finished_at": None,
+                    "candle_counts": set(),
+                    "dataset_endpoints": set(),
+                    "experiment_ids": [],
+                },
+            )
+            cohort["completed_run_count"] += 1
+            cohort["experiment_ids"].append(str(experiment.get("experiment_id", "")))
+            finished_at = self._normalize_datetime(experiment.get("finished_at"))
+            latest_finished_at = cohort.get("latest_finished_at")
+            if isinstance(finished_at, datetime) and (
+                latest_finished_at is None or finished_at > latest_finished_at
+            ):
+                cohort["latest_finished_at"] = finished_at
+            candle_count = experiment.get("candle_count")
+            if isinstance(candle_count, int):
+                cohort["candle_counts"].add(candle_count)
+            dataset_source = experiment.get("dataset_source")
+            if isinstance(dataset_source, Mapping):
+                endpoint = str(dataset_source.get("endpoint", "")).strip()
+                if endpoint:
+                    cohort["dataset_endpoints"].add(endpoint)
+
+        normalized_cohorts: list[dict[str, Any]] = []
+        for cohort in cohorts_by_key.values():
+            normalized_cohorts.append(
+                {
+                    "symbol": cohort["symbol"],
+                    "start": cohort["start"],
+                    "end": cohort["end"],
+                    "completed_run_count": cohort["completed_run_count"],
+                    "latest_finished_at": cohort["latest_finished_at"],
+                    "candle_counts": sorted(cohort["candle_counts"]),
+                    "dataset_endpoints": sorted(cohort["dataset_endpoints"]),
+                    "experiment_ids": sorted(cohort["experiment_ids"]),
+                }
+            )
+        return sorted(
+            normalized_cohorts,
+            key=lambda item: (
+                item["latest_finished_at"] or datetime.min.replace(tzinfo=timezone.utc),
+                str(item["symbol"]),
+                str(item["start"]),
+                str(item["end"]),
+            ),
+            reverse=True,
+        )
 
     def count_experiments(self) -> int:
         return self._count_documents()

@@ -12,6 +12,61 @@ class EvaluationService:
         self.experiment_repository = experiment_repository
         self.result_repository = result_repository
 
+    def list_comparable_run_cohorts(self) -> list[dict[str, Any]]:
+        cohorts = self.experiment_repository.list_completed_experiment_cohorts()
+        experiment_ids = [
+            experiment_id
+            for cohort in cohorts
+            for experiment_id in cohort.get("experiment_ids", [])
+            if isinstance(experiment_id, str) and experiment_id
+        ]
+        results = self.result_repository.list_results_for_experiments(experiment_ids)
+        result_counts: dict[str, int] = {}
+        for result in results:
+            experiment_id = str(result.get("experiment_id", ""))
+            if experiment_id:
+                result_counts[experiment_id] = result_counts.get(experiment_id, 0) + 1
+
+        payload: list[dict[str, Any]] = []
+        for cohort in cohorts:
+            start = cohort.get("start")
+            end = cohort.get("end")
+            if not isinstance(start, datetime) or not isinstance(end, datetime):
+                continue
+            cohort_experiment_ids = [
+                experiment_id
+                for experiment_id in cohort.get("experiment_ids", [])
+                if isinstance(experiment_id, str) and experiment_id
+            ]
+            payload.append(
+                {
+                    "cohort_key": self.build_cohort_key(
+                        symbol=str(cohort.get("symbol", "")),
+                        start=start,
+                        end=end,
+                    ),
+                    "symbol": str(cohort.get("symbol", "")),
+                    "start": start,
+                    "end": end,
+                    "completed_run_count": int(cohort.get("completed_run_count", 0)),
+                    "result_count": sum(
+                        result_counts.get(experiment_id, 0)
+                        for experiment_id in cohort_experiment_ids
+                    ),
+                    "latest_finished_at": cohort.get("latest_finished_at"),
+                    "candle_counts": list(cohort.get("candle_counts", [])),
+                    "dataset_endpoints": list(cohort.get("dataset_endpoints", [])),
+                    "filters": {
+                        "symbol": str(cohort.get("symbol", "")),
+                        "start_date": start.date().isoformat(),
+                        "start_time": start.astimezone(timezone.utc).strftime("%H:%M"),
+                        "end_date": end.date().isoformat(),
+                        "end_time": end.astimezone(timezone.utc).strftime("%H:%M"),
+                    },
+                }
+            )
+        return payload
+
     def find_comparable_runs(
         self,
         *,

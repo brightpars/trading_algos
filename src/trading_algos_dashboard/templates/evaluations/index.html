@@ -4,6 +4,53 @@
 <h1>Evaluations</h1>
 <p class="text-muted">Compare algorithms fairly by using the same symbol and exact time range.</p>
 
+{% if comparable_cohorts %}
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+      <div>
+        <h2 class="h5 mb-1">Comparable experiment sets</h2>
+        <p class="text-muted mb-0">Choose an existing symbol + exact time-range cohort instead of entering filters manually.</p>
+      </div>
+      <span class="badge text-bg-light">{{ comparable_cohorts|length }} cohorts</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-bordered table-striped align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Runs</th>
+            <th>Results</th>
+            <th>Latest finished</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cohort in comparable_cohorts %}
+          <tr>
+            <td><strong>{{ cohort.symbol }}</strong></td>
+            <td><code>{{ cohort.start }}</code></td>
+            <td><code>{{ cohort.end }}</code></td>
+            <td>{{ cohort.completed_run_count }}</td>
+            <td>{{ cohort.result_count }}</td>
+            <td>{{ cohort.latest_finished_at or '—' }}</td>
+            <td>
+              <a
+                class="btn btn-sm btn-primary"
+                href="{{ url_for('evaluations.cohort', symbol=cohort.filters.symbol, start_date=cohort.filters.start_date, start_time=cohort.filters.start_time, end_date=cohort.filters.end_date, end_time=cohort.filters.end_time) }}"
+              >Compare</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="card">
   <div class="card-body">
     <form method="get" action="{{ url_for('evaluations.cohort') }}" class="row g-3">

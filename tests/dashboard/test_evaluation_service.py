@@ -28,6 +28,40 @@ class _ExperimentRepository:
             == normalized_end
         ]
 
+    def list_completed_experiment_cohorts(self):
+        grouped: dict[tuple[str, datetime, datetime], dict] = {}
+        for experiment in self.experiments:
+            if experiment.get("status") != "completed":
+                continue
+            symbol = str(experiment.get("symbol", "")).strip().upper()
+            time_range = experiment.get("time_range", {})
+            start = time_range.get("start")
+            end = time_range.get("end")
+            if (
+                not symbol
+                or not isinstance(start, datetime)
+                or not isinstance(end, datetime)
+            ):
+                continue
+            key = (symbol, start, end)
+            grouped.setdefault(
+                key,
+                {
+                    "symbol": symbol,
+                    "start": start,
+                    "end": end,
+                    "completed_run_count": 0,
+                    "latest_finished_at": None,
+                    "candle_counts": [],
+                    "dataset_endpoints": [],
+                    "experiment_ids": [],
+                },
+            )
+            cohort = grouped[key]
+            cohort["completed_run_count"] += 1
+            cohort["experiment_ids"].append(experiment["experiment_id"])
+        return list(grouped.values())
+
 
 class _ResultRepository:
     def __init__(self, results):
@@ -121,3 +155,41 @@ def test_evaluation_service_returns_empty_rows_for_no_matches():
 
     assert payload["rows"] == []
     assert payload["warnings"] == []
+
+
+def test_evaluation_service_lists_comparable_run_cohorts():
+    start = datetime(2024, 2, 1, 9, 30, tzinfo=timezone.utc)
+    end = datetime(2024, 2, 3, 16, 0, tzinfo=timezone.utc)
+    experiments = [
+        {
+            "experiment_id": "exp_1",
+            "symbol": "AAPL",
+            "status": "completed",
+            "time_range": {"start": start, "end": end},
+            "finished_at": end,
+        },
+        {
+            "experiment_id": "exp_2",
+            "symbol": "AAPL",
+            "status": "completed",
+            "time_range": {"start": start, "end": end},
+            "finished_at": end,
+        },
+    ]
+    results = [
+        {"experiment_id": "exp_1", "alg_name": "Algo 1"},
+        {"experiment_id": "exp_1", "alg_name": "Algo 1b"},
+        {"experiment_id": "exp_2", "alg_name": "Algo 2"},
+    ]
+    service = EvaluationService(
+        experiment_repository=_ExperimentRepository(experiments),
+        result_repository=_ResultRepository(results),
+    )
+
+    payload = service.list_comparable_run_cohorts()
+
+    assert len(payload) == 1
+    assert payload[0]["symbol"] == "AAPL"
+    assert payload[0]["completed_run_count"] == 2
+    assert payload[0]["result_count"] == 3
+    assert payload[0]["filters"]["start_date"] == "2024-02-01"
