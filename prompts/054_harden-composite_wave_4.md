@@ -1,0 +1,31 @@
+Read these files first:
+- docs/algorithm_library_requirements_v4.md
+- docs/algorithm_library_systematic_implementation_plan_v2.md
+- manifests/algorithm_library_manifest.yaml
+- manifests/algorithm_framework_blockers.yaml
+- manifests/algorithm_test_fixtures.yaml
+- manifests/algorithm_performance_budgets.yaml
+
+Work only on the already-implemented batch `composite_wave_4`.
+
+Rows in scope:
+- combination:8 — Bagging Ensemble
+- combination:9 — Boosting Ensemble
+- combination:10 — Stacking / Meta-Learning
+
+Fixtures to verify:
+- fixture.composite_ml_ensemble_v1
+
+Tasks:
+- Review the batch implementation for correctness, reuse of shared helpers, and output normalization.
+- Strengthen fixture coverage and expected-behavior checks.
+- Add or improve tests for registration, parameter validation, short history or warmup handling, behavior, and performance-smoke coverage as appropriate.
+- Check diagnostics and report payload fields so the dashboard can explain strategy outputs.
+- Promote manifest statuses only if the evidence supports the promotion.
+- Regenerate the tracker with `python scripts/build_algorithm_library_tracker.py`.
+- Do not start unrelated batches.
+- Do not mark rows `production_ready` without evidence.
+- Run relevant tests.
+- Stop when done.
+
+

@@ -1,0 +1,56 @@
+performance_budgets_version: 1
+performance_budgets:
+- performance_budget_id: perf.single_asset_bar_v1
+  description: Budget for single-asset OHLCV bar-by-bar strategies.
+  acceptance:
+  - Processes 1,000,000 bars within the target CI runtime budget
+  - Peak memory remains within configured single-series threshold
+  - Warm-up logic does not allocate per-bar object explosions
+- performance_budget_id: perf.single_asset_intraday_v1
+  description: Budget for intraday single-asset strategies with session awareness.
+  acceptance:
+  - Processes intraday session data for benchmark dataset within target runtime
+  - Session reset logic does not degrade linearly with number of sessions
+  - Memory use remains bounded under repeated session resets
+- performance_budget_id: perf.cross_sectional_rebalance_v1
+  description: Budget for universe ranking and rebalance-driven portfolio strategies.
+  acceptance:
+  - Rebalances a representative universe within target runtime budget
+  - Panel operations remain vectorized enough for repeated rebalances
+  - Weight-generation and ranking outputs serialize efficiently
+- performance_budget_id: perf.event_driven_v1
+  description: Budget for event-window strategies.
+  acceptance:
+  - Event-window backtests scale with number of events and symbols within expected limits
+  - Event lookup does not require quadratic scans
+  - Reports include event diagnostics without extreme payload bloat
+- performance_budget_id: perf.multi_leg_relative_value_v1
+  description: Budget for paired, basket, and relative-value strategies.
+  acceptance:
+  - Spread and hedge-ratio calculations scale to representative pair/basket counts
+  - Multi-leg diagnostics remain within reporting budget
+  - Leg-level serialization is stable
+- performance_budget_id: perf.options_surface_v1
+  description: Budget for options-chain and surface-based strategies.
+  acceptance:
+  - Contract selection and greek calculations remain within target runtime for benchmark chain size
+  - Surface queries are indexed or cached sufficiently
+  - Options diagnostics remain bounded
+- performance_budget_id: perf.execution_engine_v1
+  description: Budget for execution-plan and child-order strategies.
+  acceptance:
+  - Execution schedule generation is fast enough for repeated simulations
+  - Child-order traces remain compact enough for report persistence
+  - Fill-simulation benchmark completes within target runtime
+- performance_budget_id: perf.microstructure_v1
+  description: Budget for order-book and HFT-style strategies.
+  acceptance:
+  - Top-of-book and depth calculations handle benchmark update volume within target budget
+  - Queue-state updates avoid excessive per-update allocations
+  - Diagnostics can be sampled or downsampled safely
+- performance_budget_id: perf.composite_signal_v1
+  description: Budget for composite strategy alignment and child-score aggregation.
+  acceptance:
+  - Child-output alignment runs within target budget for representative child count
+  - Composite diagnostics remain interpretable without excessive payload size
+  - Weighted or Boolean combination remains linear in number of children

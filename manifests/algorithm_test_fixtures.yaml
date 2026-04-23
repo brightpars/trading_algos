@@ -1,0 +1,227 @@
+fixtures_version: 1
+fixtures:
+- fixture_id: fixture.trend_monotonic_cross_v1
+  domain: single_asset_ohlcv
+  purpose: Clean moving-average crossover with one bullish transition.
+  inputs:
+    dataset_path: tests/fixtures/trend/monotonic_cross.csv
+  expected_behaviors:
+  - Fast moving average crosses slow moving average exactly once
+  - Buy event occurs on the first positive crossover
+  - No sell event appears later in the fixture horizon
+- fixture_id: fixture.trend_whipsaw_guard_v1
+  domain: single_asset_ohlcv
+  purpose: Sideways price action used to validate anti-whipsaw filters.
+  inputs:
+    dataset_path: tests/fixtures/trend/whipsaw_guard.csv
+  expected_behaviors:
+  - Trend algorithms produce fewer events when a minimum-spread or confirmation filter is enabled
+  - No lookahead is required to suppress noisy crossover churn
+- fixture_id: fixture.momentum_sustained_up_v1
+  domain: single_asset_ohlcv
+  purpose: Sustained price continuation for single-asset momentum checks.
+  inputs:
+    dataset_path: tests/fixtures/momentum/sustained_up.csv
+  expected_behaviors:
+  - Momentum score rises above bullish threshold
+  - No bearish reversal occurs while continuation remains intact
+- fixture_id: fixture.momentum_cross_sectional_ranking_v1
+  domain: multi_asset_panel
+  purpose: Deterministic ranking of a small universe on rebalance dates.
+  inputs:
+    dataset_path: tests/fixtures/momentum/cross_sectional_ranking.parquet
+  expected_behaviors:
+  - Known winners rank above known losers on the target rebalance date
+  - Selection list is reproducible under the declared ranking rule
+- fixture_id: fixture.mean_reversion_one_overshoot_v1
+  domain: single_asset_ohlcv
+  purpose: One clean overshoot and re-entry toward mean.
+  inputs:
+    dataset_path: tests/fixtures/mean_reversion/one_overshoot.csv
+  expected_behaviors:
+  - Stretch metric reaches entry threshold once
+  - Strategy exits when price or indicator reverts toward mean
+- fixture_id: fixture.mean_reversion_range_oscillation_v1
+  domain: single_asset_ohlcv
+  purpose: Range-bound oscillation used to validate repeated mean-reversion behavior.
+  inputs:
+    dataset_path: tests/fixtures/mean_reversion/range_oscillation.csv
+  expected_behaviors:
+  - Range-aware reversion strategies can trigger multiple valid entries
+  - Trend filters, when enabled, keep the strategy active in range mode
+- fixture_id: fixture.volatility_compression_release_v1
+  domain: single_asset_ohlcv
+  purpose: Compression followed by strong expansion for volatility breakout tests.
+  inputs:
+    dataset_path: tests/fixtures/volatility/compression_release.csv
+  expected_behaviors:
+  - Compression flag turns on before breakout
+  - Breakout signal appears only after expansion begins
+- fixture_id: fixture.pattern_support_rejection_v1
+  domain: single_asset_ohlcv
+  purpose: Support touch followed by clear rejection.
+  inputs:
+    dataset_path: tests/fixtures/patterns/support_rejection.csv
+  expected_behaviors:
+  - Support touch is detected inside configured buffer
+  - Buy signal requires rejection confirmation, not just a touch
+- fixture_id: fixture.pattern_opening_range_breakout_v1
+  domain: intraday_ohlcv
+  purpose: Opening range with one clean breakout direction.
+  inputs:
+    dataset_path: tests/fixtures/patterns/opening_range_breakout.csv
+  expected_behaviors:
+  - Opening range is frozen after configured window
+  - Breakout signal occurs only after range is fully defined
+- fixture_id: fixture.cross_asset_carry_ranking_v1
+  domain: multi_asset_panel
+  purpose: Small carry universe with deterministic ranking.
+  inputs:
+    dataset_path: tests/fixtures/cross_asset/carry_ranking.parquet
+  expected_behaviors:
+  - Highest carry assets rank above lower-carry assets
+  - Ranking is stable across repeated runs on same data
+- fixture_id: fixture.risk_on_off_regime_v1
+  domain: cross_asset_panel
+  purpose: Synthetic regime shift from calm risk-on to defensive risk-off conditions.
+  inputs:
+    dataset_path: tests/fixtures/cross_asset/risk_on_off.parquet
+  expected_behaviors:
+  - Regime detector flips state after the synthetic stress transition
+  - Configured smoothing prevents one-bar oscillation
+- fixture_id: fixture.factor_monthly_rebalance_v1
+  domain: fundamentals_pti
+  purpose: Monthly factor rebalance with point-in-time accounting inputs.
+  inputs:
+    dataset_path: tests/fixtures/factors/monthly_rebalance.parquet
+  expected_behaviors:
+  - Factor scores are reproducible under point-in-time data
+  - Rebalance output is generated only on scheduled dates
+- fixture_id: fixture.event_earnings_after_close_v1
+  domain: event_calendar
+  purpose: Earnings event arriving after close and traded next valid window.
+  inputs:
+    dataset_path: tests/fixtures/events/earnings_after_close.parquet
+  expected_behaviors:
+  - Event window starts from the correct public availability point
+  - No signal appears before the after-close announcement timestamp
+- fixture_id: fixture.event_index_rebalance_window_v1
+  domain: event_calendar
+  purpose: Index add/delete flow window around a rebalance event.
+  inputs:
+    dataset_path: tests/fixtures/events/index_rebalance.parquet
+  expected_behaviors:
+  - Expected flow direction is attached to the right symbols
+  - Signal exists only inside the configured rebalance window
+- fixture_id: fixture.statarb_pair_divergence_reversion_v1
+  domain: pair_prices
+  purpose: Stable pair with one temporary spread divergence and convergence.
+  inputs:
+    dataset_path: tests/fixtures/stat_arb/pair_divergence.parquet
+  expected_behaviors:
+  - Spread z-score crosses entry threshold during divergence
+  - Paired trade exits when spread normalizes
+- fixture_id: fixture.relative_value_curve_spread_v1
+  domain: multi_leg_curve_data
+  purpose: Simple curve-spread distortion for relative-value strategies.
+  inputs:
+    dataset_path: tests/fixtures/relative_value/curve_spread.parquet
+  expected_behaviors:
+  - Curve-spread metric becomes extreme on known dates
+  - Strategy emits paired-leg directions rather than one-sided signal
+- fixture_id: fixture.options_iv_rv_gap_v1
+  domain: options_surface
+  purpose: Implied-versus-realized volatility gap for options strategies.
+  inputs:
+    dataset_path: tests/fixtures/options/iv_rv_gap.parquet
+  expected_behaviors:
+  - Volatility-premium measure rises above configured threshold
+  - Signal reflects the configured long-vol or short-vol policy
+- fixture_id: fixture.execution_twap_schedule_v1
+  domain: execution_schedule
+  purpose: Simple TWAP schedule with catch-up behavior.
+  inputs:
+    dataset_path: tests/fixtures/execution/twap_schedule.json
+  expected_behaviors:
+  - Target cumulative quantity advances evenly through time
+  - Catch-up rule activates when actual fills lag target schedule
+- fixture_id: fixture.execution_vwap_curve_drift_v1
+  domain: execution_schedule
+  purpose: VWAP schedule under realized volume that differs from expected curve.
+  inputs:
+    dataset_path: tests/fixtures/execution/vwap_curve_drift.json
+  expected_behaviors:
+  - Desired cumulative quantity adapts to realized volume
+  - Benchmark diagnostics show target versus achieved schedule
+- fixture_id: fixture.microstructure_top_of_book_imbalance_v1
+  domain: order_book
+  purpose: Top-of-book imbalance with short-lived directional pressure.
+  inputs:
+    dataset_path: tests/fixtures/microstructure/top_of_book_imbalance.parquet
+  expected_behaviors:
+  - Imbalance metric rises when bid depth dominates ask depth
+  - Derived short-horizon bias changes with imbalance sign
+- fixture_id: fixture.microstructure_queue_state_v1
+  domain: own_order_state
+  purpose: Queue-position evolution for passive order logic.
+  inputs:
+    dataset_path: tests/fixtures/microstructure/queue_state.json
+  expected_behaviors:
+  - Queue estimate improves as volume ahead is consumed
+  - Cancel or amend action appears when fill probability falls below threshold
+- fixture_id: fixture.composite_boolean_truth_table_v1
+  domain: child_output_stream
+  purpose: Truth-table validation for Boolean gating.
+  inputs:
+    dataset_path: tests/fixtures/composite/boolean_truth_table.json
+  expected_behaviors:
+  - AND, OR, and majority rules match expected truth-table rows
+  - Tie and veto policies produce deterministic final states
+- fixture_id: fixture.composite_weighted_blend_v1
+  domain: child_output_stream
+  purpose: Weighted-score blend across aligned child strategies.
+  inputs:
+    dataset_path: tests/fixtures/composite/weighted_blend.json
+  expected_behaviors:
+  - Weighted sum matches expected numeric result
+  - Final thresholds map the score to the expected state
+- fixture_id: fixture.composite_rank_aggregation_v1
+  domain: cross_sectional_child_outputs
+  purpose: Cross-sectional rank aggregation on a small universe.
+  inputs:
+    dataset_path: tests/fixtures/composite/rank_aggregation.parquet
+  expected_behaviors:
+  - Aggregate rank is reproducible from the child ranks
+  - Top-k selection matches expected result
+- fixture_id: fixture.composite_risk_budget_v1
+  domain: strategy_return_streams
+  purpose: Risk-budget allocation across multiple sleeves.
+  inputs:
+    dataset_path: tests/fixtures/composite/risk_budget.parquet
+  expected_behaviors:
+  - Risk contribution targets are reflected in output weights
+  - Weight changes are stable under the configured rebalance cadence
+- fixture_id: fixture.composite_regime_switch_v1
+  domain: regime_features
+  purpose: Regime-gated child activation with explicit state changes.
+  inputs:
+    dataset_path: tests/fixtures/composite/regime_switch.parquet
+  expected_behaviors:
+  - Regime label flips on the known transition
+  - Active child set changes according to regime map
+- fixture_id: fixture.composite_ml_ensemble_v1
+  domain: model_prediction_streams
+  purpose: Aggregation of child model predictions into one final prediction.
+  inputs:
+    dataset_path: tests/fixtures/composite/ml_ensemble.parquet
+  expected_behaviors:
+  - Meta-aggregation is deterministic for the fixture
+  - Final thresholded state matches expected result
+- fixture_id: fixture.composite_rl_policy_stub_v1
+  domain: rl_environment
+  purpose: Stub environment for RL allocation and hierarchical policy plumbing.
+  inputs:
+    dataset_path: tests/fixtures/composite/rl_policy_stub.json
+  expected_behaviors:
+  - State vector is parsed deterministically
+  - Policy action maps cleanly to output allocation structure
