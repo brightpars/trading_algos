@@ -9,6 +9,14 @@ from trading_algos_dashboard.repositories.mongo_base import MongoRepository
 
 
 class MarketDataCacheRepository(MongoRepository):
+    @staticmethod
+    def _normalize_utc_datetime(value: Any) -> datetime | None:
+        if not isinstance(value, datetime):
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
     def __init__(self, db: Any):
         super().__init__(db, "dashboard_market_data_cache")
 
@@ -91,7 +99,7 @@ class MarketDataCacheRepository(MongoRepository):
         now = datetime.now(timezone.utc)
         if isinstance(existing, Mapping):
             current_owner = existing.get("fill_owner_id")
-            expires_at = existing.get("fill_expires_at")
+            expires_at = self._normalize_utc_datetime(existing.get("fill_expires_at"))
             has_candles = isinstance(existing.get("candles"), list) and bool(
                 existing.get("candles")
             )
@@ -141,9 +149,15 @@ class MarketDataCacheRepository(MongoRepository):
 
     def delete_expired_entries(self, *, expires_before: datetime) -> int:
         deleted_count = 0
+        normalized_expires_before = self._normalize_utc_datetime(expires_before)
+        if normalized_expires_before is None:
+            return 0
         for entry in self.list_entries():
-            stored_at = entry.get("stored_at")
-            if isinstance(stored_at, datetime) and stored_at < expires_before:
+            stored_at = self._normalize_utc_datetime(entry.get("stored_at"))
+            if (
+                isinstance(stored_at, datetime)
+                and stored_at < normalized_expires_before
+            ):
                 cache_key = entry.get("cache_key")
                 if isinstance(cache_key, str):
                     self.delete_entry_by_cache_key(cache_key)
@@ -156,7 +170,7 @@ class MarketDataCacheRepository(MongoRepository):
             return 0
 
         def _stored_at_sort_key(item: dict[str, Any]) -> datetime:
-            stored_at = item.get("stored_at")
+            stored_at = self._normalize_utc_datetime(item.get("stored_at"))
             if isinstance(stored_at, datetime):
                 return stored_at
             return datetime.min.replace(tzinfo=timezone.utc)
