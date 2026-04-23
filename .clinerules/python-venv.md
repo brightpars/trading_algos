@@ -28,6 +28,11 @@ For this repository, always use the project virtual environment.
 - If `.venv` does not exist, tell me clearly and suggest the exact command to create it.
 - If a command fails because a package is missing, use `./.venv/bin/python -m pip ...`, not global pip.
 
+## Patch size and number of file changes
+1. Make changes in small file-by-file edits.
+2. Do not attempt one large multi-file patch.
+3. If multiple files need to change, edit them one at a time.
+
 ## Implementation and architecture rules
 When touching a file, implementing something new, or fixing a bug/issue, always try to:
 1. Do **not** preserve legacy architecture, legacy compatibility layers, transitional adapters, fallback paths, or wrapper APIs whose only purpose is backward compatibility.

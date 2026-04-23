@@ -1,0 +1,490 @@
+blockers_version: 1
+blockers:
+- blocker_key: blocker.multi_asset_panel_v1
+  description: Aligned multi-symbol panel support with consistent date intersection/union rules and universe slicing.
+  category: input-domain blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/data/panel_dataset.py
+  - src/trading_algos/data/universe_membership.py
+  exit_criteria:
+  - Panel loader supports aligned multi-asset slices
+  - Missing-history and unequal-start-date behavior is tested
+  - Universe membership can be reproduced for a rebalance date
+  affected_rows:
+  - algorithm:16
+  - algorithm:17
+  - algorithm:18
+  - algorithm:19
+  - algorithm:78
+  - algorithm:79
+  - algorithm:80
+  - algorithm:81
+  - algorithm:82
+  - algorithm:83
+  - algorithm:84
+  - algorithm:85
+  - algorithm:86
+  - algorithm:87
+  - algorithm:88
+  - algorithm:89
+  - algorithm:90
+  - algorithm:91
+  - algorithm:92
+  - algorithm:93
+  - algorithm:100
+  - algorithm:101
+  - algorithm:102
+  - algorithm:103
+  - algorithm:104
+  - algorithm:105
+  - algorithm:106
+  - algorithm:107
+  - algorithm:108
+  - algorithm:109
+  - algorithm:110
+  - algorithm:111
+  - algorithm:112
+  - algorithm:113
+  - algorithm:114
+  - combination:3
+  - combination:4
+  - combination:5
+  affected_families:
+  - cross_asset_macro_carry
+  - factor_risk_premia
+  - fundamental_ml_composite
+  - momentum
+  - optimization_based
+  - risk_overlay
+  - rule_based_combination
+- blocker_key: blocker.rebalance_engine_v1
+  description: Repository support for rebalance-date iteration, portfolio refresh cadence, and rebalance-aware reporting.
+  category: execution-model blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/rebalance/calendar.py
+  - src/trading_algos/rebalance/runner.py
+  exit_criteria:
+  - Rebalance calendars support monthly/weekly/custom schedules
+  - Strategies can emit date-level selections or weights
+  - Rebalance simulation is covered by tests
+  affected_rows:
+  - algorithm:16
+  - algorithm:17
+  - algorithm:18
+  - algorithm:19
+  - algorithm:78
+  - algorithm:79
+  - algorithm:80
+  - algorithm:81
+  - algorithm:82
+  - algorithm:83
+  - algorithm:84
+  - algorithm:85
+  - algorithm:86
+  - algorithm:87
+  - algorithm:88
+  - algorithm:89
+  - algorithm:90
+  - algorithm:91
+  - algorithm:92
+  - algorithm:93
+  - algorithm:100
+  - algorithm:101
+  - algorithm:102
+  - algorithm:103
+  - algorithm:104
+  - algorithm:105
+  - algorithm:106
+  - algorithm:107
+  - algorithm:108
+  - algorithm:109
+  - algorithm:110
+  - algorithm:111
+  - algorithm:112
+  - algorithm:113
+  - algorithm:114
+  - combination:3
+  - combination:4
+  - combination:5
+  affected_families:
+  - cross_asset_macro_carry
+  - factor_risk_premia
+  - fundamental_ml_composite
+  - momentum
+  - optimization_based
+  - risk_overlay
+  - rule_based_combination
+- blocker_key: blocker.portfolio_weight_output_v1
+  description: Normalized portfolio-weight output contract for rank/selection/allocation strategies.
+  category: output-contract blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/contracts/portfolio_output.py
+  exit_criteria:
+  - Portfolio outputs support rank, selection, and weights
+  - Weights validate sum and exposure constraints
+  - Dashboard/report layer can render allocation results
+  affected_rows:
+  - algorithm:16
+  - algorithm:17
+  - algorithm:18
+  - algorithm:19
+  - algorithm:86
+  - algorithm:87
+  - algorithm:88
+  - algorithm:89
+  - algorithm:90
+  - algorithm:91
+  - algorithm:92
+  - algorithm:93
+  - algorithm:100
+  - algorithm:101
+  - algorithm:102
+  - algorithm:103
+  - algorithm:104
+  - algorithm:105
+  - algorithm:106
+  - algorithm:107
+  - algorithm:108
+  - algorithm:109
+  - algorithm:110
+  - algorithm:111
+  - algorithm:112
+  - algorithm:113
+  - algorithm:114
+  - combination:4
+  - combination:5
+  affected_families:
+  - factor_risk_premia
+  - fundamental_ml_composite
+  - momentum
+  - optimization_based
+  - risk_overlay
+- blocker_key: blocker.event_calendar_v1
+  description: Point-in-time event calendar support with event timestamps and source metadata.
+  category: data-model blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/events/calendar.py
+  exit_criteria:
+  - Events support before-open and after-close timestamps
+  - Events can be queried by date window and symbol
+  - Calendar fixtures exist and pass
+  affected_rows:
+  - algorithm:85
+  - algorithm:117
+  - algorithm:118
+  - algorithm:119
+  - algorithm:120
+  - algorithm:121
+  affected_families:
+  - cross_asset_macro_carry
+  - event_driven
+- blocker_key: blocker.event_window_execution_v1
+  description: Event-window strategy runner supporting pre-event, event-day, and post-event windows.
+  category: execution-model blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/events/window_runner.py
+  exit_criteria:
+  - Entry/exit windows can be expressed relative to event time
+  - No lookahead leakage across event windows
+  - Event-window reporting is tested
+  affected_rows:
+  - algorithm:85
+  - algorithm:117
+  - algorithm:118
+  - algorithm:119
+  - algorithm:120
+  - algorithm:121
+  affected_families:
+  - cross_asset_macro_carry
+  - event_driven
+- blocker_key: blocker.event_reporting_v1
+  description: Reporting support for event metadata, surprise values, and event-specific diagnostics.
+  category: reporting blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/reporting/event_report.py
+  exit_criteria:
+  - Event reports include event timestamp and type
+  - Diagnostic payload includes surprise or expected-flow inputs
+  - Dashboard can render event windows
+  affected_rows:
+  - algorithm:85
+  - algorithm:117
+  - algorithm:118
+  - algorithm:119
+  - algorithm:120
+  - algorithm:121
+  affected_families:
+  - cross_asset_macro_carry
+  - event_driven
+- blocker_key: blocker.spread_leg_output_v1
+  description: Multi-leg output contract for paired and basket strategies.
+  category: output-contract blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/contracts/multi_leg_output.py
+  exit_criteria:
+  - Strategy can emit per-leg actions and hedge ratio
+  - Paired positions serialize cleanly
+  - Reports include leg-level diagnostics
+  affected_rows:
+  - algorithm:38
+  - algorithm:39
+  - algorithm:40
+  - algorithm:41
+  - algorithm:42
+  - algorithm:43
+  - algorithm:44
+  - algorithm:45
+  - algorithm:46
+  - algorithm:47
+  - algorithm:48
+  - algorithm:49
+  - algorithm:50
+  - algorithm:51
+  - algorithm:79
+  - algorithm:80
+  - algorithm:81
+  - algorithm:115
+  - algorithm:116
+  affected_families:
+  - cross_asset_macro_carry
+  - fixed_income_relative_value
+  - stat_arb
+- blocker_key: blocker.hedge_ratio_helpers_v1
+  description: Reusable hedge-ratio, spread, and residual helpers for relative-value strategies.
+  category: data-model blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/relative_value/hedge_ratio.py
+  exit_criteria:
+  - Static and rolling hedge-ratio helpers exist
+  - Spread normalization helpers exist
+  - Multi-leg fixtures cover hedge-ratio drift
+  affected_rows:
+  - algorithm:38
+  - algorithm:39
+  - algorithm:40
+  - algorithm:41
+  - algorithm:42
+  - algorithm:43
+  - algorithm:44
+  - algorithm:45
+  - algorithm:46
+  - algorithm:47
+  - algorithm:48
+  - algorithm:49
+  - algorithm:50
+  - algorithm:51
+  - algorithm:115
+  - algorithm:116
+  affected_families:
+  - fixed_income_relative_value
+  - stat_arb
+- blocker_key: blocker.multi_leg_reporting_v1
+  description: Reporting support for spreads, leg PnL, carry terms, and convergence diagnostics.
+  category: reporting blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/reporting/multi_leg_report.py
+  exit_criteria:
+  - Spread value and leg state are visible in reports
+  - Carry/funding assumptions can be rendered
+  - Paired strategy charts are supported
+  affected_rows:
+  - algorithm:38
+  - algorithm:39
+  - algorithm:40
+  - algorithm:41
+  - algorithm:42
+  - algorithm:43
+  - algorithm:44
+  - algorithm:45
+  - algorithm:46
+  - algorithm:47
+  - algorithm:48
+  - algorithm:49
+  - algorithm:50
+  - algorithm:51
+  - algorithm:79
+  - algorithm:80
+  - algorithm:81
+  - algorithm:115
+  - algorithm:116
+  affected_families:
+  - cross_asset_macro_carry
+  - fixed_income_relative_value
+  - stat_arb
+- blocker_key: blocker.options_chain_v1
+  description: Options-chain and contract-selection support for option-based strategies.
+  category: input-domain blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/options/chain.py
+  - src/trading_algos/options/contract_selection.py
+  exit_criteria:
+  - Option chains can be queried by timestamp and expiry
+  - Contract selection helpers exist
+  - Options fixtures are wired into tests
+  affected_rows:
+  - algorithm:55
+  - algorithm:56
+  - algorithm:57
+  - algorithm:58
+  - algorithm:59
+  - algorithm:60
+  - algorithm:61
+  affected_families:
+  - volatility_options
+- blocker_key: blocker.greeks_v1
+  description: Greeks and implied-volatility support required by advanced option strategies.
+  category: data-model blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/options/greeks.py
+  - src/trading_algos/options/iv_surface.py
+  exit_criteria:
+  - Delta/Gamma/Vega are available for selected contracts
+  - IV terms can be reported
+  - Greek-aware tests exist
+  affected_rows:
+  - algorithm:55
+  - algorithm:56
+  - algorithm:57
+  - algorithm:58
+  - algorithm:59
+  - algorithm:60
+  - algorithm:61
+  affected_families:
+  - volatility_options
+- blocker_key: blocker.execution_plan_output_v1
+  description: Child-order and execution-plan output contract for execution algorithms.
+  category: output-contract blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/contracts/execution_plan.py
+  exit_criteria:
+  - Execution plan supports slice schedule and action stream
+  - Execution reports include benchmark comparisons
+  - Execution fixtures validate schedule behavior
+  affected_rows:
+  - algorithm:94
+  - algorithm:95
+  - algorithm:96
+  - algorithm:97
+  - algorithm:98
+  - algorithm:99
+  affected_families:
+  - execution
+- blocker_key: blocker.fill_simulation_v1
+  description: Fill simulation support for execution strategies and realistic benchmark measurement.
+  category: simulation blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/simulation/fills.py
+  exit_criteria:
+  - Partial fills and queue assumptions are modeled
+  - Execution backtests can compare target vs achieved schedule
+  - Fill-simulation smoke tests exist
+  affected_rows:
+  - algorithm:94
+  - algorithm:95
+  - algorithm:96
+  - algorithm:97
+  - algorithm:98
+  - algorithm:99
+  affected_families:
+  - execution
+- blocker_key: blocker.order_book_input_v1
+  description: Order-book input model for top-of-book and depth-aware strategies.
+  category: input-domain blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/market_data/order_book.py
+  exit_criteria:
+  - Top-of-book and depth snapshots are supported
+  - Book updates retain timestamp precision
+  - Order-book fixtures validate imbalance and microprice calculations
+  affected_rows:
+  - algorithm:62
+  - algorithm:63
+  - algorithm:64
+  - algorithm:65
+  - algorithm:66
+  - algorithm:67
+  - algorithm:68
+  - algorithm:69
+  affected_families:
+  - microstructure_hft
+- blocker_key: blocker.own_order_state_v1
+  description: Own-order state and queue-position support for passive execution and market making.
+  category: data-model blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/execution/own_order_state.py
+  exit_criteria:
+  - Own resting orders and queue estimates can be tracked
+  - Cancel/replace state is represented
+  - Queue-position tests exist
+  affected_rows:
+  - algorithm:62
+  - algorithm:63
+  - algorithm:64
+  - algorithm:65
+  - algorithm:66
+  - algorithm:67
+  - algorithm:68
+  - algorithm:69
+  affected_families:
+  - microstructure_hft
+- blocker_key: blocker.rl_environment_v1
+  description: Training and evaluation environment for RL controllers, including state, action, and reward plumbing.
+  category: simulation blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/rl/environment.py
+  exit_criteria:
+  - RL environment supports deterministic replay
+  - Reward definition is configurable
+  - RL controller can be evaluated in offline tests
+  affected_rows:
+  - combination:11
+  - combination:12
+  affected_families:
+  - reinforcement_learning
+- blocker_key: blocker.regime_state_support_v1
+  description: Reusable regime-state representation and smoothing helpers for regime-gated composites.
+  category: data-model blocker
+  status: planned
+  owner: null
+  target_modules:
+  - src/trading_algos/regime/state.py
+  exit_criteria:
+  - Regime label/probability object exists
+  - State smoothing and hysteresis helpers exist
+  - Composite regime fixtures pass
+  affected_rows:
+  - combination:7
+  affected_families:
+  - adaptive_state_based
