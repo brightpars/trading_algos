@@ -103,6 +103,9 @@ def test_evaluation_service_returns_ranked_rows_and_warnings():
             "experiment_id": "exp_1",
             "alg_name": "Algo 1",
             "signal_summary": {"buy_count": 1, "sell_count": 2, "total_rows": 4},
+            "execution_steps": [
+                {"step": "run_algorithm", "duration_seconds": 1.5},
+            ],
             "report": {
                 "algorithm_summary": {"algorithm_name": "Algo 1", "family": "trend"},
                 "evaluation_summary": {"headline_metrics": {"cumulative_return": 0.4}},
@@ -112,6 +115,9 @@ def test_evaluation_service_returns_ranked_rows_and_warnings():
             "experiment_id": "exp_2",
             "alg_name": "Algo 2",
             "signal_summary": {"buy_count": 2, "sell_count": 1, "total_rows": 5},
+            "execution_steps": [
+                {"step": "run_algorithm", "duration_seconds": 2.25},
+            ],
             "report": {
                 "algorithm_summary": {"algorithm_name": "Algo 2", "family": "trend"},
                 "summary_cards": [{"label": "Win rate", "value": "0.6"}],
@@ -136,9 +142,53 @@ def test_evaluation_service_returns_ranked_rows_and_warnings():
     assert payload["rows"][0]["metrics"]["cumulative_return"] == 0.4
     assert payload["rows"][1]["metrics"]["win_rate"] == 0.6
     assert payload["rows"][0]["trade_count"] == 3
+    assert payload["rows"][0]["duration_seconds"] == 1.5
+    assert payload["rows"][0]["total_duration_seconds"] == 11.0
     assert len(payload["warnings"]) == 2
     assert len(payload["charts"]) >= 2
     assert payload["charts"][0]["chart"]["data"][0]["type"] == "bar"
+
+
+def test_evaluation_service_prefers_algorithm_runtime_over_total_experiment_runtime():
+    start = datetime(2024, 2, 1, 9, 30, tzinfo=timezone.utc)
+    end = datetime(2024, 2, 3, 16, 0, tzinfo=timezone.utc)
+    experiments = [
+        {
+            "experiment_id": "exp_1",
+            "symbol": "AAPL",
+            "status": "completed",
+            "time_range": {"start": start, "end": end},
+            "duration_seconds": 20.0,
+        }
+    ]
+    results = [
+        {
+            "experiment_id": "exp_1",
+            "alg_name": "Algo 1",
+            "execution_steps": [
+                {"step": "read_candles", "duration_seconds": 8.0},
+                {"step": "run_algorithm", "duration_seconds": 3.5},
+            ],
+            "report": {
+                "algorithm_summary": {"algorithm_name": "Algo 1", "family": "trend"},
+            },
+        }
+    ]
+    service = EvaluationService(
+        experiment_repository=_ExperimentRepository(experiments),
+        result_repository=_ResultRepository(results),
+    )
+
+    payload = service.find_comparable_runs(
+        symbol="AAPL",
+        start_date="2024-02-01",
+        start_time="09:30",
+        end_date="2024-02-03",
+        end_time="16:00",
+    )
+
+    assert payload["rows"][0]["duration_seconds"] == 3.5
+    assert payload["rows"][0]["total_duration_seconds"] == 20.0
 
 
 def test_evaluation_service_builds_scatter_chart_when_return_and_drawdown_exist():

@@ -182,13 +182,32 @@ class EvaluationService:
             "status": str(experiment.get("status", "")),
             "created_at": experiment.get("created_at"),
             "finished_at": experiment.get("finished_at"),
-            "duration_seconds": experiment.get("duration_seconds"),
+            "duration_seconds": self._extract_execution_runtime_seconds(result=result),
+            "total_duration_seconds": experiment.get("duration_seconds"),
             "signal_count": metrics.get("signal_count"),
             "trade_count": metrics.get("trade_count"),
             "metrics": metrics,
             "detail_url": f"/experiments/{experiment.get('experiment_id', '')}",
             "metric_notes": [] if isinstance(report, dict) else ["Report unavailable"],
         }
+
+    @staticmethod
+    def _extract_execution_runtime_seconds(
+        result: dict[str, Any],
+    ) -> float | int | None:
+        execution_steps = result.get("execution_steps")
+        if not isinstance(execution_steps, list):
+            return None
+        for step in execution_steps:
+            if not isinstance(step, dict):
+                continue
+            step_name = str(step.get("step", ""))
+            if step_name not in {"run_algorithm", "run_configuration"}:
+                continue
+            duration_seconds = step.get("duration_seconds")
+            if isinstance(duration_seconds, (int, float)):
+                return duration_seconds
+        return None
 
     def _extract_metrics(
         self, *, report: object, result: dict[str, Any]
@@ -328,7 +347,11 @@ class EvaluationService:
             ),
             ("win_rate", "Win rate by algorithm", "Win rate"),
             ("max_drawdown", "Max drawdown by algorithm", "Max drawdown"),
-            ("duration_seconds", "Runtime by algorithm", "Runtime (seconds)"),
+            (
+                "duration_seconds",
+                "Algorithm execution runtime by algorithm",
+                "Execution runtime (seconds)",
+            ),
         ]
 
         for metric_key, title, y_axis_title in metric_chart_specs:

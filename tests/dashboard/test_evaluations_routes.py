@@ -81,6 +81,10 @@ def test_evaluations_cohort_renders_matching_completed_runs(monkeypatch):
         {
             "experiment_id": "exp_eval",
             "alg_name": "Algo Eval",
+            "execution_steps": [
+                {"step": "read_candles", "duration_seconds": 5.0},
+                {"step": "run_algorithm", "duration_seconds": 1.25},
+            ],
             "signal_summary": {"buy_count": 1, "sell_count": 1, "total_rows": 3},
             "report": {
                 "algorithm_summary": {"algorithm_name": "Algo Eval", "family": "trend"},
@@ -102,6 +106,7 @@ def test_evaluations_cohort_renders_matching_completed_runs(monkeypatch):
     assert b"Evaluation cohort" in response.data
     assert b"Algo Eval" in response.data
     assert b"0.25" in response.data
+    assert b"1.25s" in response.data
     assert b"Return vs drawdown" in response.data
     assert b"chart-container" in response.data
 
