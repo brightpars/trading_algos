@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Algorithm Library Systematic Implementation Plan — Version 2</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.58;
+      margin: 0;
+      background: #f5f7fb;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 1180px;
+      margin: 28px auto;
+      background: #fff;
+      padding: 34px 42px;
+      border-radius: 14px;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.08);
+    }
+    h1, h2, h3, h4 {
+      color: #0f172a;
+    }
+    h1 {
+      margin-top: 0;
+      border-bottom: 3px solid #e5e7eb;
+      padding-bottom: 12px;
+    }
+    h2 {
+      margin-top: 34px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 6px;
+    }
+    h3 {
+      margin-top: 24px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 20px 0;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f4f6;
+    }
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 0.95em;
+    }
+    pre {
+      background: #0f172a;
+      color: #e5eefc;
+      padding: 16px;
+      border-radius: 10px;
+      overflow-x: auto;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 28px 0;
+    }
+    ul li, ol li {
+      margin-bottom: 6px;
+    }
+    blockquote {
+      margin: 0;
+      padding: 12px 16px;
+      border-left: 4px solid #3b82f6;
+      background: #eef4ff;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Algorithm Library Systematic Implementation Plan — Version 2</h1>
+<h2>What changed in Version 2</h2>
+<p>This version keeps the core structure of the original plan, but adds the main improvements identified during review:</p>
+<ol>
+<li><strong>The machine-readable manifest becomes the single source of truth</strong> for counts, source-document version, catalog references, and completion totals.</li>
+<li><strong>Framework blockers become first-class tracked artifacts</strong>, not just a status value hidden inside algorithm rows.</li>
+<li><strong>Golden fixtures and expected-behavior snapshots</strong> become mandatory parts of the testing strategy.</li>
+<li><strong>Performance and scalability budgets</strong> become explicit acceptance criteria, not an afterthought.</li>
+<li><strong>A small composite-method wave moves earlier</strong> so the child-output contract is validated before too many families are implemented.</li>
+<li><strong>Readiness is split into two axes</strong>: delivery status and operational readiness (<code>research_ready</code> vs <code>production_ready</code>).</li>
+<li><strong>A capabilities matrix is added to the manifest</strong>, so every row clearly declares what kind of data, timing model, scope, and output model it needs.</li>
+</ol>
+<hr />
+<h2>Purpose</h2>
+<p>This document defines a <strong>systematic, trackable, automatable, and delivery-safe strategy</strong> for implementing the full algorithm library.</p>
+<p>It is intended to answer these practical questions:</p>
+<ol>
+<li>In what order should the algorithms and combination methods be implemented?</li>
+<li>How should the work be batched so implementation remains manageable?</li>
+<li>How do we keep the codebase state visible at all times?</li>
+<li>How do we automate progress tracking so the library does not become a manual spreadsheet exercise?</li>
+<li>How do we know when a family, phase, blocker, or individual algorithm is actually done?</li>
+<li>How do we keep the library implementation aligned with evolving requirements documents without tracker drift?</li>
+<li>How do we distinguish a strategy that is merely coded from a strategy that is truly ready for research or production use?</li>
+</ol>
+<p>This plan should be used together with the current requirement, authoring, reporting, and readiness documents in the repository. However, the authoritative totals and source references must come from the manifest metadata, not from prose in this file.</p>
+<hr />
+<h2>Executive summary</h2>
+<p>The library should <strong>not</strong> be implemented as a flat list.</p>
+<p>Instead, it should be implemented as a <strong>multi-phase product program</strong> with:</p>
+<ul>
+<li>explicit readiness tiers</li>
+<li>family-by-family delivery</li>
+<li>reusable primitives</li>
+<li>small repeatable batches</li>
+<li>machine-readable manifests</li>
+<li>first-class blocker tracking</li>
+<li>generated progress dashboards</li>
+<li>fixture-based behavior validation</li>
+<li>CI-visible completion checks</li>
+<li>performance budgets</li>
+<li>separate research-readiness and production-readiness states</li>
+</ul>
+<p>The recommended implementation order is:</p>
+<ol>
+<li><strong>Manifest, blocker registry, fixture registry, and tracker automation</strong></li>
+<li><strong>Shared Tier-1 OHLCV primitives</strong></li>
+<li><strong>First trend batch</strong></li>
+<li><strong>Early composite contract-validation batch</strong></li>
+<li><strong>First momentum and mean-reversion batches</strong></li>
+<li><strong>Remaining Tier-1 families</strong></li>
+<li><strong>Cross-sectional, ranking, and rebalance-driven families</strong></li>
+<li><strong>Event-driven families</strong></li>
+<li><strong>Spread / multi-leg / relative-value families</strong></li>
+<li><strong>Advanced execution, options, microstructure, and RL families only after framework expansion</strong></li>
+</ol>
+<hr />
+<h2>Core delivery principles</h2>
+<h3>1. Treat the library as a product program, not as a loose backlog</h3>
+<p>Every algorithm and every combination method must have:</p>
+<ul>
+<li>a manifest row</li>
+<li>a family</li>
+<li>a tier</li>
+<li>a target module</li>
+<li>known dependencies</li>
+<li>a test surface</li>
+<li>a readiness state</li>
+<li>an operational-readiness target</li>
+<li>a fixture mapping</li>
+<li>a performance budget id</li>
+</ul>
+<p>No row should be considered truly planned until it exists in the manifest.</p>
+<h3>2. The manifest is the single source of truth</h3>
+<p>Counts, source-document version, row identifiers, family totals, and catalog references must <strong>not</strong> be manually maintained in multiple prose files.</p>
+<p>The source of truth should be:</p>
+<ul>
+<li>one top-level manifest metadata section</li>
+<li>one row per algorithm</li>
+<li>one row per combination method</li>
+<li>one blocker registry</li>
+<li>one fixture registry</li>
+<li>one generated markdown dashboard</li>
+</ul>
+<p>This means:</p>
+<ul>
+<li>totals shown in dashboards are generated</li>
+<li>percentages are generated</li>
+<li>&quot;missing rows&quot; are discovered automatically</li>
+<li>source-doc version is read from manifest metadata</li>
+<li>drift between docs and code is a CI failure, not a manual cleanup task</li>
+</ul>
+<h3>3. Implement by family and shared primitive, not by random algorithm order</h3>
+<p>Many strategies are minor variants of the same internal machinery.</p>
+<p>The fast path is:</p>
+<ol>
+<li>build reusable primitives</li>
+<li>build family scaffolding</li>
+<li>implement several algorithms that reuse the same internals</li>
+<li>validate the family through fixture-backed tests</li>
+</ol>
+<p>This reduces duplicated code and keeps behavior consistent.</p>
+<h3>4. Separate framework readiness from algorithm readiness</h3>
+<p>Some rows are blocked because the algorithm is difficult.</p>
+<p>Others are blocked because the repository cannot yet support:</p>
+<ul>
+<li>the required input domain</li>
+<li>the required timing model</li>
+<li>the required output contract</li>
+<li>the required simulation environment</li>
+</ul>
+<p>Examples:</p>
+<ul>
+<li>microstructure strategies need order-book inputs</li>
+<li>execution algorithms need child-order and execution-plan outputs</li>
+<li>options strategies need option-chain, term-structure, and greek-aware inputs</li>
+<li>cross-sectional strategies need aligned panels and rebalance logic</li>
+<li>event-driven strategies need event calendars and timestamp-valid windows</li>
+<li>relative-value strategies need multi-leg diagnostics and hedge-ratio helpers</li>
+</ul>
+<p>Framework readiness must be tracked explicitly.</p>
+<h3>5. Framework blockers are first-class tracked work items</h3>
+<p>A blocker should not be just a string inside an algorithm row.</p>
+<p>It should have:</p>
+<ul>
+<li>a blocker key</li>
+<li>a description</li>
+<li>status</li>
+<li>owner</li>
+<li>affected families</li>
+<li>affected rows</li>
+<li>exit criteria</li>
+<li>unlock conditions</li>
+<li>related framework modules</li>
+<li>target tests</li>
+</ul>
+<p>This makes it possible to manage the program honestly.</p>
+<h3>6. Preserve explainability and normalized outputs</h3>
+<p>Every strategy should expose:</p>
+<ul>
+<li>machine-readable parameter schema</li>
+<li>raw intermediate metrics</li>
+<li>normalized final output</li>
+<li>reporting metadata</li>
+<li>enough diagnostics for the dashboard</li>
+<li>enough child-output structure for composition</li>
+</ul>
+<p>Even when internal math differs, outputs should remain composable.</p>
+<h3>7. Use small, repeatable implementation batches</h3>
+<p>Recommended batch sizes:</p>
+<ul>
+<li><strong>5 to 10 single-series algorithms</strong></li>
+<li><strong>3 to 6 cross-sectional / event-driven / multi-asset algorithms</strong></li>
+<li><strong>1 framework expansion plus 2 to 4 dependent algorithms</strong></li>
+<li><strong>1 composite-method wave that validates the child-output contract</strong></li>
+</ul>
+<h3>8. Distinguish delivery completion from operational readiness</h3>
+<p>An algorithm can be:</p>
+<ul>
+<li>coded</li>
+<li>registered</li>
+<li>tested</li>
+<li>documented</li>
+</ul>
+<p>and still only be <strong>research-ready</strong>, not <strong>production-ready</strong>.</p>
+<p>This is especially true for:</p>
+<ul>
+<li>microstructure</li>
+<li>execution</li>
+<li>options surface</li>
+<li>institutional relative value</li>
+<li>RL controllers</li>
+<li>any strategy with heavy simulation assumptions</li>
+</ul>
+<p>The tracker must model that difference directly.</p>
+<hr />
+<h2>Readiness tiers</h2>
+<h3>Tier 1 — Implementable now with the current OHLCV-centric architecture</h3>
+<p>These are the best early targets because they fit the current repository shape with limited extension.</p>
+<p>Typical families:</p>
+<ul>
+<li>trend following</li>
+<li>single-asset momentum</li>
+<li>single-asset mean reversion</li>
+<li>simple volatility breakout / normalization</li>
+<li>many pattern / price-action algorithms</li>
+<li>basic composite methods that consume normalized child outputs</li>
+</ul>
+<p>Typical characteristics:</p>
+<ul>
+<li>single symbol</li>
+<li>OHLCV input</li>
+<li>bar-by-bar processing</li>
+<li>signal / score / regime output</li>
+<li>modest warmup handling</li>
+</ul>
+<h3>Tier 2 — Implementable after moderate framework expansion</h3>
+<p>These need new infrastructure, but are still realistic without architectural reinvention.</p>
+<p>Typical families:</p>
+<ul>
+<li>cross-sectional momentum and relative strength</li>
+<li>dual momentum and residual momentum</li>
+<li>factor and risk-premia strategies</li>
+<li>rebalance-driven portfolio selection</li>
+<li>event-driven strategies</li>
+<li>rank aggregation and optimization-based combination methods</li>
+<li>some spread / stat-arb families</li>
+</ul>
+<p>Typical new requirements:</p>
+<ul>
+<li>aligned multi-asset panels</li>
+<li>rebalance calendar</li>
+<li>ranking outputs</li>
+<li>portfolio-weight outputs</li>
+<li>event calendar inputs</li>
+<li>multi-leg diagnostics</li>
+</ul>
+<h3>Tier 3 — Requires substantial new framework or data model</h3>
+<p>These should remain visible, but explicitly framework-blocked, until infrastructure exists.</p>
+<p>Typical families:</p>
+<ul>
+<li>options / greeks / volatility-surface strategies</li>
+<li>execution algorithms</li>
+<li>microstructure / HFT / market making</li>
+<li>advanced institutional stat-arb and fixed-income relative value</li>
+<li>RL control layers</li>
+</ul>
+<p>Typical new requirements:</p>
+<ul>
+<li>option chains and surfaces</li>
+<li>order book and own-order state</li>
+<li>execution-plan outputs and fill simulation</li>
+<li>high-frequency timestamp precision</li>
+<li>action-space and reward-model support</li>
+</ul>
+<hr />
+<h2>Two-axis readiness model</h2>
+<p>The tracker should model two separate dimensions.</p>
+<h3>A. Delivery status</h3>
+<p>Use one of these values per row:</p>
+<ul>
+<li><code>not_started</code></li>
+<li><code>blocked_framework</code></li>
+<li><code>ready_to_implement</code></li>
+<li><code>in_progress</code></li>
+<li><code>implemented</code></li>
+<li><code>tested</code></li>
+<li><code>documented</code></li>
+<li><code>complete</code></li>
+</ul>
+<p>Recommended meaning:</p>
+<ul>
+<li><code>implemented</code> = code exists and registers</li>
+<li><code>tested</code> = mapped tests exist and pass</li>
+<li><code>documented</code> = reporting/spec/docs exist</li>
+<li><code>complete</code> = all required deliverables and acceptance checks pass</li>
+</ul>
+<h3>B. Operational readiness</h3>
+<p>Use one of these values per row:</p>
+<ul>
+<li><code>not_applicable</code></li>
+<li><code>prototype_only</code></li>
+<li><code>research_ready</code></li>
+<li><code>production_candidate</code></li>
+<li><code>production_ready</code></li>
+</ul>
+<p>Recommended meaning:</p>
+<table>
+<thead>
+<tr>
+  <th>State</th>
+  <th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>prototype_only</code></td>
+  <td>Code exists mainly to prove concept or wire interfaces.</td>
+</tr>
+<tr>
+  <td><code>research_ready</code></td>
+  <td>Good enough for backtesting, evaluation, and dashboard exploration.</td>
+</tr>
+<tr>
+  <td><code>production_candidate</code></td>
+  <td>Implementation is stable enough for broader validation but still has known operational gaps.</td>
+</tr>
+<tr>
+  <td><code>production_ready</code></td>
+  <td>Inputs, outputs, diagnostics, performance, and safeguards are adequate for production use in the intended environment.</td>
+</tr>
+</tbody>
+</table>
+<p>This axis matters most for advanced families.</p>
+<hr />
+<h2>Canonical blocker model</h2>
+<p>Each framework blocker should be tracked explicitly.</p>
+<h3>Recommended blocker statuses</h3>
+<ul>
+<li><code>planned</code></li>
+<li><code>in_progress</code></li>
+<li><code>done</code></li>
+</ul>
+<h3>Suggested blocker categories</h3>
+<ul>
+<li>input-domain blocker</li>
+<li>output-contract blocker</li>
+<li>data-model blocker</li>
+<li>execution-model blocker</li>
+<li>simulation blocker</li>
+<li>reporting blocker</li>
+<li>performance blocker</li>
+</ul>
+<h3>Example blocker keys</h3>
+<ul>
+<li><code>blocker.multi_asset_panel_v1</code></li>
+<li><code>blocker.rebalance_engine_v1</code></li>
+<li><code>blocker.event_calendar_v1</code></li>
+<li><code>blocker.spread_leg_output_v1</code></li>
+<li><code>blocker.options_chain_v1</code></li>
+<li><code>blocker.greeks_v1</code></li>
+<li><code>blocker.execution_plan_output_v1</code></li>
+<li><code>blocker.order_book_input_v1</code></li>
+<li><code>blocker.fill_simulation_v1</code></li>
+<li><code>blocker.rl_environment_v1</code></li>
+</ul>
+<hr />
+<h2>Machine-readable tracking system</h2>
+<p>The tracking system should be repository-native and automation-first.</p>
+<h3>Tracking artifacts</h3>
+<ol>
+<li><code>manifests/algorithm_library_manifest.yaml</code><ul>
+<li>authoritative row-level manifest</li>
+</ul>
+</li>
+<li><code>manifests/algorithm_framework_blockers.yaml</code><ul>
+<li>blocker registry</li>
+</ul>
+</li>
+<li><code>manifests/algorithm_test_fixtures.yaml</code><ul>
+<li>fixture registry</li>
+</ul>
+</li>
+<li><code>manifests/algorithm_performance_budgets.yaml</code><ul>
+<li>performance budgets</li>
+</ul>
+</li>
+<li><code>docs/algorithm_library_implementation_tracker.md</code><ul>
+<li>generated human-readable dashboard</li>
+</ul>
+</li>
+<li><code>scripts/build_algorithm_library_tracker.py</code><ul>
+<li>renders dashboard from manifest + registry state</li>
+</ul>
+</li>
+<li><code>scripts/build_algorithm_capability_matrix.py</code><ul>
+<li>optional derived capability summary</li>
+</ul>
+</li>
+<li><code>tests/test_algorithm_manifest_consistency.py</code><ul>
+<li>checks manifest integrity</li>
+</ul>
+</li>
+<li><code>tests/test_algorithm_registry_consistency.py</code><ul>
+<li>checks manifest vs registry</li>
+</ul>
+</li>
+<li><code>tests/test_algorithm_fixture_mapping_consistency.py</code></li>
+</ol>
+<ul>
+<li>checks fixture coverage claims</li>
+</ul>
+<h3>Why this structure is recommended</h3>
+<ul>
+<li>YAML is easy to diff and review</li>
+<li>generated markdown is easy for humans to inspect</li>
+<li>blocker registry prevents vague hidden blockers</li>
+<li>fixture registry makes behavior expectations explicit</li>
+<li>performance budgets prevent &quot;works on my machine&quot; drift</li>
+<li>consistency tests prevent the tracker from lying</li>
+</ul>
+<hr />
+<h2>Manifest-first source-of-truth policy</h2>
+<p>The manifest should own these values:</p>
+<ul>
+<li>current source requirements document path</li>
+<li>source requirements document version</li>
+<li>expected totals</li>
+<li>expected family totals</li>
+<li>expected method totals</li>
+<li>catalog-ref namespace</li>
+<li>supported capability taxonomy</li>
+</ul>
+<h3>Top-level manifest metadata</h3>
+<p>Example:</p>
+<pre><code class="language-yaml">manifest_version: 2
+source_catalog:
+  requirements_doc_path: docs/algorithm_library_requirements_v4.md
+  requirements_doc_version: 4
+  combination_doc_path: docs/algorithm_library_requirements_v4.md
+  source_catalog_generated_at: 2026-04-23
+expected_totals:
+  algorithms: 121
+  combination_methods: 12
+expected_family_totals:
+  trend: 14
+  momentum: 11
+  mean_reversion: 12
+  composite: 12
+# ...
+capability_taxonomy_version: 1
+</code></pre>
+<p>Important rule:</p>
+<ul>
+<li>prose files may describe the system</li>
+<li>generated dashboards may summarize the system</li>
+<li>only the manifest metadata is allowed to define authoritative totals</li>
+</ul>
+<hr />
+<h2>Capabilities matrix</h2>
+<p>Every row should declare what type of strategy it is from an engineering perspective.</p>
+<h3>Minimum capability fields per row</h3>
+<ul>
+<li><code>timeframe_support</code></li>
+<li><code>asset_scope</code></li>
+<li><code>position_style</code></li>
+<li><code>data_frequency_needed</code></li>
+<li><code>required_input_domains</code></li>
+<li><code>required_output_modes</code></li>
+<li><code>supports_composition</code></li>
+<li><code>reporting_mode</code></li>
+<li><code>warmup_profile</code></li>
+<li><code>session_awareness</code></li>
+<li><code>event_awareness</code></li>
+<li><code>simulation_needs</code></li>
+</ul>
+<h3>Recommended value examples</h3>
+<table>
+<thead>
+<tr>
+  <th>Field</th>
+  <th>Example values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+  <td><code>timeframe_support</code></td>
+  <td><code>intraday</code>, <code>daily</code>, <code>rebalance_driven</code>, <code>mixed</code></td>
+</tr>
+<tr>
+  <td><code>asset_scope</code></td>
+  <td><code>single_asset</code>, <code>multi_asset</code>, <code>universe</code>, <code>portfolio</code>, <code>pair</code>, <code>basket</code></td>
+</tr>
+<tr>
+  <td><code>position_style</code></td>
+  <td><code>long_only</code>, <code>long_short</code>, <code>paired_legs</code>, <code>allocation</code>, <code>execution_child_orders</code></td>
+</tr>
+<tr>
+  <td><code>data_frequency_needed</code></td>
+  <td><code>bar</code>, <code>intraday_bar</code>, <code>tick</code>, <code>order_book</code>, <code>event_calendar</code>, <code>fundamentals_pti</code>, <code>options_surface</code></td>
+</tr>
+<tr>
+  <td><code>supports_composition</code></td>
+  <td><code>true</code>, <code>false</code>, <code>child_only</code>, <code>score_only</code></td>
+</tr>
+<tr>
+  <td><code>reporting_mode</code></td>
+  <td><code>bar_series</code>, <code>rebalance_report</code>, <code>event_window</code>, <code>multi_leg</code>, <code>execution_trace</code></td>
+</tr>
+</tbody>
+</table>
+<p>This matrix is useful both for planning and for UI/catalog exposure later.</p>
+<hr />
+<h2>Recommended manifest row schema</h2>
+<p>Example algorithm row:</p>
+<pre><code class="language-yaml">- catalog_ref: &quot;algorithm:1&quot;
+  source_doc_ref: &quot;requirements_v4:algorithm:1&quot;
+  kind: algorithm
+  name: &quot;Simple Moving Average Crossover&quot;
+  family: trend
+  subcategory: moving_average
+  tier: tier1
+
+  delivery_status: ready_to_implement
+  operational_readiness: prototype_only
+
+  framework_blockers: []
+  framework_dependencies: []
+  code_dependencies:
+    - indicators.moving_averages
+    - transforms.crossover_detection
+
+  target_module: src/trading_algos/alertgen/algorithms/trend/sma_crossover.py
+  target_catalog: src/trading_algos/alertgen/algorithms/trend/catalog.py
+
+  required_input_domains:
+    - single_asset_ohlcv
+  required_output_modes:
+    - signal
+    - score
+    - diagnostics
+
+  timeframe_support:
+    - daily
+    - intraday
+  asset_scope: single_asset
+  position_style: long_only
+  data_frequency_needed:
+    - bar
+  supports_composition: true
+  reporting_mode: bar_series
+  warmup_profile: rolling_window
+  session_awareness: false
+  event_awareness: false
+  simulation_needs: none
+
+  fixture_ids:
+    - fixture.trend_monotonic_cross_v1
+    - fixture.trend_whipsaw_guard_v1
+
+  performance_budget_id: perf.single_asset_bar_v1
+
+  required_tests:
+    - registry
+    - param_validation
+    - short_history
+    - signal_behavior
+    - fixture_behavior
+    - performance_smoke
+
+  batch: trend_wave_1
+  notes: &quot;Implement with event/state emit mode and min spread filter.&quot;
+</code></pre>
+<p>Example combination-method row:</p>
+<pre><code class="language-yaml">- catalog_ref: &quot;combination:1&quot;
+  source_doc_ref: &quot;requirements_v4:combination:1&quot;
+  kind: combination_method
+  name: &quot;Hard Boolean Gating (AND / OR / Majority)&quot;
+  family: composite
+  tier: tier1
+
+  delivery_status: ready_to_implement
+  operational_readiness: research_ready
+
+  framework_blockers: []
+  framework_dependencies: []
+
+  target_module: src/trading_algos/alertgen/algorithms/composite/boolean_gating.py
+
+  required_input_domains:
+    - aligned_child_outputs
+  required_output_modes:
+    - signal
+    - diagnostics
+
+  timeframe_support:
+    - daily
+    - intraday
+  asset_scope: single_asset
+  position_style: long_only
+  data_frequency_needed:
+    - child_output_stream
+  supports_composition: true
+  reporting_mode: composite_trace
+  warmup_profile: child_dependent
+  session_awareness: child_dependent
+  event_awareness: child_dependent
+  simulation_needs: none
+
+  fixture_ids:
+    - fixture.composite_boolean_truth_table_v1
+
+  performance_budget_id: perf.composite_signal_v1
+
+  required_tests:
+    - alignment
+    - voting_logic
+    - serialization
+    - fixture_behavior
+
+  batch: composite_contract_wave_1
+</code></pre>
+<hr />
+<h2>Blocker registry schema</h2>
+<p>Example:</p>
+<pre><code class="language-yaml">- blocker_key: blocker.multi_asset_panel_v1
+  description: &quot;Repository support for aligned multi-symbol panels with rebalance-date slicing.&quot;
+  category: input-domain blocker
+  status: planned
+  owner: null
+  affected_families:
+    - momentum
+    - factor
+    - cross_asset
+    - portfolio
+  affected_rows:
+    - algorithm:17
+    - algorithm:18
+    - algorithm:19
+  target_modules:
+    - src/trading_algos/data/panel_dataset.py
+    - src/trading_algos/rebalance/calendar.py
+  exit_criteria:
+    - &quot;Panel loader supports aligned universe slices&quot;
+    - &quot;Rebalance-date iteration exists&quot;
+    - &quot;Tests cover missing symbols and unequal history&quot;
+</code></pre>
+<hr />
+<h2>Golden fixtures and expected-behavior snapshots</h2>
+<p>The plan should require <strong>deterministic fixture datasets</strong> and <strong>expected behavior checks</strong>.</p>
+<p>This is the easiest way to make strategy tests meaningful instead of shallow.</p>
+<h3>Why fixtures are needed</h3>
+<p>Without fixtures, many tests collapse to:</p>
+<ul>
+<li>imports work</li>
+<li>registry works</li>
+<li>some output exists</li>
+</ul>
+<p>That is not enough.</p>
+<p>A good fixture test tells you:</p>
+<ul>
+<li>what input shape the strategy expects</li>
+<li>what a known scenario looks like</li>
+<li>which signal transition should happen</li>
+<li>which internal metric should cross or flip</li>
+<li>what output should be emitted</li>
+</ul>
+<h3>Fixture categories to define</h3>
+<ol>
+<li><p><strong>Trend fixtures</strong></p>
+<ul>
+<li>monotonic uptrend</li>
+<li>monotonic downtrend</li>
+<li>single clean crossover</li>
+<li>whipsaw / false-break scenario</li>
+</ul>
+</li>
+<li><p><strong>Mean-reversion fixtures</strong></p>
+<ul>
+<li>one clear overshoot and re-entry</li>
+<li>prolonged trend where reversion should be suppressed</li>
+<li>range-bound oscillation</li>
+</ul>
+</li>
+<li><p><strong>Momentum fixtures</strong></p>
+<ul>
+<li>sustained continuation</li>
+<li>weakening momentum</li>
+<li>cross-sectional ranking with deterministic winners</li>
+</ul>
+</li>
+<li><p><strong>Event-driven fixtures</strong></p>
+<ul>
+<li>event timestamp before market open</li>
+<li>event timestamp after market close</li>
+<li>overlapping events</li>
+</ul>
+</li>
+<li><p><strong>Spread / stat-arb fixtures</strong></p>
+<ul>
+<li>stable pair then temporary divergence</li>
+<li>drifted hedge ratio scenario</li>
+<li>stale-leg alignment failure</li>
+</ul>
+</li>
+<li><p><strong>Execution / advanced fixtures</strong></p>
+<ul>
+<li>partial-fill progression</li>
+<li>volume-curve deviation</li>
+<li>queue and order-state transitions</li>
+</ul>
+</li>
+</ol>
+<h3>Recommended fixture schema</h3>
+<pre><code class="language-yaml">- fixture_id: fixture.trend_monotonic_cross_v1
+  domain: single_asset_ohlcv
+  purpose: &quot;Clean SMA crossover&quot;
+  inputs:
+    dataset_path: tests/fixtures/trend/monotonic_cross.csv
+  expected_behaviors:
+    - &quot;Fast SMA crosses slow SMA exactly once&quot;
+    - &quot;Buy event emitted on first positive crossover&quot;
+    - &quot;No sell event after crossover in the fixture horizon&quot;
+</code></pre>
+<h3>Required rule</h3>
+<p>A row cannot be marked <code>tested</code> unless it has at least one mapped fixture or an explicit justification for why a fixture is not applicable.</p>
+<hr />
+<h2>Performance and scalability budgets</h2>
+<p>Performance should be tracked as a real acceptance criterion.</p>
+<h3>Why this matters</h3>
+<p>A strategy can be logically correct and still be unusable because it is:</p>
+<ul>
+<li>too slow</li>
+<li>too memory-heavy</li>
+<li>too expensive to recompute</li>
+<li>too slow to evaluate across a universe</li>
+<li>too slow to compose in the dashboard</li>
+</ul>
+<h3>Minimum budget types</h3>
+<ol>
+<li><strong>Single-series bar strategies</strong></li>
+<li><strong>Cross-sectional rebalance strategies</strong></li>
+<li><strong>Event-driven strategies</strong></li>
+<li><strong>Multi-leg strategies</strong></li>
+<li><strong>Composite / child-output strategies</strong></li>
+<li><strong>Execution / microstructure strategies</strong></li>
+</ol>
+<h3>Example budget schema</h3>
+<pre><code class="language-yaml">- performance_budget_id: perf.single_asset_bar_v1
+  description: &quot;Single-asset OHLCV strategy budget&quot;
+  acceptance:
+    - &quot;Processes 1 million bars within target runtime on CI reference environment&quot;
+    - &quot;Peak memory remains below configured threshold&quot;
+    - &quot;No per-bar object explosion&quot;
+</code></pre>
+<h3>Required rule</h3>
+<p>A row should not be marked <code>production_ready</code> unless the relevant performance budget passes.</p>
+<p>For advanced rows, performance validation can be the difference between <code>research_ready</code> and <code>production_ready</code>.</p>
+<hr />
+<h2>Automated tracking workflow</h2>
+<p>The tracker should be maintained automatically by combining:</p>
+<ol>
+<li>the manifest</li>
+<li>the blocker registry</li>
+<li>the fixture registry</li>
+<li>the strategy registry discovered from code</li>
+<li>optional test mappings</li>
+<li>optional benchmark/performance results</li>
+</ol>
+<h3>Desired automation behavior</h3>
+<p>The tracker generator should be able to:</p>
+<ol>
+<li>read the manifest metadata</li>
+<li>inspect registered strategy specs and combination specs</li>
+<li>inspect blocker registry</li>
+<li>inspect fixture coverage</li>
+<li>detect which rows are implemented in code</li>
+<li>summarize by family, tier, phase, blocker, capability, and readiness state</li>
+<li>generate a markdown dashboard with:<ul>
+<li>totals</li>
+<li>percentages</li>
+<li>family summaries</li>
+<li>blocker summaries</li>
+<li>next-ready batches</li>
+<li>missing fixtures</li>
+<li>rows stuck in research-only state</li>
+<li>production-ready counts</li>
+<li>capability coverage</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2>Required automated progress views</h2>
+<p>The generated dashboard should include at least these sections.</p>
+<h3>1. Overall progress summary</h3>
+<ul>
+<li>algorithms complete / total</li>
+<li>methods complete / total</li>
+<li>counts by delivery status</li>
+<li>counts by operational readiness</li>
+<li>counts by tier</li>
+</ul>
+<h3>2. Family summary table</h3>
+<p>Columns:</p>
+<ul>
+<li>family</li>
+<li>total rows</li>
+<li>ready to implement</li>
+<li>in progress</li>
+<li>complete</li>
+<li>blocked</li>
+<li>research ready</li>
+<li>production ready</li>
+<li>percent complete</li>
+<li>current active batch</li>
+</ul>
+<h3>3. Framework blockers table</h3>
+<p>Columns:</p>
+<ul>
+<li>blocker key</li>
+<li>description</li>
+<li>status</li>
+<li>affected families</li>
+<li>affected row count</li>
+<li>exit criteria summary</li>
+</ul>
+<h3>4. Capabilities summary</h3>
+<p>Columns:</p>
+<ul>
+<li>capability type</li>
+<li>number of rows requiring it</li>
+<li>rows already supported</li>
+<li>rows currently blocked</li>
+</ul>
+<h3>5. Current batch view</h3>
+<p>Columns:</p>
+<ul>
+<li>batch key</li>
+<li>phase</li>
+<li>rows included</li>
+<li>status</li>
+<li>prerequisites</li>
+<li>remaining tasks</li>
+</ul>
+<h3>6. Fixture coverage view</h3>
+<p>Columns:</p>
+<ul>
+<li>family</li>
+<li>rows with fixture mapping</li>
+<li>rows missing fixtures</li>
+<li>rows with failing expected behavior</li>
+</ul>
+<h3>7. Performance readiness view</h3>
+<p>Columns:</p>
+<ul>
+<li>budget id</li>
+<li>rows using budget</li>
+<li>rows passing</li>
+<li>rows failing</li>
+<li>rows unmeasured</li>
+</ul>
+<h3>8. Drift detection view</h3>
+<p>Examples:</p>
+<ul>
+<li>manifest rows with no registered code</li>
+<li>registered strategies with no manifest row</li>
+<li>rows marked tested but missing fixture mappings</li>
+<li>rows marked production ready but missing performance evidence</li>
+<li>source document version mismatch between tracker and manifest metadata</li>
+</ul>
+<hr />
+<h2>CI checks to add</h2>
+<h3>Manifest and registry integrity</h3>
+<ol>
+<li>every implemented strategy in code has a manifest row</li>
+<li>every manifest row marked <code>implemented</code> is actually registered</li>
+<li>no duplicate <code>catalog_ref</code></li>
+<li>source metadata exists and is internally consistent</li>
+<li>family totals in the generated dashboard match manifest metadata</li>
+</ol>
+<h3>Test and fixture integrity</h3>
+<ol start="6">
+<li>every row marked <code>tested</code> has at least one mapped fixture or explicit waiver</li>
+<li>every row marked <code>tested</code> has mapped test coverage</li>
+<li>fixture ids referenced by rows actually exist</li>
+<li>fixture expected-behavior sections are not empty</li>
+</ol>
+<h3>Readiness integrity</h3>
+<ol start="10">
+<li>no row marked <code>production_ready</code> without performance evidence</li>
+<li>no Tier-3 row silently marked complete while blocker keys remain unresolved</li>
+<li>advanced rows can be <code>complete + research_ready</code> while still not <code>production_ready</code>, but that state must be explicit</li>
+</ol>
+<hr />
+<h2>Definitions of done</h2>
+<h3>Algorithm-level done</h3>
+<p>An individual algorithm is only fully complete when all of the following are true:</p>
+<ol>
+<li>implementation module exists</li>
+<li>family catalog registers it</li>
+<li>spec metadata is complete</li>
+<li>parameter schema exists</li>
+<li>normalized output contract is supported</li>
+<li>intermediate metrics are included for reporting</li>
+<li>at least one golden fixture is mapped and passes</li>
+<li>tests cover registration, validation, short history, and behavior</li>
+<li>manifest row has correct dependency and capability metadata</li>
+<li>performance budget is assigned</li>
+<li>delivery status reaches <code>complete</code></li>
+</ol>
+<h3>Research-ready done</h3>
+<p>A row is <code>research_ready</code> when:</p>
+<ol>
+<li>implementation is complete</li>
+<li>behavior fixtures pass</li>
+<li>output diagnostics are sufficient for backtesting and dashboard inspection</li>
+<li>known framework limitations are documented</li>
+<li>no major correctness blockers remain for the intended research environment</li>
+</ol>
+<h3>Production-ready done</h3>
+<p>A row is <code>production_ready</code> only when:</p>
+<ol>
+<li>all research-ready criteria are true</li>
+<li>input domain is operationally supported in the target environment</li>
+<li>performance budget passes</li>
+<li>reporting is stable enough for monitoring/debugging</li>
+<li>safeguards and failure modes are defined</li>
+<li>no unresolved blocker prevents intended production usage</li>
+</ol>
+<h3>Family-level done</h3>
+<p>A family is complete when:</p>
+<ol>
+<li>all family rows are <code>complete</code> or explicitly <code>blocked_framework</code></li>
+<li>shared primitives are consolidated</li>
+<li>family catalog is coherent</li>
+<li>family fixtures and tests pass</li>
+<li>performance budget coverage exists for the family</li>
+<li>dashboard exposure is verified</li>
+</ol>
+<h3>Phase-level done</h3>
+<p>A phase is complete when:</p>
+<ol>
+<li>all included batches are complete or explicitly blocked</li>
+<li>all phase blocker dependencies are resolved</li>
+<li>generated tracker reports the expected state</li>
+<li>CI checks pass</li>
+<li>fixture and performance summaries are in the expected state</li>
+</ol>
+<hr />
+<h2>Recommended implementation phases</h2>
+<h2>Phase 0 — Tracking, metadata, and automation foundation</h2>
+<h3>Goal</h3>
+<p>Make progress visible, machine-readable, and auditable before large-scale implementation starts.</p>
+<h3>Deliverables</h3>
+<ul>
+<li>manifest format</li>
+<li>blocker registry</li>
+<li>fixture registry</li>
+<li>performance budget registry</li>
+<li>generated markdown tracker</li>
+<li>consistency tests</li>
+<li>batch naming convention</li>
+<li>status model</li>
+<li>operational-readiness model</li>
+<li>capabilities taxonomy</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>every strategy row represented in manifest</li>
+<li>every row assigned family, tier, and blocker state</li>
+<li>every row assigned capability metadata</li>
+<li>tracker can be regenerated automatically</li>
+<li>blocker registry exists and validates</li>
+<li>fixture registry exists, even if initially sparse</li>
+</ul>
+<hr />
+<h2>Phase 1 — Shared primitives and capability baselines for Tier-1 OHLCV work</h2>
+<h3>Goal</h3>
+<p>Build reusable infrastructure that accelerates the earliest families.</p>
+<h3>Shared capabilities</h3>
+<ul>
+<li>moving averages</li>
+<li>crossover detection helpers</li>
+<li>rolling highs/lows and channels</li>
+<li>ATR and realized volatility</li>
+<li>z-score helpers</li>
+<li>ROC and momentum helpers</li>
+<li>RSI, stochastic, CCI, MACD</li>
+<li>Bollinger and Donchian helpers</li>
+<li>basic regression helpers</li>
+<li>session reset helpers where needed</li>
+<li>normalized signal and diagnostics output contract</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>helpers exist and are reused by multiple strategies</li>
+<li>no repeated indicator logic without reason</li>
+<li>normalized child-output contract exists</li>
+<li>fixture harness exists for simple OHLCV strategies</li>
+</ul>
+<hr />
+<h2>Phase 2 — Trend family wave</h2>
+<h3>Goal</h3>
+<p>Deliver the first visible family using the new shared primitives.</p>
+<h3>Suggested batches</h3>
+<h4>Batch <code>trend_wave_1</code></h4>
+<ul>
+<li>Simple Moving Average Crossover</li>
+<li>Exponential Moving Average Crossover</li>
+<li>Triple Moving Average Crossover</li>
+<li>Price vs Moving Average</li>
+<li>Moving Average Ribbon Trend</li>
+</ul>
+<h4>Batch <code>trend_wave_2</code></h4>
+<ul>
+<li>Breakout (Donchian Channel)</li>
+<li>Channel Breakout with Confirmation</li>
+<li>ADX Trend Filter</li>
+<li>Parabolic SAR Trend Following</li>
+<li>SuperTrend</li>
+</ul>
+<h4>Batch <code>trend_wave_3</code></h4>
+<ul>
+<li>Ichimoku Trend Strategy</li>
+<li>MACD Trend Strategy</li>
+<li>Linear Regression Trend</li>
+<li>Time-Series Momentum</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>trend strategies use shared primitives</li>
+<li>trend fixtures exist and pass</li>
+<li>tracker shows trend family progress automatically</li>
+<li>runtime and memory stay within the single-series bar budget</li>
+</ul>
+<hr />
+<h2>Phase 3 — Early composite contract-validation wave</h2>
+<h3>Goal</h3>
+<p>Validate the child-output contract <strong>early</strong>, before too many families are implemented independently.</p>
+<h3>Why this phase moves earlier in Version 2</h3>
+<p>If composite support is left too late, each family may drift into a slightly different output shape.</p>
+<p>A small early composite phase forces the team to standardize:</p>
+<ul>
+<li>signal labels</li>
+<li>score semantics</li>
+<li>alignment assumptions</li>
+<li>diagnostic payload shape</li>
+<li>child contribution reporting</li>
+</ul>
+<h3>Suggested batch</h3>
+<h4>Batch <code>composite_contract_wave_1</code></h4>
+<ul>
+<li>Hard Boolean Gating (AND / OR / Majority)</li>
+<li>Weighted Linear Score Blend</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>child-output schema is stable</li>
+<li>at least one trend strategy can be composed with another</li>
+<li>composite fixtures exist and pass</li>
+<li>generated reports show child contributions clearly</li>
+</ul>
+<hr />
+<h2>Phase 4 — Momentum family wave</h2>
+<h3>Suggested batches</h3>
+<h4>Batch <code>momentum_wave_1</code></h4>
+<ul>
+<li>Rate of Change Momentum</li>
+<li>Accelerating Momentum</li>
+<li>RSI Momentum Continuation</li>
+<li>Stochastic Momentum</li>
+<li>CCI Momentum</li>
+</ul>
+<h4>Batch <code>momentum_wave_2</code></h4>
+<ul>
+<li>KST</li>
+<li>Volume-Confirmed Momentum</li>
+</ul>
+<h4>Batch <code>momentum_wave_3</code></h4>
+<ul>
+<li>Cross-Sectional Momentum</li>
+<li>Relative Strength Momentum</li>
+<li>Dual Momentum</li>
+<li>Residual Momentum</li>
+</ul>
+<h3>Notes</h3>
+<ul>
+<li>the first two batches are early-wave friendly</li>
+<li><code>momentum_wave_3</code> should wait until multi-asset panel and rebalance support exist</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>single-series momentum rows complete</li>
+<li>multi-asset momentum rows either complete or explicitly blocked</li>
+<li>fixture coverage exists for both continuation and false-continuation cases</li>
+</ul>
+<hr />
+<h2>Phase 5 — Mean reversion family wave</h2>
+<h3>Suggested batches</h3>
+<h4>Batch <code>mean_reversion_wave_1</code></h4>
+<ul>
+<li>Z-Score Mean Reversion</li>
+<li>Bollinger Bands Reversion</li>
+<li>RSI Reversion</li>
+<li>Stochastic Reversion</li>
+<li>CCI Reversion</li>
+</ul>
+<h4>Batch <code>mean_reversion_wave_2</code></h4>
+<ul>
+<li>Williams %R Reversion</li>
+<li>Range Reversion</li>
+<li>Volatility-Adjusted Reversion</li>
+<li>Long-Horizon Reversal</li>
+</ul>
+<h4>Batch <code>mean_reversion_wave_3</code></h4>
+<ul>
+<li>Intraday VWAP Reversion</li>
+<li>Opening Gap Fade</li>
+<li>Ornstein-Uhlenbeck Reversion</li>
+</ul>
+<h3>Notes</h3>
+<ul>
+<li>OU reversion should reuse shared statistical-model helpers</li>
+<li>session-aware variants should wait for session-reset support</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>mean-reversion fixtures include both oscillating and trending scenarios</li>
+<li>trend-suppression or filter behavior is tested where relevant</li>
+<li>runtime remains within expected budget</li>
+</ul>
+<hr />
+<h2>Phase 6 — Volatility and pattern families</h2>
+<h3>Volatility batches</h3>
+<h4>Batch <code>volatility_wave_1</code></h4>
+<ul>
+<li>Volatility Breakout</li>
+<li>ATR Channel Breakout</li>
+<li>Volatility Mean Reversion</li>
+</ul>
+<h4>Batch <code>volatility_wave_2</code></h4>
+<ul>
+<li>Straddle Breakout Timing</li>
+</ul>
+<h3>Pattern / price-action batches</h3>
+<h4>Batch <code>pattern_wave_1</code></h4>
+<ul>
+<li>Support and Resistance Bounce</li>
+<li>Breakout Retest</li>
+<li>Pivot Point Strategy</li>
+<li>Opening Range Breakout</li>
+<li>Inside Bar Breakout</li>
+</ul>
+<h4>Batch <code>pattern_wave_2</code></h4>
+<ul>
+<li>Gap-and-Go</li>
+<li>Trendline Break Strategy</li>
+<li>Volatility Squeeze Breakout</li>
+</ul>
+<h3>Notes</h3>
+<ul>
+<li>pattern definitions must be deterministic and fixture-backed</li>
+<li>options-heavy volatility rows should remain blocked until option support exists</li>
+</ul>
+<hr />
+<h2>Phase 7 — Cross-sectional, factor, macro, and portfolio families</h2>
+<h3>Required blockers to resolve before start</h3>
+<ul>
+<li><code>blocker.multi_asset_panel_v1</code></li>
+<li><code>blocker.rebalance_engine_v1</code></li>
+<li><code>blocker.portfolio_weight_output_v1</code></li>
+</ul>
+<h3>Suggested batches</h3>
+<h4>Batch <code>cross_asset_wave_1</code></h4>
+<ul>
+<li>Carry Trade</li>
+<li>Risk-On / Risk-Off Regime</li>
+<li>Intermarket Confirmation</li>
+<li>Seasonality / Calendar Effects</li>
+<li>Earnings Drift / Post-Event Momentum</li>
+</ul>
+<h4>Batch <code>factor_wave_1</code></h4>
+<ul>
+<li>Low Volatility Strategy</li>
+<li>Low Beta / Betting-Against-Beta</li>
+<li>Dividend Yield Strategy</li>
+<li>Growth Factor Strategy</li>
+<li>Liquidity Factor Strategy</li>
+</ul>
+<h4>Batch <code>factor_wave_2</code></h4>
+<ul>
+<li>Value Strategy</li>
+<li>Quality Strategy</li>
+<li>Profitability Factor Strategy</li>
+<li>Earnings Quality Strategy</li>
+<li>Low Leverage / Balance-Sheet Strength</li>
+</ul>
+<h4>Batch <code>factor_wave_3</code></h4>
+<ul>
+<li>Multi-Factor Composite</li>
+<li>Defensive Equity Strategy</li>
+<li>Residual Volatility Strategy</li>
+<li>Investment Quality Strategy</li>
+<li>Earnings Stability / Low Earnings Variability</li>
+</ul>
+<h4>Batch <code>portfolio_wave_1</code></h4>
+<ul>
+<li>Minimum Variance Strategy</li>
+<li>Size / Small-Cap Strategy</li>
+<li>Mid-Cap Tilt Strategy</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>rebalance-driven outputs work correctly</li>
+<li>ranking and weight outputs are normalized and reportable</li>
+<li>cross-sectional fixture sets exist</li>
+<li>portfolio and factor families meet their budget class</li>
+</ul>
+<hr />
+<h2>Phase 8 — Advanced composite and portfolio-combination methods</h2>
+<h3>Required blockers to resolve before start</h3>
+<ul>
+<li><code>blocker.multi_asset_panel_v1</code></li>
+<li><code>blocker.portfolio_weight_output_v1</code></li>
+<li><code>blocker.regime_state_support_v1</code> if applicable</li>
+</ul>
+<h3>Suggested batches</h3>
+<h4>Batch <code>composite_wave_2</code></h4>
+<ul>
+<li>Rank Aggregation</li>
+<li>Risk Budgeting / Risk Parity</li>
+<li>Volatility Targeting Overlay</li>
+</ul>
+<h4>Batch <code>composite_wave_3</code></h4>
+<ul>
+<li>Regime Switching / HMM Gating</li>
+<li>Constrained Multi-Factor Optimization</li>
+</ul>
+<h4>Batch <code>composite_wave_4</code></h4>
+<ul>
+<li>Bagging Ensemble</li>
+<li>Boosting Ensemble</li>
+<li>Stacking / Meta-Learning</li>
+</ul>
+<h4>Batch <code>composite_wave_5</code></h4>
+<ul>
+<li>RL Allocation Controller</li>
+<li>Hierarchical Controller / Meta-Policy</li>
+</ul>
+<h3>Notes</h3>
+<ul>
+<li>RL rows may still remain <code>blocked_framework</code> until environment support exists</li>
+<li>optimizer-based methods should be tested with deterministic toy fixtures as well as realistic datasets</li>
+</ul>
+<hr />
+<h2>Phase 9 — Event-driven families</h2>
+<h3>Required blockers to resolve before start</h3>
+<ul>
+<li><code>blocker.event_calendar_v1</code></li>
+<li><code>blocker.event_window_execution_v1</code></li>
+<li><code>blocker.event_reporting_v1</code></li>
+</ul>
+<h3>Suggested batch <code>event_wave_1</code></h3>
+<ul>
+<li>Post-Earnings Announcement Drift (PEAD)</li>
+<li>Pre-Earnings Announcement Drift</li>
+<li>Earnings Announcement Premium</li>
+<li>Index Rebalancing Effect Strategy</li>
+<li>ETF Rebalancing Anticipation / Front-Run Strategy</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>event timestamps are handled correctly</li>
+<li>before-open and after-close cases are covered by fixtures</li>
+<li>event metadata appears in reports</li>
+<li>no lookahead leakage in event-window logic</li>
+</ul>
+<hr />
+<h2>Phase 10 — Spread and relative-value families</h2>
+<h3>Required blockers to resolve before start</h3>
+<ul>
+<li><code>blocker.spread_leg_output_v1</code></li>
+<li><code>blocker.hedge_ratio_helpers_v1</code></li>
+<li><code>blocker.multi_leg_reporting_v1</code></li>
+</ul>
+<h3>Suggested batch <code>stat_arb_wave_1</code></h3>
+<ul>
+<li>Pairs Trading (Distance Method)</li>
+<li>Pairs Trading (Cointegration)</li>
+<li>Basket Statistical Arbitrage</li>
+<li>Funding / Basis Arbitrage</li>
+</ul>
+<h3>Suggested batch <code>relative_value_wave_2</code></h3>
+<ul>
+<li>Yield Curve Steepener / Flattener</li>
+<li>Curve Roll-Down Strategy</li>
+<li>Commodity Term Structure / Roll Yield</li>
+<li>Fixed-Income Arbitrage</li>
+<li>Swap Spread Arbitrage</li>
+</ul>
+<h3>Exit criteria</h3>
+<ul>
+<li>paired or multi-leg instructions are normalized</li>
+<li>hedge-ratio diagnostics are visible</li>
+<li>spread fixtures exist and pass</li>
+<li>multi-leg reporting contract is stable</li>
+</ul>
+<hr />
+<h2>Phase 11 — Advanced and framework-heavy families</h2>
+<p>These rows should remain explicit in the tracker and should <strong>not</strong> be hidden or prematurely claimed as done.</p>
+<h3>Families</h3>
+<ul>
+<li>options / volatility-surface</li>
+<li>execution algorithms</li>
+<li>microstructure / HFT / market making</li>
+<li>advanced institutional relative-value engines</li>
+<li>RL production controllers</li>
+</ul>
+<h3>Required blockers typically include</h3>
+<ul>
+<li><code>blocker.options_chain_v1</code></li>
+<li><code>blocker.greeks_v1</code></li>
+<li><code>blocker.execution_plan_output_v1</code></li>
+<li><code>blocker.fill_simulation_v1</code></li>
+<li><code>blocker.order_book_input_v1</code></li>
+<li><code>blocker.own_order_state_v1</code></li>
+<li><code>blocker.rl_environment_v1</code></li>
+</ul>
+<h3>Policy</h3>
+<p>These rows may become:</p>
+<ul>
+<li><code>implemented + research_ready</code></li>
+<li>or remain <code>blocked_framework</code></li>
+</ul>
+<p>But they must not be presented as fully production-ready unless the operational requirements are actually met.</p>
+<hr />
+<h2>Implementation batch template</h2>
+<p>Every batch should be described using the same structure.</p>
+<h3>Batch definition fields</h3>
+<ul>
+<li>batch key</li>
+<li>phase</li>
+<li>family</li>
+<li>rows included</li>
+<li>shared primitives required</li>
+<li>framework blockers required</li>
+<li>target modules</li>
+<li>fixture ids required</li>
+<li>performance budget ids</li>
+<li>tests to add</li>
+<li>completion criteria</li>
+<li>readiness target (<code>research_ready</code> or <code>production_candidate</code>)</li>
+</ul>
+<h3>Example</h3>
+<pre><code class="language-yaml">batch: trend_wave_1
+phase: phase_2_trend
+family: trend
+rows:
+  - algorithm:1
+  - algorithm:2
+  - algorithm:3
+  - algorithm:4
+  - algorithm:5
+shared_primitives:
+  - indicators.moving_averages
+  - transforms.crossover_detection
+  - statistics.spread_thresholds
+framework_blockers: []
+fixture_ids:
+  - fixture.trend_monotonic_cross_v1
+  - fixture.trend_whipsaw_guard_v1
+performance_budget_ids:
+  - perf.single_asset_bar_v1
+completion_criteria:
+  - all rows registered
+  - behavior fixtures pass
+  - docs/report payload present
+  - tracker regenerated
+  - performance smoke passes
+readiness_target: research_ready
+</code></pre>
+<hr />
+<h2>Required engineering workflow per batch</h2>
+<p>For each implementation batch, use this sequence:</p>
+<ol>
+<li>confirm target batch from manifest</li>
+<li>confirm unresolved blockers</li>
+<li>confirm required shared primitives</li>
+<li>confirm fixture ids and performance budget ids</li>
+<li>implement shared helpers first</li>
+<li>implement algorithms or methods</li>
+<li>register specs in family or composite catalog</li>
+<li>add tests and fixture checks</li>
+<li>regenerate tracker</li>
+<li>run CI checks</li>
+<li>promote statuses only when criteria are actually met</li>
+</ol>
+<h3>Recommended delivery-status promotion path</h3>
+<ul>
+<li><code>not_started</code> -&gt; <code>in_progress</code></li>
+<li><code>in_progress</code> -&gt; <code>implemented</code></li>
+<li><code>implemented</code> -&gt; <code>tested</code></li>
+<li><code>tested</code> -&gt; <code>documented</code></li>
+<li><code>documented</code> -&gt; <code>complete</code></li>
+</ul>
+<h3>Recommended operational-readiness promotion path</h3>
+<ul>
+<li><code>prototype_only</code> -&gt; <code>research_ready</code></li>
+<li><code>research_ready</code> -&gt; <code>production_candidate</code></li>
+<li><code>production_candidate</code> -&gt; <code>production_ready</code></li>
+</ul>
+<p>These two paths should not be conflated.</p>
+<hr />
+<h2>Minimal automation roadmap</h2>
+<h3>Step A — Create the manifest</h3>
+<p>Create a machine-readable manifest covering all rows in the current algorithm catalog and all combination-method rows.</p>
+<h3>Step B — Create the blocker registry</h3>
+<p>Create an explicit blocker registry and attach blocker keys to affected rows.</p>
+<h3>Step C — Create the fixture registry</h3>
+<p>Add at least one deterministic fixture for the earliest Tier-1 families and wire the schema into CI.</p>
+<h3>Step D — Create the tracker generator</h3>
+<p>Generate a markdown progress report from:</p>
+<ul>
+<li>manifest</li>
+<li>blocker registry</li>
+<li>fixture registry</li>
+<li>registry state</li>
+<li>optional performance results</li>
+</ul>
+<h3>Step E — Add consistency tests</h3>
+<p>Add tests that fail when:</p>
+<ul>
+<li>tracker metadata drifts from manifest</li>
+<li>manifest claims do not match registry state</li>
+<li>fixture ids are missing</li>
+<li>rows are marked production-ready without required evidence</li>
+</ul>
+<h3>Step F — Start implementation from the first practical batch</h3>
+<p>Begin with:</p>
+<ul>
+<li><code>trend_wave_1</code></li>
+<li><code>composite_contract_wave_1</code></li>
+<li><code>momentum_wave_1</code></li>
+<li><code>mean_reversion_wave_1</code></li>
+</ul>
+<p>This validates the foundation early and keeps the output contract honest.</p>
+<hr />
+<h2>Recommended first practical ACT-mode sequence</h2>
+<p>If implementation starts immediately after this plan, the best early order is:</p>
+<ol>
+<li>create manifest metadata and row inventory</li>
+<li>create blocker registry</li>
+<li>create fixture registry</li>
+<li>create tracker generation script</li>
+<li>add consistency tests</li>
+<li>add shared indicator/transforms packages</li>
+<li>implement <code>trend_wave_1</code></li>
+<li>implement <code>composite_contract_wave_1</code></li>
+<li>implement <code>momentum_wave_1</code></li>
+<li>implement <code>mean_reversion_wave_1</code></li>
+<li>regenerate tracker after each batch</li>
+<li>only promote rows to <code>research_ready</code> or higher once fixture and reporting criteria pass</li>
+</ol>
+<p>This gives quick visible progress while also validating the architecture.</p>
+<hr />
+<h2>Explicit non-goals for early waves</h2>
+<p>Early waves should <strong>not</strong> pretend to provide full-library readiness.</p>
+<p>They should not claim full support for:</p>
+<ul>
+<li>order-book-driven strategies</li>
+<li>options-surface-driven strategies</li>
+<li>execution plans with realistic fill simulation</li>
+<li>advanced institutional relative-value engines</li>
+<li>RL production controllers</li>
+</ul>
+<p>Those should remain visible as planned or blocked until the required framework exists.</p>
+<hr />
+<h2>Summary</h2>
+<p>The systematic way to implement the full library is:</p>
+<ol>
+<li>make the manifest the single source of truth</li>
+<li>classify all rows by tier, capability, and blocker state</li>
+<li>track blockers as first-class work items</li>
+<li>generate the tracker automatically</li>
+<li>validate strategy behavior with golden fixtures</li>
+<li>add performance budgets as real acceptance criteria</li>
+<li>implement family-by-family in small batches</li>
+<li>move a small composite wave earlier to validate the signal contract</li>
+<li>separate <code>complete</code> from <code>research_ready</code> and <code>production_ready</code></li>
+<li>let CI verify that tracker, manifest, fixtures, tests, and code stay aligned</li>
+</ol>
+<p>This turns a very large algorithm-library objective into a controlled delivery program with visible progress, low ambiguity, honest blockers, and much less tracker drift.</p>
+
+  </div>
+</body>
+</html>
