@@ -1258,6 +1258,35 @@ def test_experiment_detail_renders_standardized_report_sections(monkeypatch):
     assert b"Diagnostics" in response.data
 
 
+def test_experiment_detail_links_to_evaluations(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+    app.extensions["experiment_repository"].create_experiment(
+        {
+            "experiment_id": "exp_linked",
+            "created_at": datetime(2024, 2, 3, 12, 0, tzinfo=timezone.utc),
+            "status": "completed",
+            "symbol": "AAPL",
+            "time_range": {
+                "start": "2024-02-01 09:30:00",
+                "end": "2024-02-03 16:00:00",
+            },
+            "selected_algorithms": [],
+            "candle_count": 10,
+        }
+    )
+
+    response = app.test_client().get("/experiments/exp_linked")
+
+    assert response.status_code == 200
+    assert b"Find comparable runs" in response.data
+    assert b"/evaluations/cohort?symbol=AAPL" in response.data
+
+
 def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()

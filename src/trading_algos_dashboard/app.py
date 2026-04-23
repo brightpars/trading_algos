@@ -9,6 +9,7 @@ from trading_algos_dashboard.blueprints.algorithms import bp as algorithms_bp
 from trading_algos_dashboard.blueprints.administration import bp as administration_bp
 from trading_algos_dashboard.blueprints.configurations import bp as configurations_bp
 from trading_algos_dashboard.blueprints.api import bp as api_bp
+from trading_algos_dashboard.blueprints.evaluations import bp as evaluations_bp
 from trading_algos_dashboard.blueprints.experiments import bp as experiments_bp
 from trading_algos_dashboard.blueprints.home import bp as home_bp
 from trading_algos_dashboard.blueprints.reports import bp as reports_bp
@@ -73,6 +74,7 @@ from trading_algos_dashboard.services.experiment_service import ExperimentServic
 from trading_algos_dashboard.services.bulk_experiment_service import (
     BulkExperimentService,
 )
+from trading_algos_dashboard.services.evaluation_service import EvaluationService
 from trading_algos_dashboard.services.experiment_runtime_settings_service import (
     ExperimentRuntimeSettingsService,
 )
@@ -195,6 +197,10 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     )
     administration_service.rebuild_algorithm_catalog_links()
     report_service = ReportService(result_repository=result_repository)
+    evaluation_service = EvaluationService(
+        experiment_repository=experiment_repository,
+        result_repository=result_repository,
+    )
     configuration_builder_service = ConfigurationBuilderService(
         draft_repository=configuration_draft_repository,
         revision_repository=configuration_revision_repository,
@@ -250,6 +256,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         algorithm_catalog_import_service
     )
     app.extensions["report_service"] = report_service
+    app.extensions["evaluation_service"] = evaluation_service
     app.extensions["configuration_builder_service"] = configuration_builder_service
     app.extensions["configuration_publish_service"] = configuration_publish_service
 
@@ -258,6 +265,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.register_blueprint(administration_bp)
     app.register_blueprint(configurations_bp)
     app.register_blueprint(experiments_bp)
+    app.register_blueprint(evaluations_bp)
     app.register_blueprint(reports_bp)
     app.register_blueprint(api_bp)
     return app

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Evaluation Cohort · Trading Algos Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+  <div>
+    <h1 class="mb-1">Evaluation cohort</h1>
+    <p class="text-muted mb-0">{{ cohort.symbol }} · {{ filters.start_date }} {{ filters.start_time }} → {{ filters.end_date }} {{ filters.end_time }}</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('evaluations.index') }}">New evaluation</a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="builder-summary-label">Completed runs</div><div>{{ cohort.completed_run_count }}</div></div></div>
+  <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="builder-summary-label">Results</div><div>{{ cohort.result_count }}</div></div></div>
+  <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="builder-summary-label">Candle counts</div><div>{{ cohort.candle_counts|join(', ') if cohort.candle_counts else '—' }}</div></div></div>
+  <div class="col-md-3"><div class="border rounded p-3 h-100"><div class="builder-summary-label">Data endpoints</div><div>{{ cohort.dataset_endpoints|join(', ') if cohort.dataset_endpoints else '—' }}</div></div></div>
+</div>
+
+{% if warnings %}
+<div class="mb-4">
+  {% for warning in warnings %}
+  <div class="alert alert-{{ warning.level }}" role="alert">{{ warning.message }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if rows %}
+<div class="table-responsive">
+  <table class="table table-bordered table-striped align-middle">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Algorithm</th>
+        <th>Family</th>
+        <th>Parameters</th>
+        <th>Experiment</th>
+        <th>Cumulative return</th>
+        <th>Max drawdown</th>
+        <th>Win rate</th>
+        <th>Signals</th>
+        <th>Trades</th>
+        <th>Sharpe</th>
+        <th>Runtime</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td>{{ row.rank }}</td>
+        <td>{{ row.algorithm_name }}</td>
+        <td>{{ row.family or '—' }}</td>
+        <td><code>{{ row.parameters }}</code></td>
+        <td><code>{{ row.experiment_id }}</code></td>
+        <td>{{ row.metrics.cumulative_return if row.metrics.cumulative_return is not none else '—' }}</td>
+        <td>{{ row.metrics.max_drawdown if row.metrics.max_drawdown is not none else '—' }}</td>
+        <td>{{ row.metrics.win_rate if row.metrics.win_rate is not none else '—' }}</td>
+        <td>{{ row.signal_count if row.signal_count is not none else '—' }}</td>
+        <td>{{ row.trade_count if row.trade_count is not none else '—' }}</td>
+        <td>{{ row.metrics.sharpe_ratio if row.metrics.sharpe_ratio is not none else '—' }}</td>
+        <td>{% if row.duration_seconds is not none %}{{ '%.2f'|format(row.duration_seconds) }}s{% else %}—{% endif %}</td>
+        <td><a class="btn btn-sm btn-outline-primary" href="{{ row.detail_url }}">View experiment</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-info" role="alert">
+  No completed comparable runs were found for this symbol and exact time range.
+</div>
+{% endif %}
+{% endblock %}

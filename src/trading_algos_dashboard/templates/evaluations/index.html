@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Evaluations · Trading Algos Dashboard{% endblock %}
+{% block content %}
+<h1>Evaluations</h1>
+<p class="text-muted">Compare algorithms fairly by using the same symbol and exact time range.</p>
+
+<div class="card">
+  <div class="card-body">
+    <form method="get" action="{{ url_for('evaluations.cohort') }}" class="row g-3">
+      <div class="col-md-3">
+        <label class="form-label" for="symbol">Symbol</label>
+        <input class="form-control" id="symbol" name="symbol" value="{{ form_data.symbol }}" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="start_date">Start date</label>
+        <input class="form-control" id="start_date" name="start_date" type="date" value="{{ form_data.start_date }}" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="start_time">Start time</label>
+        <input class="form-control" id="start_time" name="start_time" type="time" value="{{ form_data.start_time }}" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="end_date">End date</label>
+        <input class="form-control" id="end_date" name="end_date" type="date" value="{{ form_data.end_date }}" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label" for="end_time">End time</label>
+        <input class="form-control" id="end_time" name="end_time" type="time" value="{{ form_data.end_time }}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" for="primary_metric">Rank by</label>
+        <select class="form-select" id="primary_metric" name="primary_metric">
+          <option value="cumulative_return" {% if form_data.primary_metric == 'cumulative_return' %}selected{% endif %}>Cumulative return</option>
+          <option value="win_rate" {% if form_data.primary_metric == 'win_rate' %}selected{% endif %}>Win rate</option>
+          <option value="max_drawdown" {% if form_data.primary_metric == 'max_drawdown' %}selected{% endif %}>Max drawdown</option>
+          <option value="sharpe_ratio" {% if form_data.primary_metric == 'sharpe_ratio' %}selected{% endif %}>Sharpe ratio</option>
+        </select>
+      </div>
+      <div class="col-12">
+        <button class="btn btn-primary" type="submit">Find comparable runs</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

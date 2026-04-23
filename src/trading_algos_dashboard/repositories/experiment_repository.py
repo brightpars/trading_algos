@@ -130,6 +130,31 @@ class ExperimentRepository(MongoRepository):
         experiments = self._list_documents(filters)
         return sorted(experiments, key=self._created_at_sort_key, reverse=True)
 
+    def list_completed_experiments_for_scope(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+        status: str = "completed",
+    ) -> list[dict[str, Any]]:
+        experiments = self.list_experiments({"symbol": symbol, "status": status})
+        normalized_start = self._normalize_datetime(start)
+        normalized_end = self._normalize_datetime(end)
+        matching: list[dict[str, Any]] = []
+        for experiment in experiments:
+            time_range = experiment.get("time_range")
+            if not isinstance(time_range, Mapping):
+                continue
+            experiment_start = self._normalize_datetime(time_range.get("start"))
+            experiment_end = self._normalize_datetime(time_range.get("end"))
+            if (
+                experiment_start == normalized_start
+                and experiment_end == normalized_end
+            ):
+                matching.append(experiment)
+        return matching
+
     def count_experiments(self) -> int:
         return self._count_documents()
 

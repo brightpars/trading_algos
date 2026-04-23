@@ -217,3 +217,48 @@ def test_experiment_repository_claims_next_queued_experiment_in_fifo_order():
     assert claimed is not None
     assert claimed["experiment_id"] == "exp_a"
     assert claimed["status"] == "running"
+
+
+def test_experiment_repository_lists_completed_experiments_for_exact_scope():
+    collection = _Collection()
+    repo = ExperimentRepository({"dashboard_experiments": collection})
+    start = datetime(2024, 2, 1, 9, 30, tzinfo=timezone.utc)
+    end = datetime(2024, 2, 3, 16, 0, tzinfo=timezone.utc)
+    repo.create_experiment(
+        {
+            "experiment_id": "exp_match",
+            "status": "completed",
+            "symbol": "AAPL",
+            "time_range": {"start": start, "end": end},
+            "created_at": start,
+        }
+    )
+    repo.create_experiment(
+        {
+            "experiment_id": "exp_wrong_status",
+            "status": "running",
+            "symbol": "AAPL",
+            "time_range": {"start": start, "end": end},
+            "created_at": start,
+        }
+    )
+    repo.create_experiment(
+        {
+            "experiment_id": "exp_wrong_range",
+            "status": "completed",
+            "symbol": "AAPL",
+            "time_range": {
+                "start": start,
+                "end": datetime(2024, 2, 4, 16, 0, tzinfo=timezone.utc),
+            },
+            "created_at": start,
+        }
+    )
+
+    matches = repo.list_completed_experiments_for_scope(
+        symbol="AAPL",
+        start=start,
+        end=end,
+    )
+
+    assert [item["experiment_id"] for item in matches] == ["exp_match"]

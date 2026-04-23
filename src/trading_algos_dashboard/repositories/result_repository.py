@@ -29,6 +29,19 @@ class ResultRepository(MongoRepository):
             )
         )
 
+    def list_results_for_experiments(
+        self, experiment_ids: list[str]
+    ) -> list[dict[str, Any]]:
+        if not experiment_ids:
+            return []
+        experiment_id_set = {str(experiment_id) for experiment_id in experiment_ids}
+        return [
+            self._without_id(doc) or {}
+            for doc in self.collection.find({})
+            if isinstance(doc, dict)
+            and str(doc.get("experiment_id", "")) in experiment_id_set
+        ]
+
     def count_results(self) -> int:
         return self._count_documents()
 
