@@ -175,6 +175,145 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b"executed up to the configured concurrency limit" in response.data
 
 
+def test_bulk_experiment_page_renders(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+
+    response = app.test_client().get("/experiments/bulk")
+
+    assert response.status_code == 200
+    assert b"Bulk runs" in response.data
+    assert b"Run all runnable algorithms for one symbol" in response.data
+    assert b"Run one algorithm for many symbols" in response.data
+    assert b"Queue all runnable algorithms" in response.data
+    assert b"Queue one experiment per symbol" in response.data
+
+
+def test_bulk_experiment_creates_one_queued_experiment_per_runnable_algorithm(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+            "/tmp/smarttrade",
+            1,
+        )
+    )
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
+
+    response = app.test_client().post(
+        "/experiments/bulk",
+        data={
+            "bulk_mode": "all_algorithms_for_symbol",
+            "symbol": "AAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-31",
+            "end_time": "16:00",
+            "notes": "bulk all algos",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/experiments")
+    experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(experiments) >= 1
+    assert all(experiment["symbol"] == "AAPL" for experiment in experiments)
+    assert all(experiment["status"] == "queued" for experiment in experiments)
+    assert all(
+        len(experiment["selected_algorithms"]) == 1 for experiment in experiments
+    )
+
+
+def test_bulk_experiment_creates_one_queued_experiment_per_symbol(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+            "/tmp/smarttrade",
+            1,
+        )
+    )
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
+
+    response = app.test_client().post(
+        "/experiments/bulk",
+        data={
+            "bulk_mode": "single_algorithm_for_symbols",
+            "alg_key": "boundary_breakout",
+            "symbols_text": "AAPL\nMSFT\nAAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-31",
+            "end_time": "16:00",
+            "notes": "bulk many symbols",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/experiments")
+    experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(experiments) == 2
+    assert sorted(experiment["symbol"] for experiment in experiments) == [
+        "AAPL",
+        "MSFT",
+    ]
+    assert all(
+        experiment["selected_algorithms"][0]["alg_key"] == "boundary_breakout"
+        for experiment in experiments
+    )
+
+
+def test_bulk_experiment_returns_400_and_preserves_form_state_for_invalid_symbols(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
+    )
+
+    response = app.test_client().post(
+        "/experiments/bulk",
+        data={
+            "bulk_mode": "single_algorithm_for_symbols",
+            "alg_key": "boundary_breakout",
+            "symbols_text": " , \n  ",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-31",
+            "end_time": "16:00",
+            "notes": "bad bulk",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 400
+    assert b"At least one symbol is required." in response.data
+    assert b"bad bulk" in response.data
+    assert b"boundary_breakout" in response.data
+
+
 def test_create_experiment_does_not_update_runtime_concurrency_setting(
     monkeypatch, tmp_path
 ):

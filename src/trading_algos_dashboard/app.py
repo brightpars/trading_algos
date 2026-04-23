@@ -70,6 +70,9 @@ from trading_algos_dashboard.services.configuration_publish_service import (
     ConfigurationPublishService,
 )
 from trading_algos_dashboard.services.experiment_service import ExperimentService
+from trading_algos_dashboard.services.bulk_experiment_service import (
+    BulkExperimentService,
+)
 from trading_algos_dashboard.services.experiment_runtime_settings_service import (
     ExperimentRuntimeSettingsService,
 )
@@ -175,6 +178,10 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     algorithm_catalog_service = AlgorithmCatalogService(
         catalog_repository=algorithm_catalog_repository,
     )
+    bulk_experiment_service = BulkExperimentService(
+        experiment_service=experiment_service,
+        algorithm_catalog_service=algorithm_catalog_service,
+    )
     administration_service = AdministrationService(
         experiment_repository=experiment_repository,
         result_repository=result_repository,
@@ -236,6 +243,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     )
     app.extensions["data_source_service"] = data_source_service
     app.extensions["experiment_service"] = experiment_service
+    app.extensions["bulk_experiment_service"] = bulk_experiment_service
     app.extensions["administration_service"] = administration_service
     app.extensions["algorithm_catalog_service"] = algorithm_catalog_service
     app.extensions["algorithm_catalog_import_service"] = (

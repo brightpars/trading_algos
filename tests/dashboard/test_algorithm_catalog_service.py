@@ -190,6 +190,26 @@ def test_catalog_service_filters_entries_for_public_queries():
     assert len(items) == 1
 
 
+def test_catalog_service_lists_only_runnable_algorithm_implementations():
+    service = _build_service()
+
+    items = service.list_runnable_algorithm_implementations()
+
+    assert items
+    assert all(item["status"] in {"stable", "runnable"} for item in items)
+
+
+def test_catalog_service_rejects_non_runnable_algorithm_lookup():
+    service = _build_service()
+
+    try:
+        service.get_runnable_algorithm_implementation("nonexistent_algorithm")
+    except ValueError as exc:
+        assert "unsupported" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for unknown runnable algorithm")
+
+
 def test_catalog_service_filters_entries_for_admin_queries():
     service = _build_service()
     payload = service.list_admin_catalog_entries(

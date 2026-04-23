@@ -29,6 +29,7 @@ from trading_algos_dashboard.services.data_source_service import (
 bp = Blueprint("experiments", __name__, url_prefix="/experiments")
 
 _EXPERIMENT_FORM_COOKIE = "trading_algos_dashboard_experiment_form"
+_BULK_EXPERIMENT_FORM_COOKIE = "trading_algos_dashboard_bulk_experiment_form"
 
 
 def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str]:
@@ -325,6 +326,48 @@ def _render_new_experiment(
     )
 
 
+def _bulk_experiment_form_defaults() -> dict[str, str]:
+    return {
+        "bulk_mode": "all_algorithms_for_symbol",
+        "symbol": "",
+        "symbols_text": "",
+        "alg_key": "",
+        "start_date": "",
+        "start_time": "09:30",
+        "end_date": "",
+        "end_time": "16:00",
+        "notes": "",
+    }
+
+
+def _render_bulk_experiment(
+    *,
+    status_code: int = 200,
+    form_data: dict[str, str] | None = None,
+) -> Response:
+    runtime_settings = current_app.extensions[
+        "experiment_runtime_settings_service"
+    ].get_effective_settings()
+    algorithm_catalog_service = current_app.extensions["algorithm_catalog_service"]
+    effective_form_data = _bulk_experiment_form_defaults()
+    effective_form_data.update(
+        load_form_state(request.cookies.get(_BULK_EXPERIMENT_FORM_COOKIE))
+    )
+    if form_data is not None:
+        effective_form_data.update(form_data)
+    return Response(
+        render_template(
+            "experiments/bulk.html",
+            form_data=effective_form_data,
+            runnable_algorithms=(
+                algorithm_catalog_service.list_runnable_algorithm_implementations()
+            ),
+            max_concurrent_experiments=runtime_settings["max_concurrent_experiments"],
+        ),
+        status=status_code,
+    )
+
+
 @bp.get("")
 def history():
     service = current_app.extensions["experiment_service"]
@@ -358,6 +401,11 @@ def history():
 @bp.get("/new")
 def new_experiment():
     return _render_new_experiment()
+
+
+@bp.get("/bulk")
+def bulk_experiment():
+    return _render_bulk_experiment()
 
 
 @bp.post("/<experiment_id>/cancel")
@@ -476,6 +524,64 @@ def create_experiment():
         return response
     response = redirect(url_for("experiments.detail", experiment_id=experiment_id))
     clear_form_state(response, cookie_name=_EXPERIMENT_FORM_COOKIE)
+    return response
+
+
+@bp.post("/bulk")
+def create_bulk_experiment():
+    submitted_form_data = {
+        "bulk_mode": request.form.get("bulk_mode", "all_algorithms_for_symbol"),
+        "symbol": request.form.get("symbol", ""),
+        "symbols_text": request.form.get("symbols_text", ""),
+        "alg_key": request.form.get("alg_key", ""),
+        "start_date": request.form.get("start_date", ""),
+        "start_time": request.form.get("start_time", ""),
+        "end_date": request.form.get("end_date", ""),
+        "end_time": request.form.get("end_time", ""),
+        "notes": request.form.get("notes", ""),
+    }
+    service = current_app.extensions["bulk_experiment_service"]
+    try:
+        if submitted_form_data["bulk_mode"] == "all_algorithms_for_symbol":
+            result = service.submit_all_algorithms_for_symbol(
+                symbol=submitted_form_data["symbol"],
+                start_date=submitted_form_data["start_date"],
+                start_time=submitted_form_data["start_time"],
+                end_date=submitted_form_data["end_date"],
+                end_time=submitted_form_data["end_time"],
+                notes=submitted_form_data["notes"],
+            )
+        elif submitted_form_data["bulk_mode"] == "single_algorithm_for_symbols":
+            result = service.submit_single_algorithm_for_symbols(
+                alg_key=submitted_form_data["alg_key"],
+                symbols_text=submitted_form_data["symbols_text"],
+                start_date=submitted_form_data["start_date"],
+                start_time=submitted_form_data["start_time"],
+                end_date=submitted_form_data["end_date"],
+                end_time=submitted_form_data["end_time"],
+                notes=submitted_form_data["notes"],
+            )
+        else:
+            raise ValueError(
+                f"Unsupported bulk submission mode: {submitted_form_data['bulk_mode']}"
+            )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        response = _render_bulk_experiment(
+            status_code=400, form_data=submitted_form_data
+        )
+        persist_form_state(
+            response,
+            cookie_name=_BULK_EXPERIMENT_FORM_COOKIE,
+            form_data=submitted_form_data,
+        )
+        return response
+    flash(
+        f"Bulk submission created {result.created_count} queued experiments.",
+        "success",
+    )
+    response = redirect(url_for("experiments.history"))
+    clear_form_state(response, cookie_name=_BULK_EXPERIMENT_FORM_COOKIE)
     return response
 
 

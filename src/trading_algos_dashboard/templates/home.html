@@ -6,6 +6,7 @@
   <div class="d-flex gap-2 flex-wrap">
     <a class="btn btn-primary" href="{{ url_for('algorithms.list_algorithms') }}">Browse algorithms</a>
     <a class="btn btn-success" href="{{ url_for('experiments.new_experiment') }}">Run experiment</a>
+    <a class="btn btn-outline-primary" href="{{ url_for('experiments.bulk_experiment') }}">Bulk runs</a>
     <a class="btn btn-outline-secondary" href="{{ url_for('experiments.history') }}">View history</a>
     <a class="btn btn-outline-secondary" href="{{ url_for('administration.experiment_runtime_settings') }}">Open runtime settings</a>
   </div>

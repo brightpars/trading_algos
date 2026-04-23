@@ -116,6 +116,7 @@ def test_create_app_registers_core_routes(monkeypatch):
     )
     assert app.config["EXPERIMENT_MAX_CONCURRENT_RUNS"] == 2
     assert app.extensions["experiment_service"].max_concurrent_experiments == 2
+    assert app.extensions["bulk_experiment_service"] is not None
     assert (
         app.extensions["experiment_runtime_settings_service"].get_effective_settings()[
             "max_concurrent_experiments"

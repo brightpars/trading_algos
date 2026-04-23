@@ -97,3 +97,4 @@ def test_runtime_settings_link_is_present_on_home_page(monkeypatch):
 
     assert response.status_code == 200
     assert b"/administration/experiment-runtime-settings" in response.data
+    assert b"/experiments/bulk" in response.data

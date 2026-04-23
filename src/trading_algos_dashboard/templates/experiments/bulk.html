@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Bulk runs</h1>
+<p class="text-muted">Create many queued experiments in one submission. Each generated experiment is added to the normal queue and executed by the existing scheduler.</p>
+
+<div class="alert alert-secondary mb-4" role="status">
+  <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+    <div>
+      <div class="fw-semibold">Scheduler concurrency</div>
+      <div class="small text-muted">
+        The global runtime limit is currently <strong>{{ max_concurrent_experiments }}</strong> concurrent experiment(s).
+        Bulk submission only adds queue items; execution still follows the shared scheduler limit.
+      </div>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('administration.experiment_runtime_settings') }}">Open scheduler settings</a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h5">Run all runnable algorithms for one symbol</h2>
+        <p class="small text-muted">Creates one queued experiment per runnable algorithm using the same symbol and time range.</p>
+        <form method="post" action="{{ url_for('experiments.create_bulk_experiment') }}" class="row g-3">
+          <input type="hidden" name="bulk_mode" value="all_algorithms_for_symbol">
+          <div class="col-12">
+            <label class="form-label">Symbol</label>
+            <input class="form-control" name="symbol" value="{{ form_data.symbol }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Start date</label>
+            <input class="form-control" type="date" name="start_date" value="{{ form_data.start_date }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Start time</label>
+            <input class="form-control" type="time" name="start_time" value="{{ form_data.start_time }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">End date</label>
+            <input class="form-control" type="date" name="end_date" value="{{ form_data.end_date }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">End time</label>
+            <input class="form-control" type="time" name="end_time" value="{{ form_data.end_time }}" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" rows="3" name="notes">{{ form_data.notes }}</textarea>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary" type="submit">Queue all runnable algorithms</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h5">Run one algorithm for many symbols</h2>
+        <p class="small text-muted">Creates one queued experiment per symbol using the same algorithm and time range.</p>
+        <form method="post" action="{{ url_for('experiments.create_bulk_experiment') }}" class="row g-3">
+          <input type="hidden" name="bulk_mode" value="single_algorithm_for_symbols">
+          <div class="col-12">
+            <label class="form-label">Algorithm</label>
+            <select class="form-select" name="alg_key" required>
+              <option value="">Select a runnable algorithm</option>
+              {% for algorithm in runnable_algorithms %}
+              <option value="{{ algorithm.key }}" {% if form_data.alg_key == algorithm.key %}selected{% endif %}>{{ algorithm.name }} ({{ algorithm.key }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Symbols</label>
+            <textarea class="form-control" rows="6" name="symbols_text" placeholder="AAPL&#10;MSFT&#10;NVDA" required>{{ form_data.symbols_text }}</textarea>
+            <div class="form-text">Enter symbols separated by new lines or commas. Duplicates are removed automatically.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Start date</label>
+            <input class="form-control" type="date" name="start_date" value="{{ form_data.start_date }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Start time</label>
+            <input class="form-control" type="time" name="start_time" value="{{ form_data.start_time }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">End date</label>
+            <input class="form-control" type="date" name="end_date" value="{{ form_data.end_date }}" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">End time</label>
+            <input class="form-control" type="time" name="end_time" value="{{ form_data.end_time }}" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Notes</label>
+            <textarea class="form-control" rows="3" name="notes">{{ form_data.notes }}</textarea>
+          </div>
+          <div class="col-12">
+            <button class="btn btn-primary" type="submit">Queue one experiment per symbol</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

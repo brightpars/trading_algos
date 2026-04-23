@@ -132,6 +132,22 @@ class AlgorithmCatalogService:
         ]
         return sorted(options, key=lambda item: item["name"])
 
+    def list_runnable_algorithm_implementations(self) -> list[dict[str, Any]]:
+        return sorted(
+            [
+                spec
+                for spec in self.list_algorithm_implementations()
+                if str(spec.get("status", "")) in {"stable", "runnable"}
+            ],
+            key=lambda item: str(item.get("name", "")),
+        )
+
+    def get_runnable_algorithm_implementation(self, alg_key: str) -> dict[str, Any]:
+        spec = self.get_algorithm_implementation(alg_key)
+        if str(spec.get("status", "")) not in {"stable", "runnable"}:
+            raise ValueError(f"Algorithm is not runnable: {alg_key}")
+        return spec
+
     def list_review_state_options(self) -> list[dict[str, str]]:
         return [dict(item) for item in self.REVIEW_STATE_OPTIONS]
 
