@@ -84,7 +84,12 @@ def test_evaluations_cohort_renders_matching_completed_runs(monkeypatch):
             "signal_summary": {"buy_count": 1, "sell_count": 1, "total_rows": 3},
             "report": {
                 "algorithm_summary": {"algorithm_name": "Algo Eval", "family": "trend"},
-                "evaluation_summary": {"headline_metrics": {"cumulative_return": 0.25}},
+                "evaluation_summary": {
+                    "headline_metrics": {
+                        "cumulative_return": 0.25,
+                        "max_drawdown": 0.1,
+                    }
+                },
             },
         }
     )
@@ -97,6 +102,8 @@ def test_evaluations_cohort_renders_matching_completed_runs(monkeypatch):
     assert b"Evaluation cohort" in response.data
     assert b"Algo Eval" in response.data
     assert b"0.25" in response.data
+    assert b"Return vs drawdown" in response.data
+    assert b"chart-container" in response.data
 
 
 def test_evaluations_cohort_returns_400_for_invalid_range(monkeypatch):

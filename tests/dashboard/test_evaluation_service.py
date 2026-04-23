@@ -137,6 +137,65 @@ def test_evaluation_service_returns_ranked_rows_and_warnings():
     assert payload["rows"][1]["metrics"]["win_rate"] == 0.6
     assert payload["rows"][0]["trade_count"] == 3
     assert len(payload["warnings"]) == 2
+    assert len(payload["charts"]) >= 2
+    assert payload["charts"][0]["chart"]["data"][0]["type"] == "bar"
+
+
+def test_evaluation_service_builds_scatter_chart_when_return_and_drawdown_exist():
+    start = datetime(2024, 2, 1, 9, 30, tzinfo=timezone.utc)
+    end = datetime(2024, 2, 3, 16, 0, tzinfo=timezone.utc)
+    service = EvaluationService(
+        experiment_repository=_ExperimentRepository([]),
+        result_repository=_ResultRepository([]),
+    )
+
+    payload = service.find_comparable_runs(
+        symbol="AAPL",
+        start_date="2024-02-01",
+        start_time="09:30",
+        end_date="2024-02-03",
+        end_time="16:00",
+    )
+
+    assert payload["charts"] == []
+
+    experiments = [
+        {
+            "experiment_id": "exp_1",
+            "symbol": "AAPL",
+            "status": "completed",
+            "time_range": {"start": start, "end": end},
+        }
+    ]
+    results = [
+        {
+            "experiment_id": "exp_1",
+            "alg_name": "Algo 1",
+            "report": {
+                "algorithm_summary": {"algorithm_name": "Algo 1", "family": "trend"},
+                "evaluation_summary": {
+                    "headline_metrics": {
+                        "cumulative_return": 0.4,
+                        "max_drawdown": 0.1,
+                    }
+                },
+            },
+        }
+    ]
+    service = EvaluationService(
+        experiment_repository=_ExperimentRepository(experiments),
+        result_repository=_ResultRepository(results),
+    )
+
+    payload = service.find_comparable_runs(
+        symbol="AAPL",
+        start_date="2024-02-01",
+        start_time="09:30",
+        end_date="2024-02-03",
+        end_time="16:00",
+    )
+
+    assert any(chart["title"] == "Return vs drawdown" for chart in payload["charts"])
 
 
 def test_evaluation_service_returns_empty_rows_for_no_matches():
@@ -155,6 +214,7 @@ def test_evaluation_service_returns_empty_rows_for_no_matches():
 
     assert payload["rows"] == []
     assert payload["warnings"] == []
+    assert payload["charts"] == []
 
 
 def test_evaluation_service_lists_comparable_run_cohorts():

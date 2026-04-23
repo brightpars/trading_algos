@@ -25,6 +25,21 @@
 {% endif %}
 
 {% if rows %}
+{% if charts %}
+<div class="row g-4 mb-4">
+  {% for item in charts %}
+  <div class="col-12 col-xl-6">
+    <div class="card h-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="h6 mb-3">{{ item.title }}</h2>
+        <div class="chart-container" data-chart='{{ item.chart|tojson }}'></div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <div class="table-responsive">
   <table class="table table-bordered table-striped align-middle">
     <thead>
@@ -70,4 +85,8 @@
   No completed comparable runs were found for this symbol and exact time range.
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
 {% endblock %}

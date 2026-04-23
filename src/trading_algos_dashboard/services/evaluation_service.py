@@ -101,6 +101,7 @@ class EvaluationService:
 
         ranked_rows = self._rank_rows(rows=rows, primary_metric=primary_metric)
         warnings = self._build_warnings(experiments=experiments, rows=ranked_rows)
+        charts = self._build_comparison_charts(rows=ranked_rows)
 
         return {
             "cohort": {
@@ -139,6 +140,7 @@ class EvaluationService:
                 "primary_metric": primary_metric,
             },
             "warnings": warnings,
+            "charts": charts,
             "rows": ranked_rows,
         }
 
@@ -313,3 +315,112 @@ class EvaluationService:
                 }
             )
         return warnings
+
+    @staticmethod
+    def _build_comparison_charts(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        chart_payloads: list[dict[str, Any]] = []
+
+        metric_chart_specs = [
+            (
+                "cumulative_return",
+                "Cumulative return by algorithm",
+                "Cumulative return",
+            ),
+            ("win_rate", "Win rate by algorithm", "Win rate"),
+            ("max_drawdown", "Max drawdown by algorithm", "Max drawdown"),
+            ("duration_seconds", "Runtime by algorithm", "Runtime (seconds)"),
+        ]
+
+        for metric_key, title, y_axis_title in metric_chart_specs:
+            x_values: list[str] = []
+            y_values: list[float] = []
+            hover_text: list[str] = []
+            for row in rows:
+                if metric_key == "duration_seconds":
+                    raw_value = row.get("duration_seconds")
+                else:
+                    raw_value = (row.get("metrics") or {}).get(metric_key)
+                if not isinstance(raw_value, (int, float)):
+                    continue
+                algorithm_name = str(row.get("algorithm_name", "Unknown"))
+                x_values.append(algorithm_name)
+                y_values.append(float(raw_value))
+                hover_text.append(
+                    f"{algorithm_name}<br>experiment={row.get('experiment_id', '')}<br>{y_axis_title}={raw_value}"
+                )
+            if not x_values:
+                continue
+            chart_payloads.append(
+                {
+                    "title": title,
+                    "chart": {
+                        "data": [
+                            {
+                                "type": "bar",
+                                "x": x_values,
+                                "y": y_values,
+                                "text": [str(value) for value in y_values],
+                                "textposition": "auto",
+                                "hovertemplate": "%{customdata}<extra></extra>",
+                                "customdata": hover_text,
+                            }
+                        ],
+                        "layout": {
+                            "title": title,
+                            "margin": {"t": 48, "r": 24, "b": 96, "l": 56},
+                            "xaxis": {"title": "Algorithm", "automargin": True},
+                            "yaxis": {"title": y_axis_title},
+                        },
+                        "config": {"displayModeBar": False, "responsive": True},
+                    },
+                }
+            )
+
+        scatter_x: list[float] = []
+        scatter_y: list[float] = []
+        scatter_text: list[str] = []
+        scatter_labels: list[str] = []
+        for row in rows:
+            cumulative_return = (row.get("metrics") or {}).get("cumulative_return")
+            max_drawdown = (row.get("metrics") or {}).get("max_drawdown")
+            if not isinstance(cumulative_return, (int, float)) or not isinstance(
+                max_drawdown, (int, float)
+            ):
+                continue
+            algorithm_name = str(row.get("algorithm_name", "Unknown"))
+            scatter_x.append(float(max_drawdown))
+            scatter_y.append(float(cumulative_return))
+            scatter_text.append(algorithm_name)
+            scatter_labels.append(
+                f"{algorithm_name}<br>experiment={row.get('experiment_id', '')}<br>drawdown={max_drawdown}<br>return={cumulative_return}"
+            )
+        if scatter_x:
+            chart_payloads.append(
+                {
+                    "title": "Return vs drawdown",
+                    "chart": {
+                        "data": [
+                            {
+                                "type": "scatter",
+                                "mode": "markers+text",
+                                "x": scatter_x,
+                                "y": scatter_y,
+                                "text": scatter_text,
+                                "textposition": "top center",
+                                "hovertemplate": "%{customdata}<extra></extra>",
+                                "customdata": scatter_labels,
+                                "marker": {"size": 12},
+                            }
+                        ],
+                        "layout": {
+                            "title": "Return vs drawdown",
+                            "margin": {"t": 48, "r": 24, "b": 56, "l": 56},
+                            "xaxis": {"title": "Max drawdown"},
+                            "yaxis": {"title": "Cumulative return"},
+                        },
+                        "config": {"displayModeBar": False, "responsive": True},
+                    },
+                }
+            )
+
+        return chart_payloads
