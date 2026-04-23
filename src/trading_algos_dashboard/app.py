@@ -39,6 +39,9 @@ from trading_algos_dashboard.repositories.result_repository import ResultReposit
 from trading_algos_dashboard.repositories.market_data_cache_repository import (
     MarketDataCacheRepository,
 )
+from trading_algos_dashboard.repositories.market_data_cache_settings_repository import (
+    MarketDataCacheSettingsRepository,
+)
 from trading_algos_dashboard.repositories.experiment_runtime_settings_repository import (
     ExperimentRuntimeSettingsRepository,
 )
@@ -78,6 +81,9 @@ from trading_algos_dashboard.services.market_data_cache import (
     LayeredMarketDataCache,
     MongoMarketDataCache,
 )
+from trading_algos_dashboard.services.market_data_cache_settings_service import (
+    MarketDataCacheSettingsService,
+)
 from trading_algos_dashboard.services.report_service import ReportService
 
 
@@ -110,6 +116,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     data_source_settings_repository = DataSourceSettingsRepository(mongo.db)
     algorithm_catalog_repository = AlgorithmCatalogRepository(mongo.db)
     market_data_cache_repository = MarketDataCacheRepository(mongo.db)
+    market_data_cache_settings_repository = MarketDataCacheSettingsRepository(mongo.db)
     experiment_runtime_settings_repository = ExperimentRuntimeSettingsRepository(
         mongo.db
     )
@@ -127,11 +134,20 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     experiment_scheduler_lease_service = ExperimentSchedulerLeaseService(
         repository=experiment_scheduler_lease_repository,
     )
+    market_data_cache_settings_service = MarketDataCacheSettingsService(
+        repository=market_data_cache_settings_repository,
+    )
+    cache_settings = market_data_cache_settings_service.get_effective_settings()
     market_data_cache = LayeredMarketDataCache(
-        memory_cache=InMemoryMarketDataCache(enabled=True),
+        memory_cache=InMemoryMarketDataCache(
+            enabled=cache_settings["memory_enabled"],
+            max_entries=cache_settings["memory_max_entries"],
+        ),
         shared_cache=MongoMarketDataCache(
             repository=market_data_cache_repository,
-            enabled=True,
+            enabled=cache_settings["shared_enabled"],
+            max_entries=cache_settings["shared_max_entries"],
+            ttl_hours=cache_settings["shared_ttl_hours"],
         ),
     )
     data_source_service = SmarttradeDataSourceService(
@@ -195,6 +211,9 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["data_source_settings_repository"] = data_source_settings_repository
     app.extensions["algorithm_catalog_repository"] = algorithm_catalog_repository
     app.extensions["market_data_cache_repository"] = market_data_cache_repository
+    app.extensions["market_data_cache_settings_repository"] = (
+        market_data_cache_settings_repository
+    )
     app.extensions["experiment_runtime_settings_repository"] = (
         experiment_runtime_settings_repository
     )
@@ -212,6 +231,9 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         experiment_scheduler_lease_service
     )
     app.extensions["market_data_cache"] = market_data_cache
+    app.extensions["market_data_cache_settings_service"] = (
+        market_data_cache_settings_service
+    )
     app.extensions["data_source_service"] = data_source_service
     app.extensions["experiment_service"] = experiment_service
     app.extensions["administration_service"] = administration_service

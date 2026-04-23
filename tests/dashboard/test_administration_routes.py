@@ -182,6 +182,10 @@ def test_experiment_runtime_settings_page_renders(monkeypatch):
     assert b"Market data server" in response.data
     assert b'name="ip"' in response.data
     assert b'name="port"' in response.data
+    assert b"Market data cache" in response.data
+    assert b'name="memory_max_entries"' in response.data
+    assert b'name="shared_max_entries"' in response.data
+    assert b'name="shared_ttl_hours"' in response.data
 
 
 def test_experiment_runtime_settings_page_updates_global_limit(monkeypatch):
@@ -264,6 +268,73 @@ def test_experiment_runtime_settings_page_returns_data_source_error_json(monkeyp
     assert response.status_code == 503
     assert response.get_json()["status"] == "error"
     assert response.get_json()["message"] == "not responding"
+
+
+def test_experiment_runtime_settings_page_updates_cache_settings(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/administration/market-data-cache-settings",
+        data={
+            "memory_enabled": "on",
+            "memory_max_entries": "12",
+            "shared_enabled": "on",
+            "shared_max_entries": "34",
+            "shared_ttl_hours": "48",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"market data cache settings updated" in response.data
+    settings = app.extensions[
+        "market_data_cache_settings_service"
+    ].get_effective_settings()
+    assert settings["memory_max_entries"] == 12
+    assert settings["shared_max_entries"] == 34
+    assert settings["shared_ttl_hours"] == 48
+
+
+def test_experiment_runtime_settings_page_clears_memory_cache(monkeypatch):
+    app = _build_app(monkeypatch)
+    cache = app.extensions["market_data_cache"]
+    start = Path
+    del start
+    cache.memory_cache.put(
+        symbol="AAPL",
+        start=__import__("datetime").datetime.fromisoformat("2024-01-01T09:30"),
+        end=__import__("datetime").datetime.fromisoformat("2024-01-01T09:31"),
+        candles=[{"ts": "x"}],
+    )
+
+    response = app.test_client().post(
+        "/administration/market-data-cache/clear-memory",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"memory cache cleared" in response.data
+    assert cache.stats()["memory_entry_count"] == 0
+
+
+def test_experiment_runtime_settings_page_clears_shared_cache(monkeypatch):
+    app = _build_app(monkeypatch)
+    cache = app.extensions["market_data_cache"]
+    cache.shared_cache.put(
+        symbol="AAPL",
+        start=__import__("datetime").datetime.fromisoformat("2024-01-01T09:30"),
+        end=__import__("datetime").datetime.fromisoformat("2024-01-01T09:31"),
+        candles=[{"ts": "x"}],
+    )
+
+    response = app.test_client().post(
+        "/administration/market-data-cache/clear-shared",
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"shared cache cleared" in response.data
+    assert cache.stats()["shared_entry_count"] == 0
 
 
 def test_import_algorithm_catalog_route_runs_import(monkeypatch):

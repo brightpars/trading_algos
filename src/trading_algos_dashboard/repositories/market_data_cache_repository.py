@@ -26,6 +26,17 @@ class MarketDataCacheRepository(MongoRepository):
         cache_key = self.build_cache_key(symbol=symbol, start=start, end=end)
         return self._without_id(self.collection.find_one({"cache_key": cache_key}))
 
+    def list_entries(self) -> list[dict[str, Any]]:
+        return [
+            self._without_id(document) or {} for document in self.collection.find({})
+        ]
+
+    def delete_entry_by_cache_key(self, cache_key: str) -> None:
+        self.collection.delete_many({"cache_key": cache_key})
+
+    def clear(self) -> int:
+        return self._delete_many({})
+
     def put_entry(
         self,
         *,
@@ -127,3 +138,36 @@ class MarketDataCacheRepository(MongoRepository):
             {"cache_key": cache_key},
             {"$set": {"fill_owner_id": None, "fill_expires_at": None}},
         )
+
+    def delete_expired_entries(self, *, expires_before: datetime) -> int:
+        deleted_count = 0
+        for entry in self.list_entries():
+            stored_at = entry.get("stored_at")
+            if isinstance(stored_at, datetime) and stored_at < expires_before:
+                cache_key = entry.get("cache_key")
+                if isinstance(cache_key, str):
+                    self.delete_entry_by_cache_key(cache_key)
+                    deleted_count += 1
+        return deleted_count
+
+    def prune_oldest_entries(self, *, max_entries: int) -> int:
+        entries = self.list_entries()
+        if len(entries) <= max_entries:
+            return 0
+
+        def _stored_at_sort_key(item: dict[str, Any]) -> datetime:
+            stored_at = item.get("stored_at")
+            if isinstance(stored_at, datetime):
+                return stored_at
+            return datetime.min.replace(tzinfo=timezone.utc)
+
+        sorted_entries = sorted(
+            entries,
+            key=_stored_at_sort_key,
+        )
+        delete_count = len(entries) - max_entries
+        for entry in sorted_entries[:delete_count]:
+            cache_key = entry.get("cache_key")
+            if isinstance(cache_key, str):
+                self.delete_entry_by_cache_key(cache_key)
+        return delete_count

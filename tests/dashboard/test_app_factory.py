@@ -108,6 +108,12 @@ def test_create_app_registers_core_routes(monkeypatch):
     assert b"Market data server" not in response.data
     assert app.extensions["market_data_cache"].enabled is True
     assert app.extensions["market_data_cache"].stats()["shared_backend"] == "mongo"
+    assert (
+        app.extensions["market_data_cache_settings_service"].get_effective_settings()[
+            "memory_max_entries"
+        ]
+        == 100
+    )
     assert app.config["EXPERIMENT_MAX_CONCURRENT_RUNS"] == 2
     assert app.extensions["experiment_service"].max_concurrent_experiments == 2
     assert (

@@ -27,12 +27,18 @@ def administration_home():
     data_source_settings = current_app.extensions[
         "data_source_settings_service"
     ].get_effective_settings()
+    cache_settings = current_app.extensions[
+        "market_data_cache_settings_service"
+    ].get_effective_settings()
+    cache_stats = current_app.extensions["market_data_cache"].stats()
     return render_template(
         "administration/index.html",
         content_summary=administration_service.get_database_content_summary(),
         algorithm_catalog_summary=administration_service.get_algorithm_catalog_summary(),
         experiment_runtime_settings=runtime_settings,
         data_source_settings=data_source_settings,
+        cache_settings=cache_settings,
+        cache_stats=cache_stats,
     )
 
 
@@ -44,10 +50,16 @@ def experiment_runtime_settings():
     data_source_settings = current_app.extensions[
         "data_source_settings_service"
     ].get_effective_settings()
+    cache_settings = current_app.extensions[
+        "market_data_cache_settings_service"
+    ].get_effective_settings()
+    cache_stats = current_app.extensions["market_data_cache"].stats()
     return render_template(
         "administration/experiment_runtime_settings.html",
         runtime_settings=runtime_settings,
         data_source_settings=data_source_settings,
+        cache_settings=cache_settings,
+        cache_stats=cache_stats,
     )
 
 
@@ -124,6 +136,52 @@ def check_data_source_settings():
         ), 503
     finally:
         service.endpoint_resolver = original_resolver
+
+
+@bp.post("/market-data-cache-settings")
+def save_market_data_cache_settings():
+    cache_settings_service = current_app.extensions[
+        "market_data_cache_settings_service"
+    ]
+    market_data_cache = current_app.extensions["market_data_cache"]
+    try:
+        settings = cache_settings_service.save_settings(
+            memory_enabled=request.form.get("memory_enabled") == "on",
+            memory_max_entries=int(request.form.get("memory_max_entries", "100")),
+            shared_enabled=request.form.get("shared_enabled") == "on",
+            shared_max_entries=int(request.form.get("shared_max_entries", "1000")),
+            shared_ttl_hours=int(request.form.get("shared_ttl_hours", "168")),
+        )
+        market_data_cache.configure(
+            memory_enabled=settings["memory_enabled"],
+            memory_max_entries=settings["memory_max_entries"],
+            shared_enabled=settings["shared_enabled"],
+            shared_max_entries=settings["shared_max_entries"],
+            shared_ttl_hours=settings["shared_ttl_hours"],
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("administration.experiment_runtime_settings"))
+
+    flash("administration: market data cache settings updated", "success")
+    return redirect(url_for("administration.experiment_runtime_settings"))
+
+
+@bp.post("/market-data-cache/clear-memory")
+def clear_market_data_memory_cache():
+    current_app.extensions["market_data_cache"].clear_memory()
+    flash("administration: memory cache cleared", "success")
+    return redirect(url_for("administration.experiment_runtime_settings"))
+
+
+@bp.post("/market-data-cache/clear-shared")
+def clear_market_data_shared_cache():
+    deleted_count = current_app.extensions["market_data_cache"].clear_shared()
+    flash(
+        f"administration: shared cache cleared; deleted_entries={deleted_count}",
+        "success",
+    )
+    return redirect(url_for("administration.experiment_runtime_settings"))
 
 
 @bp.post("/experiments/clear")
