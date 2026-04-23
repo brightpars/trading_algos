@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from trading_algos.alertgen.contracts.outputs import (
     AlertAlgorithmOutput,
     AlertSeriesPoint,
+    NormalizedChildOutput,
 )
 from trading_algos.alertgen.shared_utils.common import CANDLE_COLOUR, TREND
 from trading_algos.alertgen.shared_utils.evaluation import (
@@ -308,7 +309,10 @@ class BaseAlertAlgorithm(ABC):
                 AlertSeriesPoint(
                     timestamp=str(item.get("ts", "")),
                     signal_label=signal_label,
-                    confidence=float(item.get("trend_confidence", 0.0) or 0.0),
+                    score=self._normalized_signal_score(item),
+                    confidence=self._normalized_confidence(item),
+                    reason_codes=tuple(item.get("reason_codes", ())),
+                    event_markers=tuple(item.get("event_markers", ())),
                 )
             )
         derived_series = {
@@ -346,5 +350,56 @@ class BaseAlertAlgorithm(ABC):
                 "symbol": self.symbol,
                 "warmup_period": self.minimum_history(),
                 "evaluate_window_len": self.evaluate_window_len,
+                "supports_composition": True,
+                "output_contract_version": "1.0",
             },
+            child_outputs=self._normalized_child_outputs(),
+        )
+
+    def _normalized_confidence(self, item: dict[str, object]) -> float:
+        raw_value = item.get("trend_confidence", 0.0)
+        if isinstance(raw_value, (int, float)):
+            raw_confidence = float(raw_value)
+        else:
+            raw_confidence = 0.0
+        normalized = raw_confidence / 10.0
+        if normalized < 0.0:
+            return 0.0
+        if normalized > 1.0:
+            return 1.0
+        return normalized
+
+    def _normalized_signal_score(self, item: dict[str, object]) -> float:
+        if item.get("buy_SIGNAL"):
+            return 1.0
+        if item.get("sell_SIGNAL"):
+            return -1.0
+        return 0.0
+
+    def _normalized_child_outputs(self) -> tuple[NormalizedChildOutput, ...]:
+        decision = self.current_decision()
+        signal_label = (
+            "buy"
+            if decision.buy_signal
+            else "sell"
+            if decision.sell_signal
+            else "neutral"
+        )
+        direction = 1 if decision.buy_signal else -1 if decision.sell_signal else 0
+        return (
+            NormalizedChildOutput(
+                child_key=self.alg_name,
+                output_kind="composite_child",
+                signal_label=signal_label,
+                score=1.0 if direction > 0 else -1.0 if direction < 0 else 0.0,
+                confidence=max(0.0, min(1.0, decision.confidence / 10.0)),
+                regime_label=decision.trend,
+                direction=direction,
+                diagnostics={
+                    "symbol": self.symbol,
+                    "warmup_period": self.minimum_history(),
+                    "evaluate_window_len": self.evaluate_window_len,
+                },
+                reason_codes=tuple(decision.annotations.keys()),
+            ),
         )
