@@ -488,6 +488,30 @@ def stochastic_oscillator(
     return percent_k, percent_d
 
 
+def williams_percent_r(
+    highs: Sequence[float | int | None],
+    lows: Sequence[float | int | None],
+    closes: Sequence[float | int | None],
+    window: int,
+) -> list[float | None]:
+    _validate_window(window)
+    rolling_highs = rolling_high(highs, window)
+    rolling_lows = rolling_low(lows, window)
+    result: list[float | None] = []
+    for close, high_value, low_value in zip(
+        _as_float_list(closes), rolling_highs, rolling_lows
+    ):
+        if close is None or high_value is None or low_value is None:
+            result.append(None)
+            continue
+        range_width = high_value - low_value
+        if range_width == 0.0:
+            result.append(0.0)
+            continue
+        result.append(((high_value - close) / range_width) * -100.0)
+    return result
+
+
 def commodity_channel_index(
     highs: Sequence[float | int | None],
     lows: Sequence[float | int | None],

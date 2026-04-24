@@ -898,6 +898,150 @@ def require_cci_reversion_param(raw_alg_param, label):
     }
 
 
+def require_williams_percent_r_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "window",
+            "oversold_threshold",
+            "overbought_threshold",
+            "exit_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    oversold_threshold = _require_float_like(
+        normalized["oversold_threshold"], f"{label} oversold_threshold"
+    )
+    overbought_threshold = _require_float_like(
+        normalized["overbought_threshold"], f"{label} overbought_threshold"
+    )
+    exit_threshold = _require_float_like(
+        normalized["exit_threshold"], f"{label} exit_threshold"
+    )
+    if not -100.0 <= oversold_threshold <= 0.0:
+        raise ValueError(f"{label} oversold_threshold must be within [-100, 0]")
+    if not -100.0 <= overbought_threshold <= 0.0:
+        raise ValueError(f"{label} overbought_threshold must be within [-100, 0]")
+    if not -100.0 <= exit_threshold <= 0.0:
+        raise ValueError(f"{label} exit_threshold must be within [-100, 0]")
+    if oversold_threshold >= overbought_threshold:
+        raise ValueError(f"{label} requires oversold_threshold < overbought_threshold")
+    if not oversold_threshold <= exit_threshold <= overbought_threshold:
+        raise ValueError(
+            f"{label} requires oversold_threshold <= exit_threshold <= overbought_threshold"
+        )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "oversold_threshold": oversold_threshold,
+        "overbought_threshold": overbought_threshold,
+        "exit_threshold": exit_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_range_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "entry_band_fraction", "exit_band_fraction", "confirmation_bars"],
+        label,
+    )
+    entry_band_fraction = _require_non_negative_float_like(
+        normalized["entry_band_fraction"], f"{label} entry_band_fraction"
+    )
+    exit_band_fraction = _require_non_negative_float_like(
+        normalized["exit_band_fraction"], f"{label} exit_band_fraction"
+    )
+    if entry_band_fraction >= 0.5:
+        raise ValueError(f"{label} entry_band_fraction must be < 0.5")
+    if exit_band_fraction > 0.5:
+        raise ValueError(f"{label} exit_band_fraction must be <= 0.5")
+    if exit_band_fraction < entry_band_fraction:
+        raise ValueError(f"{label} requires entry_band_fraction <= exit_band_fraction")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "entry_band_fraction": entry_band_fraction,
+        "exit_band_fraction": exit_band_fraction,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_long_horizon_reversal_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "window",
+            "entry_return_threshold",
+            "exit_return_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    entry_return_threshold = _require_non_negative_float_like(
+        normalized["entry_return_threshold"], f"{label} entry_return_threshold"
+    )
+    exit_return_threshold = _require_non_negative_float_like(
+        normalized["exit_return_threshold"], f"{label} exit_return_threshold"
+    )
+    if entry_return_threshold == 0.0:
+        raise ValueError(f"{label} entry_return_threshold must be > 0")
+    if exit_return_threshold > entry_return_threshold:
+        raise ValueError(
+            f"{label} requires exit_return_threshold <= entry_return_threshold"
+        )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "entry_return_threshold": entry_return_threshold,
+        "exit_return_threshold": exit_return_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_volatility_adjusted_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "window",
+            "atr_window",
+            "entry_atr_multiple",
+            "exit_atr_multiple",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    entry_atr_multiple = _require_non_negative_float_like(
+        normalized["entry_atr_multiple"], f"{label} entry_atr_multiple"
+    )
+    exit_atr_multiple = _require_non_negative_float_like(
+        normalized["exit_atr_multiple"], f"{label} exit_atr_multiple"
+    )
+    if entry_atr_multiple == 0.0:
+        raise ValueError(f"{label} entry_atr_multiple must be > 0")
+    if exit_atr_multiple > entry_atr_multiple:
+        raise ValueError(f"{label} requires exit_atr_multiple <= entry_atr_multiple")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "atr_window": _require_positive_int_like(
+            normalized["atr_window"], f"{label} atr_window"
+        ),
+        "entry_atr_multiple": entry_atr_multiple,
+        "exit_atr_multiple": exit_atr_multiple,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def _require_rows_param(raw_rows, label):
     if not isinstance(raw_rows, list):
         raise ValueError(f"{label} rows must be a list")

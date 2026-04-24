@@ -5,11 +5,23 @@ from trading_algos.alertgen.algorithms.mean_reversion.bollinger_bands_reversion 
 from trading_algos.alertgen.algorithms.mean_reversion.cci_reversion import (
     CCIReversionAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.mean_reversion.long_horizon_reversal import (
+    LongHorizonReversalAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.mean_reversion.range_reversion import (
+    RangeReversionAlertAlgorithm,
+)
 from trading_algos.alertgen.algorithms.mean_reversion.rsi_reversion import (
     RSIReversionAlertAlgorithm,
 )
 from trading_algos.alertgen.algorithms.mean_reversion.stochastic_reversion import (
     StochasticReversionAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.mean_reversion.volatility_adjusted_reversion import (
+    VolatilityAdjustedReversionAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.mean_reversion.williams_percent_r_reversion import (
+    WilliamsPercentRReversionAlertAlgorithm,
 )
 from trading_algos.alertgen.algorithms.mean_reversion.z_score_mean_reversion import (
     ZScoreMeanReversionAlertAlgorithm,
@@ -17,8 +29,12 @@ from trading_algos.alertgen.algorithms.mean_reversion.z_score_mean_reversion imp
 from trading_algos.alertgen.core.validation import (
     require_bollinger_reversion_param,
     require_cci_reversion_param,
+    require_long_horizon_reversal_param,
+    require_range_reversion_param,
     require_rsi_reversion_param,
     require_stochastic_reversion_param,
+    require_volatility_adjusted_reversion_param,
+    require_williams_percent_r_reversion_param,
     require_zscore_mean_reversion_param,
 )
 
@@ -78,6 +94,54 @@ def _build_cci_reversion(symbol, report_base_path, alg_param, **_kwargs):
         oversold_threshold=alg_param["oversold_threshold"],
         overbought_threshold=alg_param["overbought_threshold"],
         exit_threshold=alg_param["exit_threshold"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_williams_percent_r_reversion(symbol, report_base_path, alg_param, **_kwargs):
+    return WilliamsPercentRReversionAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        oversold_threshold=alg_param["oversold_threshold"],
+        overbought_threshold=alg_param["overbought_threshold"],
+        exit_threshold=alg_param["exit_threshold"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_range_reversion(symbol, report_base_path, alg_param, **_kwargs):
+    return RangeReversionAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        entry_band_fraction=alg_param["entry_band_fraction"],
+        exit_band_fraction=alg_param["exit_band_fraction"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_long_horizon_reversal(symbol, report_base_path, alg_param, **_kwargs):
+    return LongHorizonReversalAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        entry_return_threshold=alg_param["entry_return_threshold"],
+        exit_return_threshold=alg_param["exit_return_threshold"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_volatility_adjusted_reversion(
+    symbol, report_base_path, alg_param, **_kwargs
+):
+    return VolatilityAdjustedReversionAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        atr_window=alg_param["atr_window"],
+        entry_atr_multiple=alg_param["entry_atr_multiple"],
+        exit_atr_multiple=alg_param["exit_atr_multiple"],
         confirmation_bars=alg_param["confirmation_bars"],
     )
 
@@ -391,6 +455,245 @@ def register_mean_reversion_alert_algorithms() -> None:
             category="mean_reversion",
             family="mean_reversion",
             subcategory="cci",
+            warmup_period=20,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="williams_percent_r_reversion",
+            name="Williams %R Reversion",
+            catalog_ref="algorithm:31",
+            builder=_build_williams_percent_r_reversion,
+            default_param={
+                "window": 14,
+                "oversold_threshold": -80.0,
+                "overbought_threshold": -20.0,
+                "exit_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_williams_percent_r_reversion_param,
+            description="Fade Williams %R oversold and overbought extremes back toward the middle of the range.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Williams %R lookback window.",
+                },
+                {
+                    "key": "oversold_threshold",
+                    "label": "Oversold threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": -100.0,
+                    "maximum": 0.0,
+                    "description": "Williams %R level at or below which long reversion setups become active.",
+                },
+                {
+                    "key": "overbought_threshold",
+                    "label": "Overbought threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": -100.0,
+                    "maximum": 0.0,
+                    "description": "Williams %R level at or above which short reversion setups become active.",
+                },
+                {
+                    "key": "exit_threshold",
+                    "label": "Exit threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": -100.0,
+                    "maximum": 0.0,
+                    "description": "Williams %R level considered close enough to neutral for exit diagnostics.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive extreme Williams %R bars required before confirmation.",
+                },
+            ),
+            tags=("mean-reversion", "williams-percent-r"),
+            category="mean_reversion",
+            family="mean_reversion",
+            subcategory="williams",
+            warmup_period=14,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="range_reversion",
+            name="Range Reversion",
+            catalog_ref="algorithm:34",
+            builder=_build_range_reversion,
+            default_param={
+                "window": 20,
+                "entry_band_fraction": 0.2,
+                "exit_band_fraction": 0.5,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_range_reversion_param,
+            description="Fade moves toward the edges of a rolling trading range back toward its midpoint.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Rolling lookback for the range high and low.",
+                },
+                {
+                    "key": "entry_band_fraction",
+                    "label": "Entry band fraction",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "maximum": 0.5,
+                    "description": "Fraction of the range near support or resistance that triggers a reversion setup.",
+                },
+                {
+                    "key": "exit_band_fraction",
+                    "label": "Exit band fraction",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "maximum": 0.5,
+                    "description": "Fractional distance from the midpoint considered close enough for exit diagnostics.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive range-edge bars required before confirmation.",
+                },
+            ),
+            tags=("mean-reversion", "range"),
+            category="mean_reversion",
+            family="mean_reversion",
+            subcategory="range",
+            warmup_period=20,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="long_horizon_reversal",
+            name="Long-Horizon Reversal",
+            catalog_ref="algorithm:36",
+            builder=_build_long_horizon_reversal,
+            default_param={
+                "window": 63,
+                "entry_return_threshold": 10.0,
+                "exit_return_threshold": 3.0,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_long_horizon_reversal_param,
+            description="Fade large multi-week or multi-month trailing returns as a contrarian reversal setup.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Trailing return lookback window.",
+                },
+                {
+                    "key": "entry_return_threshold",
+                    "label": "Entry return threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Absolute trailing return magnitude that triggers a reversal setup.",
+                },
+                {
+                    "key": "exit_return_threshold",
+                    "label": "Exit return threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Trailing return magnitude considered close enough to neutral for exit diagnostics.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive extreme trailing-return bars required before confirmation.",
+                },
+            ),
+            tags=("mean-reversion", "long-horizon", "contrarian"),
+            category="mean_reversion",
+            family="mean_reversion",
+            subcategory="long",
+            warmup_period=64,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="volatility_adjusted_reversion",
+            name="Volatility-Adjusted Reversion",
+            catalog_ref="algorithm:37",
+            builder=_build_volatility_adjusted_reversion,
+            default_param={
+                "window": 20,
+                "atr_window": 14,
+                "entry_atr_multiple": 1.5,
+                "exit_atr_multiple": 0.5,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_volatility_adjusted_reversion_param,
+            description="Fade price deviations from a rolling mean after normalizing the move by ATR.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Mean window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Rolling lookback for the mean anchor.",
+                },
+                {
+                    "key": "atr_window",
+                    "label": "ATR window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "ATR lookback window used for volatility normalization.",
+                },
+                {
+                    "key": "entry_atr_multiple",
+                    "label": "Entry ATR multiple",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Absolute ATR-normalized distance required to trigger a reversion setup.",
+                },
+                {
+                    "key": "exit_atr_multiple",
+                    "label": "Exit ATR multiple",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "ATR-normalized distance considered close enough to mean for exit diagnostics.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive ATR-normalized extremes required before confirmation.",
+                },
+            ),
+            tags=("mean-reversion", "volatility-adjusted", "atr"),
+            category="mean_reversion",
+            family="mean_reversion",
+            subcategory="volatility",
             warmup_period=20,
             output_modes=("signal", "score", "confidence"),
         ),

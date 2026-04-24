@@ -188,6 +188,10 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "rsi_reversion",
         "stochastic_reversion",
         "cci_reversion",
+        "williams_percent_r_reversion",
+        "range_reversion",
+        "long_horizon_reversal",
+        "volatility_adjusted_reversion",
         "hard_boolean_gating_and_or_majority",
         "weighted_linear_score_blend",
         "aggregate_boundary_and_channel",
@@ -458,6 +462,44 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "oversold_threshold": -50.0,
                 "overbought_threshold": 50.0,
                 "exit_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "williams_percent_r_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -80.0,
+                "overbought_threshold": -20.0,
+                "exit_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "range_reversion",
+            {
+                "window": 5,
+                "entry_band_fraction": 0.2,
+                "exit_band_fraction": 0.5,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "long_horizon_reversal",
+            {
+                "window": 5,
+                "entry_return_threshold": 5.0,
+                "exit_return_threshold": 2.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volatility_adjusted_reversion",
+            {
+                "window": 5,
+                "atr_window": 3,
+                "entry_atr_multiple": 1.0,
+                "exit_atr_multiple": 0.5,
                 "confirmation_bars": 1,
             },
         ),
@@ -4056,4 +4098,502 @@ def test_mean_reversion_wave_1_normalized_output_metadata_exposes_dashboard_cont
     assert output.metadata["catalog_ref"] == catalog_ref
     assert child_output.diagnostics["family"] == "mean_reversion"
     assert child_output.diagnostics["reporting_mode"] == "bar_series"
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "fixture_name"),
+    [
+        (
+            "williams_percent_r_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -80.0,
+                "overbought_threshold": -20.0,
+                "exit_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+            "one_overshoot.csv",
+        ),
+        (
+            "range_reversion",
+            {
+                "window": 5,
+                "entry_band_fraction": 0.2,
+                "exit_band_fraction": 0.5,
+                "confirmation_bars": 1,
+            },
+            "range_oscillation.csv",
+        ),
+        (
+            "long_horizon_reversal",
+            {
+                "window": 5,
+                "entry_return_threshold": 3.0,
+                "exit_return_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            "one_overshoot.csv",
+        ),
+        (
+            "volatility_adjusted_reversion",
+            {
+                "window": 5,
+                "atr_window": 3,
+                "entry_atr_multiple": 0.4,
+                "exit_atr_multiple": 0.2,
+                "confirmation_bars": 1,
+            },
+            "range_oscillation.csv",
+        ),
+    ],
+)
+def test_mean_reversion_wave_2_fixture_behavior_emits_reversion_signals(
+    tmp_path, alg_key, alg_param, fixture_name
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_mean_reversion_fixture_rows(fixture_name))
+
+    event_count = len(algorithm.buy_signals) + len(algorithm.sell_signals)
+
+    assert event_count >= 1
+    assert any(
+        point.signal_label in {"buy", "sell"}
+        for point in algorithm.normalized_output().points
+    )
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "williams_percent_r_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -80.0,
+                "overbought_threshold": -20.0,
+                "exit_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "range_reversion",
+            {
+                "window": 5,
+                "entry_band_fraction": 0.2,
+                "exit_band_fraction": 0.5,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "long_horizon_reversal",
+            {
+                "window": 5,
+                "entry_return_threshold": 3.0,
+                "exit_return_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            6,
+        ),
+        (
+            "volatility_adjusted_reversion",
+            {
+                "window": 5,
+                "atr_window": 3,
+                "entry_atr_multiple": 0.4,
+                "exit_atr_multiple": 0.2,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+    ],
+)
+def test_mean_reversion_wave_2_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(
+        _load_mean_reversion_fixture_rows("one_overshoot.csv")[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    (
+        "alg_key",
+        "alg_param",
+        "fixture_name",
+        "expected_reason_code",
+        "expected_annotation_keys",
+    ),
+    [
+        (
+            "williams_percent_r_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -80.0,
+                "overbought_threshold": -20.0,
+                "exit_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+            "one_overshoot.csv",
+            "williams_percent_r_overbought",
+            {"window", "oversold_threshold", "overbought_threshold", "indicator"},
+        ),
+        (
+            "range_reversion",
+            {
+                "window": 5,
+                "entry_band_fraction": 0.2,
+                "exit_band_fraction": 0.5,
+                "confirmation_bars": 1,
+            },
+            "range_oscillation.csv",
+            "range_resistance_reversion",
+            {"window", "entry_band_fraction", "exit_band_fraction", "indicator"},
+        ),
+        (
+            "long_horizon_reversal",
+            {
+                "window": 5,
+                "entry_return_threshold": 3.0,
+                "exit_return_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            "one_overshoot.csv",
+            "long_horizon_neutral",
+            {"window", "entry_return_threshold", "exit_return_threshold", "indicator"},
+        ),
+        (
+            "volatility_adjusted_reversion",
+            {
+                "window": 5,
+                "atr_window": 3,
+                "entry_atr_multiple": 0.4,
+                "exit_atr_multiple": 0.2,
+                "confirmation_bars": 1,
+            },
+            "range_oscillation.csv",
+            "volatility_adjusted_neutral",
+            {"window", "atr_window", "entry_atr_multiple", "indicator"},
+        ),
+    ],
+)
+def test_mean_reversion_wave_2_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path,
+    alg_key,
+    alg_param,
+    fixture_name,
+    expected_reason_code,
+    expected_annotation_keys,
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_mean_reversion_fixture_rows(fixture_name))
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    last_point = output.points[-1]
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert any(expected_reason_code in point.reason_codes for point in output.points)
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+        "threshold_value",
+        "exit_value",
+        "confirmation_state_label",
+        "warmup_ready",
+    }.issubset(output.derived_series)
+    assert output.metadata["family"] == "mean_reversion"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == child_output.diagnostics["catalog_ref"]
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+    assert child_output.diagnostics["warmup_ready"] is True
+    assert child_output.diagnostics["confirmation_state_label"] in {
+        "idle",
+        "pending",
+        "confirmed",
+    }
+    assert last_point.signal_label in {"buy", "sell", "neutral"}
+
+
+def test_mean_reversion_wave_2_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(
+        ValueError, match=r"oversold_threshold must be within \[-100, 0\]"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "williams_percent_r_reversion",
+                "alg_param": {
+                    "window": 5,
+                    "oversold_threshold": 10.0,
+                    "overbought_threshold": -20.0,
+                    "exit_threshold": -50.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="entry_band_fraction <= exit_band_fraction"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "range_reversion",
+                "alg_param": {
+                    "window": 5,
+                    "entry_band_fraction": 0.3,
+                    "exit_band_fraction": 0.2,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(
+        ValueError, match="exit_return_threshold <= entry_return_threshold"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "long_horizon_reversal",
+                "alg_param": {
+                    "window": 10,
+                    "entry_return_threshold": 5.0,
+                    "exit_return_threshold": 6.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="exit_atr_multiple <= entry_atr_multiple"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "volatility_adjusted_reversion",
+                "alg_param": {
+                    "window": 5,
+                    "atr_window": 3,
+                    "entry_atr_multiple": 1.0,
+                    "exit_atr_multiple": 1.5,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_mean_reversion_wave_2_performance_smoke_on_fixture_repetition(
+    tmp_path,
+) -> None:
+    repeated_rows = _load_mean_reversion_fixture_rows("range_oscillation.csv") * 300
+    algorithms = [
+        (
+            "williams_percent_r_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -80.0,
+                "overbought_threshold": -20.0,
+                "exit_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "range_reversion",
+            {
+                "window": 5,
+                "entry_band_fraction": 0.2,
+                "exit_band_fraction": 0.5,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "long_horizon_reversal",
+            {
+                "window": 5,
+                "entry_return_threshold": 3.0,
+                "exit_return_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volatility_adjusted_reversion",
+            {
+                "window": 5,
+                "atr_window": 3,
+                "entry_atr_multiple": 0.4,
+                "exit_atr_multiple": 0.2,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(repeated_rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(repeated_rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "bar_series"
+
+
+def test_mean_reversion_wave_2_registration_metadata_matches_manifest_contract() -> (
+    None
+):
+    expected = {
+        "williams_percent_r_reversion": (
+            "algorithm:31",
+            "mean_reversion",
+            "williams",
+            14,
+        ),
+        "range_reversion": ("algorithm:34", "mean_reversion", "range", 20),
+        "long_horizon_reversal": ("algorithm:36", "mean_reversion", "long", 64),
+        "volatility_adjusted_reversion": (
+            "algorithm:37",
+            "mean_reversion",
+            "volatility",
+            20,
+        ),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "catalog_ref", "alg_param", "fixture_name"),
+    [
+        (
+            "williams_percent_r_reversion",
+            "algorithm:31",
+            {
+                "window": 5,
+                "oversold_threshold": -80.0,
+                "overbought_threshold": -20.0,
+                "exit_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+            "one_overshoot.csv",
+        ),
+        (
+            "range_reversion",
+            "algorithm:34",
+            {
+                "window": 5,
+                "entry_band_fraction": 0.2,
+                "exit_band_fraction": 0.5,
+                "confirmation_bars": 1,
+            },
+            "range_oscillation.csv",
+        ),
+        (
+            "long_horizon_reversal",
+            "algorithm:36",
+            {
+                "window": 5,
+                "entry_return_threshold": 3.0,
+                "exit_return_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            "one_overshoot.csv",
+        ),
+        (
+            "volatility_adjusted_reversion",
+            "algorithm:37",
+            {
+                "window": 5,
+                "atr_window": 3,
+                "entry_atr_multiple": 0.4,
+                "exit_atr_multiple": 0.2,
+                "confirmation_bars": 1,
+            },
+            "range_oscillation.csv",
+        ),
+    ],
+)
+def test_mean_reversion_wave_2_normalized_output_metadata_exposes_dashboard_contract_fields(
+    tmp_path, alg_key, catalog_ref, alg_param, fixture_name
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_mean_reversion_fixture_rows(fixture_name))
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.metadata["family"] == "mean_reversion"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert child_output.diagnostics["family"] == "mean_reversion"
+    assert child_output.diagnostics["reporting_mode"] == "bar_series"
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref
     assert child_output.diagnostics["catalog_ref"] == catalog_ref

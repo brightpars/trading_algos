@@ -26,6 +26,7 @@ from trading_algos.alertgen.shared_utils.indicators import (
     stochastic_oscillator,
     supertrend,
     true_range,
+    williams_percent_r,
 )
 from trading_algos.alertgen.shared_utils.models import (
     AlgorithmDecision,
@@ -82,5 +83,6 @@ __all__ = [
     "stochastic_oscillator",
     "supertrend",
     "true_range",
+    "williams_percent_r",
     "write_analysis_report_bundle",
 ]
