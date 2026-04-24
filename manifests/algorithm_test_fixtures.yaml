@@ -158,6 +158,9 @@ fixtures:
   expected_behaviors:
   - Spread z-score crosses entry threshold during divergence
   - Paired trade exits when spread normalizes
+  - Short-history evaluation remains neutral with warmup_pending reason codes until aligned pair history satisfies the configured minimum history
+  - Distance and cointegration variants expose spread_value, zscore, hedge_ratio, spread_direction, active_legs, selected_symbol, and decision_reason diagnostics for dashboard explanation
+  - Multi-leg outputs retain per-leg side, weight, quantity_scale, and leg-role diagnostics so paired positions serialize cleanly despite framework blockers remaining open
 - fixture_id: fixture.relative_value_curve_spread_v1
   domain: multi_leg_curve_data
   purpose: Simple curve-spread distortion for relative-value strategies.
@@ -166,6 +169,8 @@ fixtures:
   expected_behaviors:
   - Curve-spread metric becomes extreme on known dates
   - Strategy emits paired-leg directions rather than one-sided signal
+  - Basket and funding-style relative-value variants preserve normalized leg payloads, gross and net exposure fields, and hedge-ratio context in dashboard-facing diagnostics
+  - Carry- or basis-aware variants remain neutral when carry distortion stays below threshold and explain the suppression with explicit decision reasons
 - fixture_id: fixture.options_iv_rv_gap_v1
   domain: options_surface
   purpose: Implied-versus-realized volatility gap for options strategies.

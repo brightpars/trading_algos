@@ -6,7 +6,9 @@ from trading_algos.alertgen.algorithms.stat_arb.base import BaseStatArbAlertAlgo
 from trading_algos.alertgen.algorithms.stat_arb.helpers import (
     StatArbRow,
     build_pair_legs,
+    evaluate_spread_state,
     pair_snapshot,
+    required_history,
 )
 from trading_algos.contracts.multi_leg_output import MultiLegPosition
 from trading_algos.data.panel_dataset import MultiAssetPanel
@@ -33,12 +35,35 @@ def build_pairs_trading_cointegration_algorithm(
     entry_zscore = float(alg_param["entry_zscore"])
     exit_zscore = float(alg_param["exit_zscore"])
     minimum_history = int(alg_param["minimum_history"])
+    warmup_period = required_history(
+        lookback_window=lookback_window,
+        minimum_history=minimum_history,
+    )
     schedule = select_rebalance_timestamps(
         panel.timestamps(), frequency=str(alg_param["rebalance_frequency"])
     )
     rows: list[StatArbRow] = []
     is_active = False
     for timestamp in schedule:
+        base_history = panel.rows_for_symbol_until(base_symbol, timestamp=timestamp)
+        quote_history = panel.rows_for_symbol_until(quote_symbol, timestamp=timestamp)
+        if min(len(base_history), len(quote_history)) < warmup_period:
+            rows.append(
+                StatArbRow(
+                    timestamp=timestamp,
+                    spread_value=0.0,
+                    zscore=None,
+                    hedge_ratio=1.0,
+                    legs=(),
+                    diagnostics={
+                        "selection_reason": "warmup_pending",
+                        "warmup_ready": False,
+                        "minimum_history": minimum_history,
+                        "warmup_period": warmup_period,
+                    },
+                )
+            )
+            continue
         snapshot = pair_snapshot(
             panel,
             timestamp=timestamp,
@@ -59,21 +84,25 @@ def build_pairs_trading_cointegration_algorithm(
                         "selection_reason": "warmup_pending",
                         "warmup_ready": False,
                         "minimum_history": minimum_history,
+                        "warmup_period": warmup_period,
                     },
                 )
             )
             continue
         zscore = snapshot.zscore
-        reason = "no_entry"
+        decision = evaluate_spread_state(
+            zscore=zscore,
+            entry_zscore=entry_zscore,
+            exit_zscore=exit_zscore,
+            was_active=is_active,
+            entry_reason="cointegration_entry",
+            hold_reason="cointegration_hold",
+            exit_reason="cointegration_exit",
+            idle_reason="no_entry",
+        )
+        is_active = decision.is_active
+        reason = decision.reason
         legs: tuple[MultiLegPosition, ...] = ()
-        if zscore is not None and abs(zscore) >= entry_zscore:
-            is_active = True
-            reason = "cointegration_entry"
-        elif is_active and zscore is not None and abs(zscore) > exit_zscore:
-            reason = "cointegration_hold"
-        elif is_active:
-            is_active = False
-            reason = "cointegration_exit"
         if is_active:
             legs = build_pair_legs(
                 base_symbol=base_symbol,
@@ -94,6 +123,7 @@ def build_pairs_trading_cointegration_algorithm(
                     "base_symbol": base_symbol,
                     "quote_symbol": quote_symbol,
                     "minimum_history": minimum_history,
+                    "warmup_period": warmup_period,
                     "entry_zscore": entry_zscore,
                     "exit_zscore": exit_zscore,
                     "mean_spread": snapshot.mean_spread,
@@ -102,6 +132,10 @@ def build_pairs_trading_cointegration_algorithm(
                     "hedge_ratio": snapshot.hedge_ratio,
                     "cointegration_proxy": abs(snapshot.mean_spread)
                     / max(snapshot.spread_volatility, 1e-9),
+                    "spread_direction": "positive"
+                    if snapshot.spread_value >= 0.0
+                    else "negative",
+                    "active_legs": len(legs),
                     "selected_symbol": f"{base_symbol}/{quote_symbol}",
                 },
             )

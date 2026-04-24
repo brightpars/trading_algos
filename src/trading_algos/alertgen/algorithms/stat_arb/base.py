@@ -113,6 +113,7 @@ class BaseStatArbAlertAlgorithm:
                 **output.metadata,
                 "reporting_mode": "multi_leg",
                 "warmup_period": self.minimum_history(),
+                "output_target": "multi_leg_positions",
             },
         )
 
@@ -142,6 +143,7 @@ class BaseStatArbAlertAlgorithm:
         )
         output.metadata["reporting_mode"] = "multi_leg"
         output.metadata["warmup_period"] = self.minimum_history()
+        output.metadata["output_target"] = "multi_leg_positions"
         return output
 
     def interactive_report_payloads(self) -> list[tuple[dict[str, Any], str]]:

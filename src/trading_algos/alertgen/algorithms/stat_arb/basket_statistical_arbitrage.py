@@ -6,6 +6,9 @@ from trading_algos.alertgen.algorithms.stat_arb.base import BaseStatArbAlertAlgo
 from trading_algos.alertgen.algorithms.stat_arb.helpers import (
     StatArbRow,
     basket_snapshot,
+    build_basket_legs,
+    evaluate_spread_state,
+    required_history,
 )
 from trading_algos.contracts.multi_leg_output import MultiLegPosition
 from trading_algos.data.panel_dataset import MultiAssetPanel
@@ -33,6 +36,10 @@ def build_basket_statistical_arbitrage_algorithm(
     entry_zscore = float(alg_param["entry_zscore"])
     exit_zscore = float(alg_param["exit_zscore"])
     minimum_history = int(alg_param["minimum_history"])
+    warmup_period = required_history(
+        lookback_window=lookback_window,
+        minimum_history=minimum_history,
+    )
     schedule = select_rebalance_timestamps(
         panel.timestamps(), frequency=str(alg_param["rebalance_frequency"])
     )
@@ -43,6 +50,28 @@ def build_basket_statistical_arbitrage_algorithm(
         weight_sum = sum(float(weight) for weight in basket_weights)
         normalized_weights = [float(weight) / weight_sum for weight in basket_weights]
     for timestamp in schedule:
+        base_history = panel.rows_for_symbol_until(base_symbol, timestamp=timestamp)
+        basket_history_lengths = [
+            len(panel.rows_for_symbol_until(symbol, timestamp=timestamp))
+            for symbol in basket_symbols
+        ]
+        if min([len(base_history), *basket_history_lengths]) < warmup_period:
+            rows.append(
+                StatArbRow(
+                    timestamp=timestamp,
+                    spread_value=0.0,
+                    zscore=None,
+                    hedge_ratio=1.0,
+                    legs=(),
+                    diagnostics={
+                        "selection_reason": "warmup_pending",
+                        "warmup_ready": False,
+                        "minimum_history": minimum_history,
+                        "warmup_period": warmup_period,
+                    },
+                )
+            )
+            continue
         snapshot = basket_snapshot(
             panel,
             timestamp=timestamp,
@@ -63,40 +92,34 @@ def build_basket_statistical_arbitrage_algorithm(
                         "selection_reason": "warmup_pending",
                         "warmup_ready": False,
                         "minimum_history": minimum_history,
+                        "warmup_period": warmup_period,
                     },
                 )
             )
             continue
         zscore = snapshot.zscore
-        reason = "no_entry"
+        decision = evaluate_spread_state(
+            zscore=zscore,
+            entry_zscore=entry_zscore,
+            exit_zscore=exit_zscore,
+            was_active=is_active,
+            entry_reason="basket_entry",
+            hold_reason="basket_hold",
+            exit_reason="basket_exit",
+            idle_reason="no_entry",
+        )
+        is_active = decision.is_active
+        reason = decision.reason
         legs: tuple[MultiLegPosition, ...] = ()
-        if zscore is not None and abs(zscore) >= entry_zscore:
-            is_active = True
-            reason = "basket_entry"
-        elif is_active and zscore is not None and abs(zscore) > exit_zscore:
-            reason = "basket_hold"
-        elif is_active:
-            is_active = False
-            reason = "basket_exit"
         if is_active:
-            base_side = "short" if snapshot.spread_value >= 0.0 else "long"
-            hedge_side = "long" if base_side == "short" else "short"
             basket_leg_weights = normalized_weights or [
                 1.0 / len(basket_symbols)
             ] * len(basket_symbols)
-            legs = (
-                MultiLegPosition(symbol=base_symbol, side=base_side, weight=1.0),
-                *tuple(
-                    MultiLegPosition(
-                        symbol=basket_symbol,
-                        side=hedge_side,
-                        weight=basket_leg_weight,
-                        quantity_scale=basket_leg_weight,
-                    )
-                    for basket_symbol, basket_leg_weight in zip(
-                        basket_symbols, basket_leg_weights, strict=True
-                    )
-                ),
+            legs = build_basket_legs(
+                base_symbol=base_symbol,
+                basket_symbols=basket_symbols,
+                basket_weights=basket_leg_weights,
+                spread_value=snapshot.spread_value,
             )
         rows.append(
             StatArbRow(
@@ -112,12 +135,17 @@ def build_basket_statistical_arbitrage_algorithm(
                     "basket_symbols": tuple(basket_symbols),
                     "basket_weights": tuple(normalized_weights or []),
                     "minimum_history": minimum_history,
+                    "warmup_period": warmup_period,
                     "entry_zscore": entry_zscore,
                     "exit_zscore": exit_zscore,
                     "mean_spread": snapshot.mean_spread,
                     "spread_volatility": snapshot.spread_volatility,
                     "zscore": zscore,
                     "hedge_ratio": snapshot.hedge_ratio,
+                    "spread_direction": "positive"
+                    if snapshot.spread_value >= 0.0
+                    else "negative",
+                    "active_legs": len(legs),
                     "selected_symbol": f"{base_symbol}/basket",
                 },
             )

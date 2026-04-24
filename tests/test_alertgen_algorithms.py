@@ -87,6 +87,10 @@ def _build_stat_arb_fixture_rows() -> list[dict[str, object]]:
     ]
 
 
+def _build_stat_arb_short_history_rows() -> list[dict[str, object]]:
+    return _build_stat_arb_fixture_rows()[:6]
+
+
 def _build_cross_asset_fixture_rows() -> list[dict[str, object]]:
     return [
         {

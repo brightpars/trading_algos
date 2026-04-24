@@ -35,6 +35,11 @@ from trading_algos.relative_value.hedge_ratio import (
     spread_series,
     static_hedge_ratio,
 )
+from trading_algos.alertgen.algorithms.stat_arb.helpers import (
+    build_basket_legs,
+    evaluate_spread_state,
+    required_history,
+)
 from trading_algos.reporting.multi_leg_report import build_multi_leg_report_payload
 from trading_algos.contracts.multi_leg_output import (
     MultiLegOutput,
@@ -181,6 +186,32 @@ def test_mean_reversion_wave_3_shared_helpers_compute_session_vwap_and_ou_state(
     assert equilibrium[-1] is not None
     assert residual[-1] is not None
     assert residual_zscore[-1] is not None
+
+
+def test_stat_arb_shared_helpers_compute_decisions_and_leg_shapes() -> None:
+    decision = evaluate_spread_state(
+        zscore=1.5,
+        entry_zscore=1.0,
+        exit_zscore=0.25,
+        was_active=False,
+        entry_reason="entry",
+        hold_reason="hold",
+        exit_reason="exit",
+        idle_reason="idle",
+    )
+    basket_legs = build_basket_legs(
+        base_symbol="AAA",
+        basket_symbols=("BBB", "CCC"),
+        basket_weights=(0.6, 0.4),
+        spread_value=2.0,
+    )
+
+    assert decision.is_active is True
+    assert decision.reason == "entry"
+    assert required_history(lookback_window=3, minimum_history=5) == 5
+    assert basket_legs[0].diagnostics["basket_role"] == "anchor"
+    assert basket_legs[1].diagnostics["basket_weight"] == pytest.approx(0.6)
+    assert basket_legs[2].side == "long"
 
 
 def test_ichimoku_helper_produces_expected_shapes() -> None:

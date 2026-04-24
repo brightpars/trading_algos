@@ -32,6 +32,36 @@ class StatArbRow:
     diagnostics: dict[str, object]
 
 
+@dataclass(frozen=True)
+class StatArbDecision:
+    is_active: bool
+    reason: str
+
+
+def required_history(*, lookback_window: int, minimum_history: int) -> int:
+    return max(lookback_window, minimum_history)
+
+
+def evaluate_spread_state(
+    *,
+    zscore: float | None,
+    entry_zscore: float,
+    exit_zscore: float,
+    was_active: bool,
+    entry_reason: str,
+    hold_reason: str,
+    exit_reason: str,
+    idle_reason: str,
+) -> StatArbDecision:
+    if zscore is not None and abs(zscore) >= entry_zscore:
+        return StatArbDecision(is_active=True, reason=entry_reason)
+    if was_active and zscore is not None and abs(zscore) > exit_zscore:
+        return StatArbDecision(is_active=True, reason=hold_reason)
+    if was_active:
+        return StatArbDecision(is_active=False, reason=exit_reason)
+    return StatArbDecision(is_active=False, reason=idle_reason)
+
+
 def pair_snapshot(
     panel: MultiAssetPanel,
     *,
@@ -166,12 +196,56 @@ def build_pair_legs(
         quote_side = "short"
     return (
         MultiLegPosition(
-            symbol=base_symbol, side=base_side, weight=1.0, quantity_scale=1.0
+            symbol=base_symbol,
+            side=base_side,
+            weight=1.0,
+            quantity_scale=1.0,
+            diagnostics={"role": "base_leg", "hedge_ratio_notional": 1.0},
         ),
         MultiLegPosition(
             symbol=quote_symbol,
             side=quote_side,
             weight=abs(hedge_ratio),
             quantity_scale=abs(hedge_ratio),
+            diagnostics={
+                "role": "hedge_leg",
+                "hedge_ratio_notional": abs(hedge_ratio),
+            },
+        ),
+    )
+
+
+def build_basket_legs(
+    *,
+    base_symbol: str,
+    basket_symbols: Sequence[str],
+    basket_weights: Sequence[float],
+    spread_value: float,
+) -> tuple[MultiLegPosition, ...]:
+    base_side = "short" if spread_value >= 0.0 else "long"
+    hedge_side = "long" if base_side == "short" else "short"
+    return (
+        MultiLegPosition(
+            symbol=base_symbol,
+            side=base_side,
+            weight=1.0,
+            quantity_scale=1.0,
+            diagnostics={"role": "base_leg", "basket_role": "anchor"},
+        ),
+        *tuple(
+            MultiLegPosition(
+                symbol=basket_symbol,
+                side=hedge_side,
+                weight=basket_weight,
+                quantity_scale=basket_weight,
+                diagnostics={
+                    "role": "hedge_leg",
+                    "basket_role": "component",
+                    "basket_weight": basket_weight,
+                },
+            )
+            for basket_symbol, basket_weight in zip(
+                basket_symbols, basket_weights, strict=True
+            )
         ),
     )
