@@ -17,6 +17,7 @@ AssetScope = Literal[
     "multi_leg",
     "universe",
     "portfolio",
+    "execution",
 ]
 InputDomain = Literal[
     "ohlcv",
@@ -34,12 +35,15 @@ InputDomain = Literal[
     "market_calendar",
     "event_calendar",
     "order_book",
+    "own_order_state",
     "options",
     "options_chain",
     "underlying_price_series",
     "fundamental",
     "fundamentals_pti",
     "events",
+    "execution_parent_order",
+    "market_data_stream",
 ]
 OutputMode = Literal[
     "signal",
@@ -61,6 +65,8 @@ OutputMode = Literal[
     "child_contributions",
     "regime",
     "execution_plan",
+    "quote_action",
+    "child_order_actions",
 ]
 CompositionRole = Literal[
     "leaf_signal",

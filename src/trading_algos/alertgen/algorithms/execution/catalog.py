@@ -1,0 +1,165 @@
+from trading_algos.algorithmspec import AlertAlgorithmSpec, register_algorithm
+from trading_algos.alertgen.algorithms.execution.iceberg_hidden_size import (
+    build_iceberg_hidden_size_algorithm,
+)
+from trading_algos.alertgen.algorithms.execution.implementation_shortfall_arrival_price import (
+    build_implementation_shortfall_arrival_price_algorithm,
+)
+from trading_algos.alertgen.algorithms.execution.pov_participation_rate import (
+    build_pov_participation_rate_algorithm,
+)
+from trading_algos.alertgen.algorithms.execution.sniper_opportunistic_execution import (
+    build_sniper_opportunistic_execution_algorithm,
+)
+from trading_algos.alertgen.algorithms.execution.twap import build_twap_algorithm
+from trading_algos.alertgen.algorithms.execution.vwap import build_vwap_algorithm
+from trading_algos.alertgen.core.validation import (
+    require_iceberg_hidden_size_param,
+    require_implementation_shortfall_param,
+    require_pov_participation_rate_param,
+    require_sniper_execution_param,
+    require_twap_param,
+    require_vwap_param,
+)
+
+
+def register_execution_alert_algorithms() -> None:
+    specs = [
+        AlertAlgorithmSpec(
+            key="twap",
+            name="TWAP",
+            catalog_ref="algorithm:94",
+            builder=build_twap_algorithm,
+            default_param={
+                "rows": [],
+                "parent_order": {"symbol": "AAA", "side": "buy", "quantity": 1},
+                "intervals": 1,
+                "catch_up_factor": 1.0,
+            },
+            param_normalizer=require_twap_param,
+            description="Prototype time-weighted execution schedule.",
+            category="execution",
+            family="execution",
+            subcategory="twap",
+            warmup_period=1,
+            input_domains=("execution_parent_order", "market_data_stream"),
+            output_modes=("execution_plan", "child_order_actions", "diagnostics"),
+            runtime_kind="execution",
+            asset_scope="execution",
+            composition_roles=("execution_only",),
+        ),
+        AlertAlgorithmSpec(
+            key="vwap",
+            name="VWAP",
+            catalog_ref="algorithm:95",
+            builder=build_vwap_algorithm,
+            default_param={
+                "rows": [],
+                "parent_order": {"symbol": "AAA", "side": "buy", "quantity": 1},
+                "volume_curve": [1.0],
+            },
+            param_normalizer=require_vwap_param,
+            description="Prototype volume-weighted execution schedule.",
+            category="execution",
+            family="execution",
+            subcategory="vwap",
+            warmup_period=1,
+            input_domains=("execution_parent_order", "market_data_stream"),
+            output_modes=("execution_plan", "child_order_actions", "diagnostics"),
+            runtime_kind="execution",
+            asset_scope="execution",
+            composition_roles=("execution_only",),
+        ),
+        AlertAlgorithmSpec(
+            key="pov_participation_rate",
+            name="POV / Participation Rate",
+            catalog_ref="algorithm:96",
+            builder=build_pov_participation_rate_algorithm,
+            default_param={
+                "rows": [],
+                "parent_order": {"symbol": "AAA", "side": "buy", "quantity": 1},
+                "participation_rate": 0.1,
+            },
+            param_normalizer=require_pov_participation_rate_param,
+            description="Prototype participation-rate execution schedule.",
+            category="execution",
+            family="execution",
+            subcategory="pov",
+            warmup_period=1,
+            input_domains=("execution_parent_order", "market_data_stream"),
+            output_modes=("execution_plan", "child_order_actions", "diagnostics"),
+            runtime_kind="execution",
+            asset_scope="execution",
+            composition_roles=("execution_only",),
+        ),
+        AlertAlgorithmSpec(
+            key="implementation_shortfall_arrival_price",
+            name="Implementation Shortfall / Arrival Price",
+            catalog_ref="algorithm:97",
+            builder=build_implementation_shortfall_arrival_price_algorithm,
+            default_param={
+                "rows": [],
+                "parent_order": {"symbol": "AAA", "side": "buy", "quantity": 1},
+                "urgency": 0.5,
+                "arrival_price": 0.0,
+            },
+            param_normalizer=require_implementation_shortfall_param,
+            description="Prototype urgency-weighted arrival-price execution schedule.",
+            category="execution",
+            family="execution",
+            subcategory="implementation",
+            warmup_period=1,
+            input_domains=("execution_parent_order", "market_data_stream"),
+            output_modes=("execution_plan", "child_order_actions", "diagnostics"),
+            runtime_kind="execution",
+            asset_scope="execution",
+            composition_roles=("execution_only",),
+        ),
+        AlertAlgorithmSpec(
+            key="iceberg_hidden_size",
+            name="Iceberg / Hidden Size",
+            catalog_ref="algorithm:98",
+            builder=build_iceberg_hidden_size_algorithm,
+            default_param={
+                "rows": [],
+                "parent_order": {"symbol": "AAA", "side": "buy", "quantity": 1},
+                "display_quantity": 1,
+            },
+            param_normalizer=require_iceberg_hidden_size_param,
+            description="Prototype iceberg display-quantity schedule.",
+            category="execution",
+            family="execution",
+            subcategory="iceberg",
+            warmup_period=1,
+            input_domains=("execution_parent_order", "market_data_stream"),
+            output_modes=("execution_plan", "child_order_actions", "diagnostics"),
+            runtime_kind="execution",
+            asset_scope="execution",
+            composition_roles=("execution_only",),
+        ),
+        AlertAlgorithmSpec(
+            key="sniper_opportunistic_execution",
+            name="Sniper / Opportunistic Execution",
+            catalog_ref="algorithm:99",
+            builder=build_sniper_opportunistic_execution_algorithm,
+            default_param={
+                "rows": [],
+                "parent_order": {"symbol": "AAA", "side": "buy", "quantity": 1},
+                "spread_threshold": 0.02,
+                "volume_threshold": 0.0,
+            },
+            param_normalizer=require_sniper_execution_param,
+            description="Prototype opportunistic execution trigger on favorable conditions.",
+            category="execution",
+            family="execution",
+            subcategory="sniper",
+            warmup_period=1,
+            input_domains=("execution_parent_order", "market_data_stream"),
+            output_modes=("execution_plan", "child_order_actions", "diagnostics"),
+            runtime_kind="execution",
+            asset_scope="execution",
+            composition_roles=("execution_only",),
+        ),
+    ]
+    for spec in specs:
+        register_algorithm(spec)

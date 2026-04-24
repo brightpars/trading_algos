@@ -28,8 +28,14 @@ from trading_algos.alertgen.algorithms.stat_arb.catalog import (
 from trading_algos.alertgen.algorithms.mean_reversion.catalog import (
     register_mean_reversion_alert_algorithms,
 )
+from trading_algos.alertgen.algorithms.microstructure_hft.catalog import (
+    register_microstructure_hft_alert_algorithms,
+)
 from trading_algos.alertgen.algorithms.volatility_options.catalog import (
     register_volatility_options_alert_algorithms,
+)
+from trading_algos.alertgen.algorithms.execution.catalog import (
+    register_execution_alert_algorithms,
 )
 from trading_algos.alertgen.algorithms.trend.catalog import (
     register_trend_alert_algorithms,
@@ -52,6 +58,8 @@ def register_builtin_alert_algorithms():
     register_mean_reversion_alert_algorithms()
     register_stat_arb_alert_algorithms()
     register_volatility_options_alert_algorithms()
+    register_microstructure_hft_alert_algorithms()
+    register_execution_alert_algorithms()
     register_cross_asset_macro_carry_alert_algorithms()
     register_event_driven_alert_algorithms()
     register_composite_alert_algorithms()

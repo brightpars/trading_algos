@@ -141,6 +141,28 @@ def _require_choice(value, label, *, allowed):
     return normalized
 
 
+def _require_float_like(value, label):
+    try:
+        return float(value)
+    except Exception as exc:
+        raise ValueError(f"{label} must be a number: {exc}")
+
+
+def _require_dict_rows(raw_rows, label):
+    if not isinstance(raw_rows, list):
+        raise ValueError(f"{label} rows must be a list")
+    normalized_rows = []
+    for index, row in enumerate(raw_rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"{label} rows[{index}] must be a dict")
+        normalized_rows.append(dict(row))
+    return normalized_rows
+
+
+def _require_rows_param(raw_rows, label):
+    return _require_dict_rows(raw_rows, label)
+
+
 def _require_positive_int_list(value, label, *, minimum_length=1):
     if not isinstance(value, list):
         raise ValueError(f"{label} must be a list")
@@ -1630,31 +1652,6 @@ def require_volatility_squeeze_breakout_param(raw_alg_param, label):
     }
 
 
-def _require_rows_param(raw_rows, label):
-    if not isinstance(raw_rows, list):
-        raise ValueError(f"{label} rows must be a list")
-    normalized_rows = []
-    for index, row in enumerate(raw_rows):
-        if not isinstance(row, dict):
-            raise ValueError(f"{label} rows[{index}] must be a dict")
-        child_outputs = row.get("child_outputs")
-        if not isinstance(child_outputs, list):
-            raise ValueError(f"{label} rows[{index}] child_outputs must be a list")
-        normalized_rows.append(dict(row))
-    return normalized_rows
-
-
-def _require_dict_rows(raw_rows, label):
-    if not isinstance(raw_rows, list):
-        raise ValueError(f"{label} rows must be a list")
-    normalized_rows = []
-    for index, row in enumerate(raw_rows):
-        if not isinstance(row, dict):
-            raise ValueError(f"{label} rows[{index}] must be a dict")
-        normalized_rows.append(dict(row))
-    return normalized_rows
-
-
 def _require_string_float_dict(value, label):
     if value is None:
         return {}
@@ -2222,13 +2219,6 @@ def require_single_asset_event_window_param(raw_alg_param, label):
     return result
 
 
-def _require_float_like(value, label):
-    try:
-        return float(value)
-    except Exception as exc:
-        raise ValueError(f"{label} must be a number: {exc}")
-
-
 def require_hard_boolean_gating_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(
@@ -2671,6 +2661,287 @@ def require_rl_allocation_controller_param(raw_alg_param, label):
 
 def require_hierarchical_controller_meta_policy_param(raw_alg_param, label):
     return _require_rl_controller_base_param(raw_alg_param, label)
+
+
+def _require_order_book_rows(raw_rows, label):
+    rows = _require_dict_rows(raw_rows, label)
+    for index, row in enumerate(rows):
+        for key in (
+            "ts",
+            "symbol",
+            "best_bid_price",
+            "best_ask_price",
+            "best_bid_size",
+            "best_ask_size",
+        ):
+            if key not in row:
+                raise ValueError(f"{label} rows[{index}] {key} is required")
+    return rows
+
+
+def _require_own_order_rows(raw_rows, label):
+    rows = _require_dict_rows(raw_rows, label)
+    for index, row in enumerate(rows):
+        for key in (
+            "ts",
+            "symbol",
+            "resting_quantity",
+            "queue_ahead",
+            "traded_volume_since_update",
+        ):
+            if key not in row:
+                raise ValueError(f"{label} own_order_rows[{index}] {key} is required")
+    return rows
+
+
+def _require_execution_rows(raw_rows, label):
+    rows = _require_dict_rows(raw_rows, label)
+    for index, row in enumerate(rows):
+        for key in ("ts", "symbol", "available_volume", "reference_price"):
+            if key not in row:
+                raise ValueError(f"{label} rows[{index}] {key} is required")
+    return rows
+
+
+def _require_parent_order(raw_order, label):
+    if not isinstance(raw_order, dict):
+        raise ValueError(f"{label} parent_order must be a dict")
+    for key in ("symbol", "side", "quantity"):
+        if key not in raw_order:
+            raise ValueError(f"{label} parent_order {key} is required")
+    quantity = _require_positive_int_like(
+        raw_order["quantity"], f"{label} parent_order quantity"
+    )
+    side = _require_choice(
+        raw_order["side"], f"{label} parent_order side", allowed={"buy", "sell"}
+    )
+    return {
+        "symbol": _require_non_empty_string(
+            raw_order["symbol"], f"{label} parent_order symbol"
+        ),
+        "side": side,
+        "quantity": quantity,
+        "start_timestamp": str(raw_order.get("start_timestamp", "")),
+        "end_timestamp": str(raw_order.get("end_timestamp", "")),
+    }
+
+
+def require_bid_ask_market_making_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized, ["rows", "own_order_rows", "min_spread", "inventory_limit"], label
+    )
+    min_spread = _require_non_negative_float_like(
+        normalized["min_spread"], f"{label} min_spread"
+    )
+    if min_spread == 0.0:
+        raise ValueError(f"{label} min_spread must be > 0")
+    return {
+        "rows": _require_order_book_rows(normalized["rows"], label),
+        "own_order_rows": _require_own_order_rows(normalized["own_order_rows"], label),
+        "min_spread": min_spread,
+        "inventory_limit": _require_non_negative_float_like(
+            normalized["inventory_limit"], f"{label} inventory_limit"
+        ),
+    }
+
+
+def require_inventory_skewed_market_making_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "own_order_rows", "inventory_target", "skew_sensitivity"],
+        label,
+    )
+    skew_sensitivity = _require_non_negative_float_like(
+        normalized["skew_sensitivity"], f"{label} skew_sensitivity"
+    )
+    if skew_sensitivity == 0.0:
+        raise ValueError(f"{label} skew_sensitivity must be > 0")
+    return {
+        "rows": _require_order_book_rows(normalized["rows"], label),
+        "own_order_rows": _require_own_order_rows(normalized["own_order_rows"], label),
+        "inventory_target": _require_float_like(
+            normalized["inventory_target"], f"{label} inventory_target"
+        ),
+        "skew_sensitivity": skew_sensitivity,
+    }
+
+
+def require_order_book_imbalance_strategy_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized, ["rows", "own_order_rows", "imbalance_threshold"], label
+    )
+    threshold = _require_non_negative_float_like(
+        normalized["imbalance_threshold"], f"{label} imbalance_threshold"
+    )
+    if threshold == 0.0:
+        raise ValueError(f"{label} imbalance_threshold must be > 0")
+    return {
+        "rows": _require_order_book_rows(normalized["rows"], label),
+        "own_order_rows": _require_own_order_rows(normalized["own_order_rows"], label),
+        "imbalance_threshold": threshold,
+    }
+
+
+def require_microprice_strategy_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized, ["rows", "own_order_rows", "edge_threshold"], label
+    )
+    threshold = _require_non_negative_float_like(
+        normalized["edge_threshold"], f"{label} edge_threshold"
+    )
+    if threshold == 0.0:
+        raise ValueError(f"{label} edge_threshold must be > 0")
+    return {
+        "rows": _require_order_book_rows(normalized["rows"], label),
+        "own_order_rows": _require_own_order_rows(normalized["own_order_rows"], label),
+        "edge_threshold": threshold,
+    }
+
+
+def require_queue_position_strategy_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "own_order_rows", "keep_threshold", "cancel_threshold"],
+        label,
+    )
+    keep = _require_non_negative_float_like(
+        normalized["keep_threshold"], f"{label} keep_threshold"
+    )
+    cancel = _require_non_negative_float_like(
+        normalized["cancel_threshold"], f"{label} cancel_threshold"
+    )
+    if cancel > keep:
+        raise ValueError(f"{label} requires cancel_threshold <= keep_threshold")
+    return {
+        "rows": _require_order_book_rows(normalized["rows"], label),
+        "own_order_rows": _require_own_order_rows(normalized["own_order_rows"], label),
+        "keep_threshold": keep,
+        "cancel_threshold": cancel,
+    }
+
+
+def require_liquidity_rebate_capture_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "own_order_rows", "maker_rebate", "adverse_selection_buffer"],
+        label,
+    )
+    return {
+        "rows": _require_order_book_rows(normalized["rows"], label),
+        "own_order_rows": _require_own_order_rows(normalized["own_order_rows"], label),
+        "maker_rebate": _require_non_negative_float_like(
+            normalized["maker_rebate"], f"{label} maker_rebate"
+        ),
+        "adverse_selection_buffer": _require_non_negative_float_like(
+            normalized["adverse_selection_buffer"], f"{label} adverse_selection_buffer"
+        ),
+    }
+
+
+def require_opening_auction_strategy_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized, ["rows", "own_order_rows", "auction_threshold"], label
+    )
+    return {
+        "rows": _require_order_book_rows(normalized["rows"], label),
+        "own_order_rows": _require_own_order_rows(normalized["own_order_rows"], label),
+        "auction_threshold": _require_non_negative_float_like(
+            normalized["auction_threshold"], f"{label} auction_threshold"
+        ),
+    }
+
+
+def require_closing_auction_strategy_param(raw_alg_param, label):
+    return require_opening_auction_strategy_param(raw_alg_param, label)
+
+
+def _require_execution_base_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(normalized, ["rows", "parent_order"], label)
+    return {
+        "rows": _require_execution_rows(normalized["rows"], label),
+        "parent_order": _require_parent_order(normalized["parent_order"], label),
+    }
+
+
+def require_twap_param(raw_alg_param, label):
+    result = _require_execution_base_param(raw_alg_param, label)
+    intervals = _require_positive_int_like(
+        raw_alg_param.get("intervals", 1), f"{label} intervals"
+    )
+    result["intervals"] = intervals
+    result["catch_up_factor"] = _require_non_negative_float_like(
+        raw_alg_param.get("catch_up_factor", 1.0), f"{label} catch_up_factor"
+    )
+    return result
+
+
+def require_vwap_param(raw_alg_param, label):
+    result = _require_execution_base_param(raw_alg_param, label)
+    volume_curve = raw_alg_param.get("volume_curve")
+    if not isinstance(volume_curve, list) or not volume_curve:
+        raise ValueError(f"{label} volume_curve must be a non-empty list")
+    result["volume_curve"] = [
+        _require_non_negative_float_like(v, f"{label} volume_curve")
+        for v in volume_curve
+    ]
+    return result
+
+
+def require_pov_participation_rate_param(raw_alg_param, label):
+    result = _require_execution_base_param(raw_alg_param, label)
+    participation_rate = _require_non_negative_float_like(
+        raw_alg_param.get("participation_rate"), f"{label} participation_rate"
+    )
+    if participation_rate <= 0.0 or participation_rate > 1.0:
+        raise ValueError(f"{label} participation_rate must be within (0, 1]")
+    result["participation_rate"] = participation_rate
+    return result
+
+
+def require_implementation_shortfall_param(raw_alg_param, label):
+    result = _require_execution_base_param(raw_alg_param, label)
+    urgency = _require_non_negative_float_like(
+        raw_alg_param.get("urgency", 0.5), f"{label} urgency"
+    )
+    if urgency > 1.0:
+        raise ValueError(f"{label} urgency must be <= 1")
+    result["urgency"] = urgency
+    result["arrival_price"] = _require_non_negative_float_like(
+        raw_alg_param.get("arrival_price", 0.0), f"{label} arrival_price"
+    )
+    return result
+
+
+def require_iceberg_hidden_size_param(raw_alg_param, label):
+    result = _require_execution_base_param(raw_alg_param, label)
+    display_quantity = _require_positive_int_like(
+        raw_alg_param.get("display_quantity"), f"{label} display_quantity"
+    )
+    if display_quantity > result["parent_order"]["quantity"]:
+        raise ValueError(f"{label} display_quantity must be <= parent order quantity")
+    result["display_quantity"] = display_quantity
+    return result
+
+
+def require_sniper_execution_param(raw_alg_param, label):
+    result = _require_execution_base_param(raw_alg_param, label)
+    spread_threshold = _require_non_negative_float_like(
+        raw_alg_param.get("spread_threshold"), f"{label} spread_threshold"
+    )
+    volume_threshold = _require_non_negative_float_like(
+        raw_alg_param.get("volume_threshold"), f"{label} volume_threshold"
+    )
+    result["spread_threshold"] = spread_threshold
+    result["volume_threshold"] = volume_threshold
+    return result
 
 
 def normalize_alertgen_sensor_config(
