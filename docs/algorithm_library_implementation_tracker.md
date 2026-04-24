@@ -15,12 +15,12 @@
 | --- | --- |
 | algorithm rows | 121 |
 | combination-method rows | 12 |
-| ready_to_implement | 45 |
+| ready_to_implement | 43 |
 | blocked_framework | 83 |
 | in_progress | 0 |
-| complete | 5 |
-| prototype_only | 128 |
-| research_ready | 5 |
+| complete | 7 |
+| prototype_only | 126 |
+| research_ready | 7 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -45,7 +45,7 @@
 | pattern_price_action | algorithm | 8 | 8 | 0 | 0 | 0 |
 | reinforcement_learning | combination_method | 2 | 0 | 2 | 0 | 0 |
 | risk_overlay | combination_method | 2 | 1 | 1 | 0 | 0 |
-| rule_based_combination | combination_method | 3 | 2 | 1 | 0 | 0 |
+| rule_based_combination | combination_method | 3 | 0 | 1 | 0 | 2 |
 | stat_arb | algorithm | 14 | 0 | 14 | 0 | 0 |
 | trend | algorithm | 14 | 9 | 0 | 0 | 5 |
 | volatility_options | algorithm | 10 | 3 | 7 | 0 | 0 |
@@ -87,7 +87,6 @@
 | pattern_wave_2 | 3 |
 | composite_wave_4 | 3 |
 | momentum_wave_2 | 2 |
-| composite_contract_wave_1 | 2 |
 | composite_wave_2 | 1 |
 
 ## Fixture coverage

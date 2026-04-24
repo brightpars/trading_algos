@@ -252,6 +252,167 @@ def require_ribbon_param(raw_alg_param, label):
     }
 
 
+def require_roc_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "bullish_threshold", "bearish_threshold", "confirmation_bars"],
+        label,
+    )
+    bullish_threshold = _require_float_like(
+        normalized["bullish_threshold"], f"{label} bullish_threshold"
+    )
+    bearish_threshold = _require_float_like(
+        normalized["bearish_threshold"], f"{label} bearish_threshold"
+    )
+    if bearish_threshold > bullish_threshold:
+        raise ValueError(f"{label} requires bearish_threshold <= bullish_threshold")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "bullish_threshold": bullish_threshold,
+        "bearish_threshold": bearish_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_accelerating_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "fast_window",
+            "slow_window",
+            "acceleration_threshold",
+            "bearish_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    fast_window = _require_positive_int_like(
+        normalized["fast_window"], f"{label} fast_window"
+    )
+    slow_window = _require_positive_int_like(
+        normalized["slow_window"], f"{label} slow_window"
+    )
+    if fast_window >= slow_window:
+        raise ValueError(f"{label} requires fast_window < slow_window")
+    acceleration_threshold = _require_float_like(
+        normalized["acceleration_threshold"], f"{label} acceleration_threshold"
+    )
+    bearish_threshold = _require_float_like(
+        normalized["bearish_threshold"], f"{label} bearish_threshold"
+    )
+    if bearish_threshold > acceleration_threshold:
+        raise ValueError(
+            f"{label} requires bearish_threshold <= acceleration_threshold"
+        )
+    return {
+        "fast_window": fast_window,
+        "slow_window": slow_window,
+        "acceleration_threshold": acceleration_threshold,
+        "bearish_threshold": bearish_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_rsi_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "bullish_threshold", "bearish_threshold", "confirmation_bars"],
+        label,
+    )
+    bullish_threshold = _require_float_like(
+        normalized["bullish_threshold"], f"{label} bullish_threshold"
+    )
+    bearish_threshold = _require_float_like(
+        normalized["bearish_threshold"], f"{label} bearish_threshold"
+    )
+    if not 0.0 <= bearish_threshold <= 100.0:
+        raise ValueError(f"{label} bearish_threshold must be within [0, 100]")
+    if not 0.0 <= bullish_threshold <= 100.0:
+        raise ValueError(f"{label} bullish_threshold must be within [0, 100]")
+    if bearish_threshold > bullish_threshold:
+        raise ValueError(f"{label} requires bearish_threshold <= bullish_threshold")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "bullish_threshold": bullish_threshold,
+        "bearish_threshold": bearish_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_stochastic_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "k_window",
+            "d_window",
+            "bullish_threshold",
+            "bearish_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    bullish_threshold = _require_float_like(
+        normalized["bullish_threshold"], f"{label} bullish_threshold"
+    )
+    bearish_threshold = _require_float_like(
+        normalized["bearish_threshold"], f"{label} bearish_threshold"
+    )
+    if not 0.0 <= bearish_threshold <= 100.0:
+        raise ValueError(f"{label} bearish_threshold must be within [0, 100]")
+    if not 0.0 <= bullish_threshold <= 100.0:
+        raise ValueError(f"{label} bullish_threshold must be within [0, 100]")
+    if bearish_threshold > bullish_threshold:
+        raise ValueError(f"{label} requires bearish_threshold <= bullish_threshold")
+    return {
+        "k_window": _require_positive_int_like(
+            normalized["k_window"], f"{label} k_window"
+        ),
+        "d_window": _require_positive_int_like(
+            normalized["d_window"], f"{label} d_window"
+        ),
+        "bullish_threshold": bullish_threshold,
+        "bearish_threshold": bearish_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_cci_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "bullish_threshold", "bearish_threshold", "confirmation_bars"],
+        label,
+    )
+    bullish_threshold = _require_float_like(
+        normalized["bullish_threshold"], f"{label} bullish_threshold"
+    )
+    bearish_threshold = _require_float_like(
+        normalized["bearish_threshold"], f"{label} bearish_threshold"
+    )
+    if bearish_threshold > bullish_threshold:
+        raise ValueError(f"{label} requires bearish_threshold <= bullish_threshold")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "bullish_threshold": bullish_threshold,
+        "bearish_threshold": bearish_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def _require_rows_param(raw_rows, label):
     if not isinstance(raw_rows, list):
         raise ValueError(f"{label} rows must be a list")
