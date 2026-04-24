@@ -49,6 +49,13 @@ class LongHorizonReversalAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
             "indicator": "rate_of_change",
         }
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {
+            "long_horizon_return": self.latest_data_modifiable.get(
+                "long_horizon_return"
+            ),
+        }
+
     def _calculate_state(self) -> MeanReversionSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
         returns = rate_of_change(closes, self.window)

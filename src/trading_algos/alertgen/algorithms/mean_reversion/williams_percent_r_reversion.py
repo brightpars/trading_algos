@@ -52,6 +52,11 @@ class WilliamsPercentRReversionAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
             "indicator": "williams_percent_r",
         }
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {
+            "williams_percent_r": self.latest_data_modifiable.get("williams_percent_r"),
+        }
+
     def _calculate_state(self) -> MeanReversionSignalState:
         highs = [float(item["High"]) for item in self.data_list]
         lows = [float(item["Low"]) for item in self.data_list]

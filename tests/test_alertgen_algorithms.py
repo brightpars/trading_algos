@@ -4170,6 +4170,19 @@ def test_mean_reversion_wave_2_fixture_behavior_emits_reversion_signals(
         point.signal_label in {"buy", "sell"}
         for point in algorithm.normalized_output().points
     )
+    if fixture_name == "one_overshoot.csv":
+        buy_indices = [
+            index
+            for index, item in enumerate(algorithm.data_list)
+            if item.get("buy_SIGNAL")
+        ]
+        assert buy_indices
+        assert any(
+            not bool(item.get("bullish_setup"))
+            for item in algorithm.data_list[buy_indices[0] + 1 :]
+        )
+    if alg_key == "range_reversion":
+        assert event_count >= 2
 
 
 @pytest.mark.parametrize(
@@ -4355,6 +4368,34 @@ def test_mean_reversion_wave_2_normalized_output_exposes_dashboard_diagnostics(
         "confirmed",
     }
     assert last_point.signal_label in {"buy", "sell", "neutral"}
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    if alg_key == "williams_percent_r_reversion":
+        assert "williams_percent_r" in output.derived_series
+        assert child_output.diagnostics["williams_percent_r"] == pytest.approx(
+            output.derived_series["williams_percent_r"][-1]
+        )
+    elif alg_key == "range_reversion":
+        assert {
+            "range_upper",
+            "range_lower",
+            "range_midpoint",
+            "range_position",
+        }.issubset(output.derived_series)
+        assert child_output.diagnostics["range_position"] == pytest.approx(
+            output.derived_series["range_position"][-1]
+        )
+    elif alg_key == "long_horizon_reversal":
+        assert "long_horizon_return" in output.derived_series
+        assert child_output.diagnostics["long_horizon_return"] == pytest.approx(
+            output.derived_series["long_horizon_return"][-1]
+        )
+    elif alg_key == "volatility_adjusted_reversion":
+        assert {"rolling_mean", "atr_value", "atr_distance"}.issubset(
+            output.derived_series
+        )
+        assert child_output.diagnostics["atr_distance"] == pytest.approx(
+            output.derived_series["atr_distance"][-1]
+        )
 
 
 def test_mean_reversion_wave_2_validation_rejects_invalid_parameter_shapes() -> None:
@@ -4393,6 +4434,22 @@ def test_mean_reversion_wave_2_validation_rejects_invalid_parameter_shapes() -> 
             }
         )
 
+    with pytest.raises(ValueError, match="entry_band_fraction must be < 0.5"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "range_reversion",
+                "alg_param": {
+                    "window": 5,
+                    "entry_band_fraction": 0.5,
+                    "exit_band_fraction": 0.5,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
     with pytest.raises(
         ValueError, match="exit_return_threshold <= entry_return_threshold"
     ):
@@ -4411,6 +4468,22 @@ def test_mean_reversion_wave_2_validation_rejects_invalid_parameter_shapes() -> 
             }
         )
 
+    with pytest.raises(ValueError, match="entry_return_threshold must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "long_horizon_reversal",
+                "alg_param": {
+                    "window": 10,
+                    "entry_return_threshold": 0.0,
+                    "exit_return_threshold": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
     with pytest.raises(ValueError, match="exit_atr_multiple <= entry_atr_multiple"):
         normalize_alertgen_sensor_config(
             {
@@ -4421,6 +4494,23 @@ def test_mean_reversion_wave_2_validation_rejects_invalid_parameter_shapes() -> 
                     "atr_window": 3,
                     "entry_atr_multiple": 1.0,
                     "exit_atr_multiple": 1.5,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="entry_atr_multiple must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "volatility_adjusted_reversion",
+                "alg_param": {
+                    "window": 5,
+                    "atr_window": 3,
+                    "entry_atr_multiple": 0.0,
+                    "exit_atr_multiple": 0.0,
                     "confirmation_bars": 1,
                 },
                 "buy": True,
@@ -4519,6 +4609,7 @@ def test_mean_reversion_wave_2_registration_metadata_matches_manifest_contract()
         assert spec.family == family
         assert spec.subcategory == subcategory
         assert spec.warmup_period == warmup
+        assert spec.output_modes == ("signal", "score", "confidence")
 
 
 @pytest.mark.parametrize(
@@ -4597,3 +4688,4 @@ def test_mean_reversion_wave_2_normalized_output_metadata_exposes_dashboard_cont
     assert child_output.diagnostics["reporting_mode"] == "bar_series"
     assert child_output.diagnostics["catalog_ref"] == catalog_ref
     assert child_output.diagnostics["catalog_ref"] == catalog_ref
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])

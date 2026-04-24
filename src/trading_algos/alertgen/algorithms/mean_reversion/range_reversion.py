@@ -49,6 +49,14 @@ class RangeReversionAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
             "indicator": "range_position",
         }
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {
+            "range_upper": self.latest_data_modifiable.get("range_upper"),
+            "range_lower": self.latest_data_modifiable.get("range_lower"),
+            "range_midpoint": self.latest_data_modifiable.get("range_midpoint"),
+            "range_position": self.latest_data_modifiable.get("range_position"),
+        }
+
     def _calculate_state(self) -> MeanReversionSignalState:
         highs = [float(item["High"]) for item in self.data_list]
         lows = [float(item["Low"]) for item in self.data_list]

@@ -45,6 +45,9 @@ class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
     def _parameter_annotations(self) -> dict[str, object]:
         return {}
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {}
+
     def _reason_codes(self, state: MeanReversionSignalState) -> tuple[str, ...]:
         if state.primary_value is None:
             return ("warmup_pending",)
@@ -91,6 +94,7 @@ class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
             "warmup_ready": self.latest_data_modifiable.get("warmup_ready", False),
         }
         annotations.update(self._parameter_annotations())
+        annotations.update(self._state_annotations())
         return annotations
 
     def _record_state(self, state: MeanReversionSignalState) -> None:
@@ -197,7 +201,12 @@ class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
             "reporting_mode": self.reporting_mode(),
         }
         diagnostics.update(decision.annotations)
-        reason_codes = tuple(diagnostics.keys())
+        raw_reason_codes = diagnostics.get("reason_codes", ())
+        reason_codes = (
+            tuple(str(code) for code in raw_reason_codes)
+            if isinstance(raw_reason_codes, tuple | list)
+            else ()
+        )
         raw_score = diagnostics.get("trend_score", 0.0)
         score = float(raw_score) if isinstance(raw_score, (int, float)) else 0.0
         if score < -1.0:

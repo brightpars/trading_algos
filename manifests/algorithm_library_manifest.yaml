@@ -1871,8 +1871,8 @@ rows:
   display_category: Mean Reversion
   subcategory: williams
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1918,7 +1918,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_2
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 31; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_2 with fixture-backed overshoot checks, warmup coverage, state-specific diagnostics for dashboard explanation, validation coverage, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:32
   source_doc_ref: requirements_v4:algorithm:32
   kind: algorithm
@@ -2038,8 +2038,8 @@ rows:
   display_category: Mean Reversion
   subcategory: range
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -2084,7 +2084,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_2
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 34; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_2 with fixture-backed range-oscillation behavior checks, repeated-entry coverage, dashboard-ready range diagnostics, validation coverage, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:35
   source_doc_ref: requirements_v4:algorithm:35
   kind: algorithm
@@ -2148,8 +2148,8 @@ rows:
   display_category: Mean Reversion
   subcategory: long
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term contrarian / reversal
   home_suitability: 1
@@ -2194,7 +2194,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_2
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 36; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_2 with fixture-backed overshoot checks, warmup coverage, long-horizon return diagnostics, validation coverage, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:37
   source_doc_ref: requirements_v4:algorithm:37
   kind: algorithm
@@ -2203,8 +2203,8 @@ rows:
   display_category: Mean Reversion
   subcategory: volatility
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -2249,7 +2249,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_2
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 37; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_2 with fixture-backed oscillation behavior checks, warmup coverage, ATR-normalized diagnostics, validation coverage, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:38
   source_doc_ref: requirements_v4:algorithm:38
   kind: algorithm

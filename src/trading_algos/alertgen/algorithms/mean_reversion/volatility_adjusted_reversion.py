@@ -55,6 +55,13 @@ class VolatilityAdjustedReversionAlertAlgorithm(BaseMeanReversionAlertAlgorithm)
             "indicator": "atr_distance",
         }
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {
+            "rolling_mean": self.latest_data_modifiable.get("rolling_mean"),
+            "atr_value": self.latest_data_modifiable.get("atr_value"),
+            "atr_distance": self.latest_data_modifiable.get("atr_distance"),
+        }
+
     def _calculate_state(self) -> MeanReversionSignalState:
         highs = [float(item["High"]) for item in self.data_list]
         lows = [float(item["Low"]) for item in self.data_list]
