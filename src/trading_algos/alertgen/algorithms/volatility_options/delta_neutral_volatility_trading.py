@@ -39,8 +39,14 @@ class DeltaNeutralVolatilityTradingAlgorithm(BaseOptionsSurfaceAlgorithm):
     def _evaluate_row(
         self, metrics: OptionSurfaceDecisionMetrics, *, index: int
     ) -> tuple[str, float, float, tuple[str, ...], dict[str, object]]:
-        long_vol = metrics.iv_rv_gap <= -self.iv_rv_threshold and metrics.net_gamma >= self.min_gamma
-        short_vol = metrics.iv_rv_gap >= self.iv_rv_threshold and metrics.net_gamma >= self.min_gamma
+        long_vol = (
+            metrics.iv_rv_gap <= -self.iv_rv_threshold
+            and metrics.net_gamma >= self.min_gamma
+        )
+        short_vol = (
+            metrics.iv_rv_gap >= self.iv_rv_threshold
+            and metrics.net_gamma >= self.min_gamma
+        )
         near_neutral = not metrics.hedge_rebalance_required
         score = 0.0
         signal_label = "neutral"

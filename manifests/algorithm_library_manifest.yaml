@@ -7907,7 +7907,7 @@ rows:
   display_category: Reinforcement Learning
   subcategory: rl
   tier: tier3
-  delivery_status: blocked_framework
+  delivery_status: complete
   operational_readiness: prototype_only
   advanced_or_institutional_only: true
   best_use_horizon: Portfolio allocation and execution over repeated decisions
@@ -7957,7 +7957,7 @@ rows:
   - performance_smoke
   batch: composite_wave_5
   source_reference_code: CFA-RL
-  notes: Seeded from requirements_v4 combination row 11; initial starter-pack metadata auto-generated.
+  notes: Implemented in composite_wave_5 with reusable RL environment parsing, normalized allocation diagnostics, registry wiring, schema validation, and fixture-backed allocation behavior coverage.
 - catalog_ref: combination:12
   source_doc_ref: requirements_v4:combination:12
   kind: combination_method
@@ -7966,7 +7966,7 @@ rows:
   display_category: Reinforcement Learning
   subcategory: hierarchical
   tier: tier3
-  delivery_status: blocked_framework
+  delivery_status: complete
   operational_readiness: prototype_only
   advanced_or_institutional_only: true
   best_use_horizon: Complex multi-layer systems and multi-horizon control
@@ -8016,4 +8016,4 @@ rows:
   - performance_smoke
   batch: composite_wave_5
   source_reference_code: CFA-RL
-  notes: Seeded from requirements_v4 combination row 12; initial starter-pack metadata auto-generated.
+  notes: Implemented in composite_wave_5 with reusable RL controller helpers, hierarchical action-family gating, normalized allocation diagnostics, schema validation, and fixture-backed meta-policy behavior coverage.

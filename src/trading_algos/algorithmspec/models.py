@@ -29,6 +29,7 @@ InputDomain = Literal[
     "multi_leg_market_data",
     "multi_leg_curve_data",
     "feature_matrix",
+    "rl_environment",
     "label_stream",
     "market_calendar",
     "event_calendar",

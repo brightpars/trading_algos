@@ -16,9 +16,9 @@
 | algorithm rows | 121 |
 | combination-method rows | 12 |
 | ready_to_implement | 1 |
-| blocked_framework | 48 |
+| blocked_framework | 46 |
 | in_progress | 0 |
-| complete | 84 |
+| complete | 86 |
 | prototype_only | 49 |
 | research_ready | 84 |
 | production_ready | 0 |
@@ -43,7 +43,7 @@
 | momentum | algorithm | 11 | 0 | 0 | 0 | 11 |
 | optimization_based | combination_method | 1 | 0 | 1 | 0 | 0 |
 | pattern_price_action | algorithm | 8 | 0 | 0 | 0 | 8 |
-| reinforcement_learning | combination_method | 2 | 0 | 2 | 0 | 0 |
+| reinforcement_learning | combination_method | 2 | 0 | 0 | 0 | 2 |
 | risk_overlay | combination_method | 2 | 1 | 1 | 0 | 0 |
 | rule_based_combination | combination_method | 3 | 0 | 1 | 0 | 2 |
 | stat_arb | algorithm | 14 | 0 | 14 | 0 | 0 |
@@ -69,7 +69,7 @@
 | blocker.fill_simulation_v1 | planned | 6 | execution |
 | blocker.order_book_input_v1 | planned | 8 | microstructure_hft |
 | blocker.own_order_state_v1 | planned | 8 | microstructure_hft |
-| blocker.rl_environment_v1 | planned | 2 | reinforcement_learning |
+| blocker.rl_environment_v1 | complete | 2 | reinforcement_learning |
 | blocker.regime_state_support_v1 | planned | 1 | adaptive_state_based |
 
 ## Next-ready batches

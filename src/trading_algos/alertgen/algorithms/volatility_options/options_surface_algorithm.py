@@ -190,18 +190,30 @@ class BaseOptionsSurfaceAlgorithm:
             "signal_label": [row.signal_label for row in self._rows],
             "score": [row.score for row in self._rows],
             "confidence": [row.confidence for row in self._rows],
-            "warmup_ready": [row.diagnostics.get("warmup_ready", False) for row in self._rows],
+            "warmup_ready": [
+                row.diagnostics.get("warmup_ready", False) for row in self._rows
+            ],
             "net_delta": [row.diagnostics.get("net_delta") for row in self._rows],
             "hedge_units": [row.diagnostics.get("hedge_units") for row in self._rows],
             "net_gamma": [row.diagnostics.get("net_gamma") for row in self._rows],
             "net_vega": [row.diagnostics.get("net_vega") for row in self._rows],
-            "average_implied_vol": [row.diagnostics.get("average_implied_vol") for row in self._rows],
+            "average_implied_vol": [
+                row.diagnostics.get("average_implied_vol") for row in self._rows
+            ],
             "realized_vol": [row.diagnostics.get("realized_vol") for row in self._rows],
             "iv_rv_gap": [row.diagnostics.get("iv_rv_gap") for row in self._rows],
-            "dispersion_gap": [row.diagnostics.get("dispersion_gap") for row in self._rows],
-            "put_call_skew": [row.diagnostics.get("put_call_skew") for row in self._rows],
-            "term_structure_slope": [row.diagnostics.get("term_structure_slope") for row in self._rows],
-            "expected_move_gap": [row.diagnostics.get("expected_move_gap") for row in self._rows],
+            "dispersion_gap": [
+                row.diagnostics.get("dispersion_gap") for row in self._rows
+            ],
+            "put_call_skew": [
+                row.diagnostics.get("put_call_skew") for row in self._rows
+            ],
+            "term_structure_slope": [
+                row.diagnostics.get("term_structure_slope") for row in self._rows
+            ],
+            "expected_move_gap": [
+                row.diagnostics.get("expected_move_gap") for row in self._rows
+            ],
             "reason_codes": [list(row.reason_codes) for row in self._rows],
         }
         latest = self._rows[-1]
@@ -213,8 +225,13 @@ class BaseOptionsSurfaceAlgorithm:
                 score=latest.score,
                 confidence=latest.confidence,
                 regime_label=latest.signal_label,
-                direction=1 if latest.signal_label == "buy" else -1 if latest.signal_label == "sell" else 0,
-                diagnostics=latest.diagnostics | {"reason_codes": list(latest.reason_codes)},
+                direction=1
+                if latest.signal_label == "buy"
+                else -1
+                if latest.signal_label == "sell"
+                else 0,
+                diagnostics=latest.diagnostics
+                | {"reason_codes": list(latest.reason_codes)},
                 reason_codes=latest.reason_codes,
             ),
         )

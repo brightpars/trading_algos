@@ -1,0 +1,76 @@
+[
+  {
+    "timestamp": "2025-01-01",
+    "state": {
+      "regime_score": 0.2,
+      "volatility": 0.3,
+      "momentum": 0.4
+    },
+    "action_scores": {
+      "balanced": 0.2,
+      "defensive": 0.1,
+      "aggressive": 0.4,
+      "trend_family_aggressive": 0.5,
+      "trend_family_defensive": 0.1
+    },
+    "candidate_weights": {
+      "balanced": {
+        "trend": 0.4,
+        "value": 0.3,
+        "carry": 0.3
+      },
+      "aggressive": {
+        "trend": 0.6,
+        "value": 0.25,
+        "carry": 0.15
+      },
+      "trend_family_aggressive": {
+        "trend": 0.7,
+        "value": 0.2,
+        "carry": 0.1
+      },
+      "trend_family_defensive": {
+        "trend": 0.5,
+        "value": 0.35,
+        "carry": 0.15
+      }
+    },
+    "reward": 0.15,
+    "policy_confidence": 0.6,
+    "metadata": {
+      "preferred_family": "trend_family"
+    }
+  },
+  {
+    "timestamp": "2025-01-02",
+    "state": {
+      "regime_score": -0.5,
+      "volatility": 0.9,
+      "momentum": -0.2
+    },
+    "action_scores": {
+      "balanced": 0.1,
+      "defensive": 0.8,
+      "aggressive": -0.4,
+      "trend_family_aggressive": 0.2,
+      "trend_family_defensive": 0.7
+    },
+    "candidate_weights": {
+      "defensive": {
+        "trend": 0.2,
+        "value": 0.2,
+        "carry": 0.6
+      },
+      "trend_family_defensive": {
+        "trend": 0.15,
+        "value": 0.25,
+        "carry": 0.6
+      }
+    },
+    "reward": 0.35,
+    "policy_confidence": 0.9,
+    "metadata": {
+      "preferred_family": "trend_family"
+    }
+  }
+]

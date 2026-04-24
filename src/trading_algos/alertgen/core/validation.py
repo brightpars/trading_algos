@@ -2602,6 +2602,77 @@ def require_stacking_meta_learning_param(raw_alg_param, label):
     return normalized
 
 
+def _require_rl_controller_base_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "min_history", "gross_exposure_limit"],
+        label,
+    )
+    gross_exposure_limit = _require_non_negative_float_like(
+        normalized["gross_exposure_limit"], f"{label} gross_exposure_limit"
+    )
+    if gross_exposure_limit == 0.0:
+        raise ValueError(f"{label} gross_exposure_limit must be > 0")
+    result = {
+        "rows": _require_dict_rows(normalized["rows"], label),
+        "min_history": _require_positive_int_like(
+            normalized["min_history"], f"{label} min_history"
+        ),
+        "gross_exposure_limit": gross_exposure_limit,
+    }
+    action_weight_templates = normalized.get("action_weight_templates", {})
+    if not isinstance(action_weight_templates, dict):
+        raise ValueError(f"{label} action_weight_templates must be a dict")
+    normalized_templates: dict[str, dict[str, float]] = {}
+    for action_key, raw_weight_map in action_weight_templates.items():
+        if not isinstance(raw_weight_map, dict):
+            raise ValueError(
+                f"{label} action_weight_templates[{action_key}] must be a dict"
+            )
+        normalized_templates[
+            _require_non_empty_string(
+                action_key, f"{label} action_weight_templates key"
+            )
+        ] = {
+            _require_non_empty_string(
+                symbol, f"{label} action_weight_templates[{action_key}] key"
+            ): _require_float_like(
+                value,
+                f"{label} action_weight_templates[{action_key}][{symbol}]",
+            )
+            for symbol, value in raw_weight_map.items()
+        }
+    result["action_weight_templates"] = normalized_templates
+    action_aliases = normalized.get("action_aliases", {})
+    if not isinstance(action_aliases, dict):
+        raise ValueError(f"{label} action_aliases must be a dict")
+    result["action_aliases"] = {
+        _require_non_empty_string(
+            key, f"{label} action_aliases key"
+        ): _require_non_empty_string(value, f"{label} action_aliases[{key}]")
+        for key, value in action_aliases.items()
+    }
+    action_overrides = normalized.get("action_overrides", {})
+    if not isinstance(action_overrides, dict):
+        raise ValueError(f"{label} action_overrides must be a dict")
+    result["action_overrides"] = {
+        _require_non_empty_string(
+            key, f"{label} action_overrides key"
+        ): _require_float_like(value, f"{label} action_overrides[{key}]")
+        for key, value in action_overrides.items()
+    }
+    return result
+
+
+def require_rl_allocation_controller_param(raw_alg_param, label):
+    return _require_rl_controller_base_param(raw_alg_param, label)
+
+
+def require_hierarchical_controller_meta_policy_param(raw_alg_param, label):
+    return _require_rl_controller_base_param(raw_alg_param, label)
+
+
 def normalize_alertgen_sensor_config(
     sensor_config, label="Alert generator sensor_config"
 ):

@@ -460,7 +460,7 @@ blockers:
 - blocker_key: blocker.rl_environment_v1
   description: Training and evaluation environment for RL controllers, including state, action, and reward plumbing.
   category: simulation blocker
-  status: planned
+  status: complete
   owner: null
   target_modules:
   - src/trading_algos/rl/environment.py

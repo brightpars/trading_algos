@@ -47,7 +47,9 @@ class GammaScalpingAlgorithm(BaseOptionsSurfaceAlgorithm):
         reason_code = "gamma_scalping_hold"
         if rich_gamma and delta_outside_band and move_large_enough:
             signal_label = "buy"
-            score = min(1.0, abs(metrics.expected_move_gap) / max(self.scalp_threshold, 1e-6))
+            score = min(
+                1.0, abs(metrics.expected_move_gap) / max(self.scalp_threshold, 1e-6)
+            )
             reason_code = "gamma_scalping_rehedge"
         elif not rich_gamma:
             reason_code = "gamma_too_low"
