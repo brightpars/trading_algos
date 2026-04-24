@@ -20,6 +20,15 @@ from trading_algos.alertgen.algorithms.trend.adx_trend_filter import (
 from trading_algos.alertgen.algorithms.trend.exponential_moving_average_crossover import (
     ExponentialMovingAverageCrossoverAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.trend.ichimoku_trend_strategy import (
+    IchimokuTrendStrategyAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.trend.linear_regression_trend import (
+    LinearRegressionTrendAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.trend.macd_trend_strategy import (
+    MACDTrendStrategyAlertAlgorithm,
+)
 from trading_algos.alertgen.algorithms.trend.moving_average_ribbon_trend import (
     MovingAverageRibbonTrendAlertAlgorithm,
 )
@@ -35,6 +44,9 @@ from trading_algos.alertgen.algorithms.trend.simple_moving_average_crossover imp
 from trading_algos.alertgen.algorithms.trend.supertrend import (
     SuperTrendAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.trend.time_series_momentum import (
+    TimeSeriesMomentumAlertAlgorithm,
+)
 from trading_algos.alertgen.algorithms.trend.triple_moving_average_crossover import (
     TripleMovingAverageCrossoverAlertAlgorithm,
 )
@@ -43,12 +55,16 @@ from trading_algos.alertgen.core.validation import (
     require_breakout_donchian_param,
     require_channel_confirmation_param,
     require_fast_medium_slow_window_param,
+    require_ichimoku_param,
+    require_linear_regression_trend_param,
+    require_macd_trend_param,
     require_parabolic_sar_param,
     require_price_vs_ma_param,
     require_period_param,
     require_ribbon_param,
     require_short_long_window_param,
     require_supertrend_param,
+    require_time_series_momentum_param,
     require_window_param,
 )
 
@@ -196,8 +212,289 @@ def _build_supertrend(symbol, report_base_path, alg_param, **_kwargs):
     )
 
 
+def _build_ichimoku_trend_strategy(symbol, report_base_path, alg_param, **_kwargs):
+    return IchimokuTrendStrategyAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        conversion_window=alg_param["conversion_window"],
+        base_window=alg_param["base_window"],
+        span_b_window=alg_param["span_b_window"],
+        displacement=alg_param["displacement"],
+        minimum_cloud_gap=alg_param["minimum_cloud_gap"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_macd_trend_strategy(symbol, report_base_path, alg_param, **_kwargs):
+    return MACDTrendStrategyAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        fast_window=alg_param["fast_window"],
+        slow_window=alg_param["slow_window"],
+        signal_window=alg_param["signal_window"],
+        histogram_threshold=alg_param["histogram_threshold"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_linear_regression_trend(symbol, report_base_path, alg_param, **_kwargs):
+    return LinearRegressionTrendAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        slope_threshold=alg_param["slope_threshold"],
+        min_r_squared=alg_param["min_r_squared"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_time_series_momentum(symbol, report_base_path, alg_param, **_kwargs):
+    return TimeSeriesMomentumAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        return_threshold=alg_param["return_threshold"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
 def register_trend_alert_algorithms() -> None:
     specs = [
+        AlertAlgorithmSpec(
+            key="ichimoku_trend_strategy",
+            name="Ichimoku Trend Strategy",
+            catalog_ref="algorithm:11",
+            builder=_build_ichimoku_trend_strategy,
+            default_param={
+                "conversion_window": 9,
+                "base_window": 26,
+                "span_b_window": 52,
+                "displacement": 26,
+                "minimum_cloud_gap": 0.0,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_ichimoku_param,
+            description="Use Ichimoku cloud structure, conversion/base alignment, and lagging confirmation to detect trend regime.",
+            param_schema=(
+                {
+                    "key": "conversion_window",
+                    "label": "Conversion window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Lookback for the Ichimoku conversion line.",
+                },
+                {
+                    "key": "base_window",
+                    "label": "Base window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 2,
+                    "description": "Lookback for the Ichimoku base line.",
+                },
+                {
+                    "key": "span_b_window",
+                    "label": "Span B window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 3,
+                    "description": "Lookback for Senkou Span B.",
+                },
+                {
+                    "key": "displacement",
+                    "label": "Displacement",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Lagging displacement used by the Ichimoku structure.",
+                },
+                {
+                    "key": "minimum_cloud_gap",
+                    "label": "Minimum cloud gap",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Minimum distance beyond the cloud required before the regime is considered active.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive bars required before the Ichimoku regime is confirmed.",
+                },
+            ),
+            tags=("trend", "ichimoku", "cloud"),
+            category="trend",
+            family="trend",
+            subcategory="ichimoku",
+            warmup_period=52,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="macd_trend_strategy",
+            name="MACD Trend Strategy",
+            catalog_ref="algorithm:12",
+            builder=_build_macd_trend_strategy,
+            default_param={
+                "fast_window": 12,
+                "slow_window": 26,
+                "signal_window": 9,
+                "histogram_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_macd_trend_param,
+            description="Use MACD line, signal line, and histogram confirmation to detect trend crossovers.",
+            param_schema=(
+                {
+                    "key": "fast_window",
+                    "label": "Fast window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Fast EMA lookback for MACD.",
+                },
+                {
+                    "key": "slow_window",
+                    "label": "Slow window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 2,
+                    "description": "Slow EMA lookback for MACD.",
+                },
+                {
+                    "key": "signal_window",
+                    "label": "Signal window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Signal EMA lookback for MACD.",
+                },
+                {
+                    "key": "histogram_threshold",
+                    "label": "Histogram threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Minimum histogram magnitude required before the crossover is treated as active.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive bars required before the MACD state is confirmed.",
+                },
+            ),
+            tags=("trend", "macd", "momentum"),
+            category="trend",
+            family="trend",
+            subcategory="macd",
+            warmup_period=26,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="linear_regression_trend",
+            name="Linear Regression Trend",
+            catalog_ref="algorithm:13",
+            builder=_build_linear_regression_trend,
+            default_param={
+                "window": 20,
+                "slope_threshold": 0.0,
+                "min_r_squared": 0.3,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_linear_regression_trend_param,
+            description="Use rolling linear regression slope and fit quality to detect persistent trends.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Regression lookback window.",
+                },
+                {
+                    "key": "slope_threshold",
+                    "label": "Slope threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Minimum absolute slope required before the trend is considered directional.",
+                },
+                {
+                    "key": "min_r_squared",
+                    "label": "Min R squared",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Minimum fit quality required before the regression trend is trusted.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive bars required before the regression trend is confirmed.",
+                },
+            ),
+            tags=("trend", "linear-regression", "statistics"),
+            category="trend",
+            family="trend",
+            subcategory="linear",
+            warmup_period=20,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="time_series_momentum",
+            name="Time-Series Momentum",
+            catalog_ref="algorithm:14",
+            builder=_build_time_series_momentum,
+            default_param={
+                "window": 20,
+                "return_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_time_series_momentum_param,
+            description="Use an asset's own trailing return sign and magnitude as a simple time-series momentum signal.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Trailing return lookback window.",
+                },
+                {
+                    "key": "return_threshold",
+                    "label": "Return threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Minimum absolute trailing return required before the momentum regime is active.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive bars required before the momentum regime is confirmed.",
+                },
+            ),
+            tags=("trend", "momentum", "time-series"),
+            category="trend",
+            family="trend",
+            subcategory="time",
+            warmup_period=21,
+            output_modes=("signal", "score", "confidence"),
+        ),
         AlertAlgorithmSpec(
             key="simple_moving_average_crossover",
             name="Simple Moving Average Crossover",

@@ -157,6 +157,10 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
     keys = [spec.key for spec in specs]
 
     assert keys == [
+        "ichimoku_trend_strategy",
+        "macd_trend_strategy",
+        "linear_regression_trend",
+        "time_series_momentum",
         "simple_moving_average_crossover",
         "exponential_moving_average_crossover",
         "triple_moving_average_crossover",
@@ -216,6 +220,44 @@ def test_factory_creates_registered_algorithm(tmp_path):
         ("boundary_breakout", {"period": 5}),
         ("double_red_confirmation", {"period": 5}),
         ("low_anchored_boundary_breakout", {"period": 5}),
+        (
+            "ichimoku_trend_strategy",
+            {
+                "conversion_window": 2,
+                "base_window": 3,
+                "span_b_window": 4,
+                "displacement": 2,
+                "minimum_cloud_gap": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "macd_trend_strategy",
+            {
+                "fast_window": 2,
+                "slow_window": 4,
+                "signal_window": 2,
+                "histogram_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "linear_regression_trend",
+            {
+                "window": 3,
+                "slope_threshold": 0.0,
+                "min_r_squared": 0.2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "time_series_momentum",
+            {
+                "window": 3,
+                "return_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
         (
             "simple_moving_average_crossover",
             {
@@ -1891,6 +1933,426 @@ def test_trend_wave_2_performance_smoke_on_representative_series(tmp_path) -> No
         (
             "supertrend",
             {"window": 5, "multiplier": 2.0, "confirmation_bars": 1},
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "bar_series"
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "ichimoku_trend_strategy",
+            {
+                "conversion_window": 3,
+                "base_window": 5,
+                "span_b_window": 7,
+                "displacement": 2,
+                "minimum_cloud_gap": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "macd_trend_strategy",
+            {
+                "fast_window": 3,
+                "slow_window": 5,
+                "signal_window": 2,
+                "histogram_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "linear_regression_trend",
+            {
+                "window": 5,
+                "slope_threshold": 0.0,
+                "min_r_squared": 0.2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "time_series_momentum",
+            {
+                "window": 4,
+                "return_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+    ],
+)
+def test_trend_wave_3_fixture_monotonic_cross_produces_buy_without_late_sell(
+    tmp_path, alg_key, alg_param
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_fixture_rows("monotonic_cross.csv"))
+
+    buy_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("buy_SIGNAL")
+    ]
+    sell_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("sell_SIGNAL")
+    ]
+
+    assert buy_indices
+    assert sell_indices == [] or max(sell_indices) < min(buy_indices)
+
+
+def test_trend_wave_3_whipsaw_controls_reduce_or_limit_events(tmp_path) -> None:
+    rows = _load_fixture_rows("whipsaw_guard.csv")
+    loose_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "macd_trend_strategy",
+            "alg_param": {
+                "fast_window": 2,
+                "slow_window": 3,
+                "signal_window": 2,
+                "histogram_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "loose"),
+    )
+    guarded_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "macd_trend_strategy",
+            "alg_param": {
+                "fast_window": 2,
+                "slow_window": 3,
+                "signal_window": 2,
+                "histogram_threshold": 0.1,
+                "confirmation_bars": 2,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "guarded"),
+    )
+
+    loose_algorithm.process_list(rows)
+    guarded_algorithm.process_list(rows)
+
+    loose_events = len(loose_algorithm.buy_signals) + len(loose_algorithm.sell_signals)
+    guarded_events = len(guarded_algorithm.buy_signals) + len(
+        guarded_algorithm.sell_signals
+    )
+
+    assert guarded_events <= loose_events
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "ichimoku_trend_strategy",
+            {
+                "conversion_window": 3,
+                "base_window": 5,
+                "span_b_window": 7,
+                "displacement": 2,
+                "minimum_cloud_gap": 0.0,
+                "confirmation_bars": 1,
+            },
+            7,
+        ),
+        (
+            "macd_trend_strategy",
+            {
+                "fast_window": 3,
+                "slow_window": 5,
+                "signal_window": 2,
+                "histogram_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "linear_regression_trend",
+            {
+                "window": 5,
+                "slope_threshold": 0.0,
+                "min_r_squared": 0.2,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "time_series_momentum",
+            {
+                "window": 4,
+                "return_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+    ],
+)
+def test_trend_wave_3_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(
+        _load_fixture_rows("monotonic_cross.csv")[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_reason_code", "expected_annotation_keys"),
+    [
+        (
+            "ichimoku_trend_strategy",
+            {
+                "conversion_window": 3,
+                "base_window": 5,
+                "span_b_window": 7,
+                "displacement": 2,
+                "minimum_cloud_gap": 0.0,
+                "confirmation_bars": 1,
+            },
+            "ichimoku_bullish_cloud_breakout",
+            {"conversion_window", "base_window", "span_b_window", "indicator"},
+        ),
+        (
+            "macd_trend_strategy",
+            {
+                "fast_window": 3,
+                "slow_window": 5,
+                "signal_window": 2,
+                "histogram_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            "macd_bullish_crossover",
+            {"fast_window", "slow_window", "signal_window", "indicator"},
+        ),
+        (
+            "linear_regression_trend",
+            {
+                "window": 5,
+                "slope_threshold": 0.0,
+                "min_r_squared": 0.2,
+                "confirmation_bars": 1,
+            },
+            "linear_regression_bullish",
+            {"window", "slope_threshold", "min_r_squared", "indicator"},
+        ),
+        (
+            "time_series_momentum",
+            {
+                "window": 4,
+                "return_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            "time_series_momentum_bullish",
+            {"window", "return_threshold", "indicator"},
+        ),
+    ],
+)
+def test_trend_wave_3_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, expected_reason_code, expected_annotation_keys
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_fixture_rows("monotonic_cross.csv"))
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    last_point = output.points[-1]
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert expected_reason_code in last_point.reason_codes
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+        "confirmation_state_label",
+        "warmup_ready",
+    }.issubset(output.derived_series)
+    assert output.metadata["family"] == "trend"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == child_output.diagnostics["catalog_ref"]
+    assert child_output.signal_label == "buy"
+    assert expected_reason_code in child_output.diagnostics["reason_codes"]
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+
+
+def test_trend_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(
+        ValueError, match="conversion_window < base_window < span_b_window"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "ichimoku_trend_strategy",
+                "alg_param": {
+                    "conversion_window": 5,
+                    "base_window": 5,
+                    "span_b_window": 7,
+                    "displacement": 2,
+                    "minimum_cloud_gap": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="fast_window < slow_window"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "macd_trend_strategy",
+                "alg_param": {
+                    "fast_window": 5,
+                    "slow_window": 4,
+                    "signal_window": 2,
+                    "histogram_threshold": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="min_r_squared must be <= 1"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "linear_regression_trend",
+                "alg_param": {
+                    "window": 5,
+                    "slope_threshold": 0.0,
+                    "min_r_squared": 1.1,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "expected_catalog_ref", "expected_warmup"),
+    [
+        ("ichimoku_trend_strategy", "algorithm:11", 52),
+        ("macd_trend_strategy", "algorithm:12", 26),
+        ("linear_regression_trend", "algorithm:13", 20),
+        ("time_series_momentum", "algorithm:14", 21),
+    ],
+)
+def test_trend_wave_3_registration_metadata_matches_catalog(
+    alg_key, expected_catalog_ref, expected_warmup
+) -> None:
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+
+    assert spec.catalog_ref == expected_catalog_ref
+    assert spec.family == "trend"
+    assert spec.category == "trend"
+    assert spec.warmup_period == expected_warmup
+
+
+def test_trend_wave_3_performance_smoke_on_representative_series(tmp_path) -> None:
+    rows = _load_fixture_rows("monotonic_cross.csv") * 400
+    algorithms = [
+        (
+            "ichimoku_trend_strategy",
+            {
+                "conversion_window": 3,
+                "base_window": 5,
+                "span_b_window": 7,
+                "displacement": 2,
+                "minimum_cloud_gap": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "macd_trend_strategy",
+            {
+                "fast_window": 3,
+                "slow_window": 5,
+                "signal_window": 2,
+                "histogram_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "linear_regression_trend",
+            {
+                "window": 5,
+                "slope_threshold": 0.0,
+                "min_r_squared": 0.2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "time_series_momentum",
+            {
+                "window": 4,
+                "return_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
         ),
     ]
 

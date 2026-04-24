@@ -13,6 +13,7 @@ from trading_algos.alertgen.shared_utils.indicators import (
     detect_crossovers,
     directional_movement_index,
     exponential_moving_average,
+    ichimoku,
     macd,
     parabolic_sar,
     rate_of_change,
@@ -114,6 +115,33 @@ def test_zscore_macd_and_regression_helpers_produce_expected_outputs() -> None:
     assert slopes[-1] == pytest.approx(1.0)
     assert intercepts[-1] == pytest.approx(4.0)
     assert r_squared_values[-1] == pytest.approx(1.0)
+
+
+def test_ichimoku_helper_produces_expected_shapes() -> None:
+    highs = [10, 11, 12, 13, 14, 15]
+    lows = [9, 10, 11, 12, 13, 14]
+    closes = [9.5, 10.5, 11.5, 12.5, 13.5, 14.5]
+
+    conversion, base, span_a, span_b, lagging = ichimoku(
+        highs,
+        lows,
+        closes,
+        conversion_window=2,
+        base_window=3,
+        span_b_window=4,
+        displacement=2,
+    )
+
+    assert len(conversion) == len(highs)
+    assert len(base) == len(highs)
+    assert len(span_a) == len(highs)
+    assert len(span_b) == len(highs)
+    assert len(lagging) == len(highs)
+    assert conversion[-1] == pytest.approx(14.0)
+    assert base[-1] == pytest.approx(13.5)
+    assert span_a[-1] == pytest.approx(13.75)
+    assert span_b[-1] == pytest.approx(13.0)
+    assert lagging[-1] == pytest.approx(12.5)
 
 
 def test_normalized_child_output_contract_validates_and_serializes() -> None:

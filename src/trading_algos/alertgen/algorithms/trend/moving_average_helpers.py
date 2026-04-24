@@ -40,6 +40,13 @@ def clamp_unit(value: float) -> float:
     return value
 
 
+def safe_relative_score(
+    numerator: float, denominator: float, *, floor: float = 1e-9
+) -> float:
+    scale = max(abs(denominator), floor)
+    return clamp_unit(numerator / scale)
+
+
 @dataclass(frozen=True)
 class TrendSignalState:
     regime: str

@@ -351,6 +351,129 @@ def require_supertrend_param(raw_alg_param, label):
     }
 
 
+def require_ichimoku_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "conversion_window",
+            "base_window",
+            "span_b_window",
+            "displacement",
+            "minimum_cloud_gap",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    conversion_window = _require_positive_int_like(
+        normalized["conversion_window"], f"{label} conversion_window"
+    )
+    base_window = _require_positive_int_like(
+        normalized["base_window"], f"{label} base_window"
+    )
+    span_b_window = _require_positive_int_like(
+        normalized["span_b_window"], f"{label} span_b_window"
+    )
+    displacement = _require_positive_int_like(
+        normalized["displacement"], f"{label} displacement"
+    )
+    if not (conversion_window < base_window < span_b_window):
+        raise ValueError(
+            f"{label} requires conversion_window < base_window < span_b_window"
+        )
+    return {
+        "conversion_window": conversion_window,
+        "base_window": base_window,
+        "span_b_window": span_b_window,
+        "displacement": displacement,
+        "minimum_cloud_gap": _require_non_negative_float_like(
+            normalized["minimum_cloud_gap"], f"{label} minimum_cloud_gap"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_macd_trend_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "fast_window",
+            "slow_window",
+            "signal_window",
+            "histogram_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    fast_window = _require_positive_int_like(
+        normalized["fast_window"], f"{label} fast_window"
+    )
+    slow_window = _require_positive_int_like(
+        normalized["slow_window"], f"{label} slow_window"
+    )
+    signal_window = _require_positive_int_like(
+        normalized["signal_window"], f"{label} signal_window"
+    )
+    if fast_window >= slow_window:
+        raise ValueError(f"{label} requires fast_window < slow_window")
+    return {
+        "fast_window": fast_window,
+        "slow_window": slow_window,
+        "signal_window": signal_window,
+        "histogram_threshold": _require_non_negative_float_like(
+            normalized["histogram_threshold"], f"{label} histogram_threshold"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_linear_regression_trend_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "slope_threshold", "min_r_squared", "confirmation_bars"],
+        label,
+    )
+    min_r_squared = _require_non_negative_float_like(
+        normalized["min_r_squared"], f"{label} min_r_squared"
+    )
+    if min_r_squared > 1.0:
+        raise ValueError(f"{label} min_r_squared must be <= 1")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "slope_threshold": _require_non_negative_float_like(
+            normalized["slope_threshold"], f"{label} slope_threshold"
+        ),
+        "min_r_squared": min_r_squared,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_time_series_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "return_threshold", "confirmation_bars"],
+        label,
+    )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "return_threshold": _require_non_negative_float_like(
+            normalized["return_threshold"], f"{label} return_threshold"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def require_roc_momentum_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(

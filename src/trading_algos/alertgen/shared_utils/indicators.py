@@ -547,6 +547,66 @@ def macd(
     return macd_line, signal_line, histogram
 
 
+def ichimoku(
+    highs: Sequence[float | int | None],
+    lows: Sequence[float | int | None],
+    closes: Sequence[float | int | None],
+    *,
+    conversion_window: int = 9,
+    base_window: int = 26,
+    span_b_window: int = 52,
+    displacement: int = 26,
+) -> tuple[
+    list[float | None],
+    list[float | None],
+    list[float | None],
+    list[float | None],
+    list[float | None],
+]:
+    _validate_window(conversion_window)
+    _validate_window(base_window)
+    _validate_window(span_b_window)
+    _validate_window(displacement)
+    conversion_high = rolling_high(highs, conversion_window)
+    conversion_low = rolling_low(lows, conversion_window)
+    base_high = rolling_high(highs, base_window)
+    base_low = rolling_low(lows, base_window)
+    span_b_high = rolling_high(highs, span_b_window)
+    span_b_low = rolling_low(lows, span_b_window)
+
+    conversion_line = [
+        None
+        if high_value is None or low_value is None
+        else (high_value + low_value) / 2.0
+        for high_value, low_value in zip(conversion_high, conversion_low)
+    ]
+    base_line = [
+        None
+        if high_value is None or low_value is None
+        else (high_value + low_value) / 2.0
+        for high_value, low_value in zip(base_high, base_low)
+    ]
+    span_a = [
+        None
+        if conversion_value is None or base_value is None
+        else (conversion_value + base_value) / 2.0
+        for conversion_value, base_value in zip(conversion_line, base_line)
+    ]
+    span_b = [
+        None
+        if high_value is None or low_value is None
+        else (high_value + low_value) / 2.0
+        for high_value, low_value in zip(span_b_high, span_b_low)
+    ]
+    lagging_span: list[float | None] = [None] * len(closes)
+    cast_closes = _as_float_list(closes)
+    for index, close_value in enumerate(cast_closes):
+        if close_value is None or index < displacement:
+            continue
+        lagging_span[index] = cast_closes[index - displacement]
+    return conversion_line, base_line, span_a, span_b, lagging_span
+
+
 def rolling_linear_regression(
     values: Sequence[float | int | None], window: int
 ) -> tuple[list[float | None], list[float | None], list[float | None]]:
