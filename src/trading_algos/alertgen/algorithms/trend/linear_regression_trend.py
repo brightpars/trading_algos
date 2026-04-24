@@ -50,6 +50,17 @@ class LinearRegressionTrendAlertAlgorithm(BaseMovingAverageTrendAlertAlgorithm):
             "indicator": "linear_regression",
         }
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {
+            "regression_slope": self.latest_data_modifiable.get("regression_slope"),
+            "regression_intercept": self.latest_data_modifiable.get(
+                "regression_intercept"
+            ),
+            "regression_r_squared": self.latest_data_modifiable.get(
+                "regression_r_squared"
+            ),
+        }
+
     def _calculate_state(self) -> TrendSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
         slopes, intercepts, r_squared_values = rolling_linear_regression(

@@ -2074,6 +2074,15 @@ def test_trend_wave_3_whipsaw_controls_reduce_or_limit_events(tmp_path) -> None:
 
     assert guarded_events <= loose_events
 
+    guarded_output = guarded_algorithm.normalized_output()
+    assert "macd_histogram" in guarded_output.derived_series
+    assert "confirmation_state_label" in guarded_output.derived_series
+    assert any(
+        "confirmation_pending" in point.reason_codes
+        or "macd_inside_threshold" in point.reason_codes
+        for point in guarded_output.points
+    )
+
 
 @pytest.mark.parametrize(
     ("alg_key", "alg_param", "expected_warmup"),
@@ -2236,6 +2245,32 @@ def test_trend_wave_3_normalized_output_exposes_dashboard_diagnostics(
     assert child_output.signal_label == "buy"
     assert expected_reason_code in child_output.diagnostics["reason_codes"]
     assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+    if alg_key == "ichimoku_trend_strategy":
+        assert {
+            "ichimoku_conversion",
+            "ichimoku_base",
+            "ichimoku_span_a",
+            "ichimoku_span_b",
+            "ichimoku_lagging",
+            "cloud_top",
+            "cloud_bottom",
+            "cloud_gap",
+            "price_cloud_gap",
+            "conversion_spread",
+            "lagging_confirmation",
+        }.issubset(child_output.diagnostics.keys())
+    elif alg_key == "macd_trend_strategy":
+        assert {"macd_line", "macd_signal", "macd_histogram"}.issubset(
+            child_output.diagnostics.keys()
+        )
+    elif alg_key == "linear_regression_trend":
+        assert {
+            "regression_slope",
+            "regression_intercept",
+            "regression_r_squared",
+        }.issubset(child_output.diagnostics.keys())
+    elif alg_key == "time_series_momentum":
+        assert {"tsmom_return"}.issubset(child_output.diagnostics.keys())
 
 
 def test_trend_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
@@ -2285,6 +2320,21 @@ def test_trend_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
                     "window": 5,
                     "slope_threshold": 0.0,
                     "min_r_squared": 1.1,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="return_threshold must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "time_series_momentum",
+                "alg_param": {
+                    "window": 5,
+                    "return_threshold": -0.1,
                     "confirmation_bars": 1,
                 },
                 "buy": True,

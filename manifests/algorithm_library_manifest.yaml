@@ -735,8 +735,8 @@ rows:
   display_category: Trend Following
   subcategory: ichimoku
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -782,7 +782,7 @@ rows:
   - performance_smoke
   batch: trend_wave_3
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 11; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_3 with fixture-backed behavior checks, warmup coverage, normalized dashboard diagnostics including Ichimoku state fields, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:12
   source_doc_ref: requirements_v4:algorithm:12
   kind: algorithm
@@ -791,8 +791,8 @@ rows:
   display_category: Trend Following
   subcategory: macd
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -839,7 +839,7 @@ rows:
   - performance_smoke
   batch: trend_wave_3
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 12; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_3 with fixture-backed crossover and whipsaw checks, warmup coverage, normalized dashboard diagnostics including MACD state fields, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:13
   source_doc_ref: requirements_v4:algorithm:13
   kind: algorithm
@@ -848,8 +848,8 @@ rows:
   display_category: Trend Following
   subcategory: linear
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -895,7 +895,7 @@ rows:
   - performance_smoke
   batch: trend_wave_3
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 13; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_3 with fixture-backed trend checks, warmup coverage, normalized dashboard diagnostics including regression state fields, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:14
   source_doc_ref: requirements_v4:algorithm:14
   kind: algorithm
@@ -904,8 +904,8 @@ rows:
   display_category: Trend Following
   subcategory: time
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -950,7 +950,7 @@ rows:
   - performance_smoke
   batch: trend_wave_3
   source_reference_code: AQR-TSMOM
-  notes: Seeded from requirements_v4 row 14; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_3 with fixture-backed momentum checks, warmup coverage, normalized dashboard diagnostics including return state fields, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:15
   source_doc_ref: requirements_v4:algorithm:15
   kind: algorithm

@@ -47,6 +47,11 @@ class TimeSeriesMomentumAlertAlgorithm(BaseMovingAverageTrendAlertAlgorithm):
             "indicator": "time_series_momentum",
         }
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {
+            "tsmom_return": self.latest_data_modifiable.get("tsmom_return"),
+        }
+
     def _calculate_state(self) -> TrendSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
         roc_values = rate_of_change(closes, self.window)

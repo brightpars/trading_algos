@@ -66,6 +66,25 @@ class IchimokuTrendStrategyAlertAlgorithm(BaseMovingAverageTrendAlertAlgorithm):
             "indicator": "ichimoku",
         }
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {
+            "ichimoku_conversion": self.latest_data_modifiable.get(
+                "ichimoku_conversion"
+            ),
+            "ichimoku_base": self.latest_data_modifiable.get("ichimoku_base"),
+            "ichimoku_span_a": self.latest_data_modifiable.get("ichimoku_span_a"),
+            "ichimoku_span_b": self.latest_data_modifiable.get("ichimoku_span_b"),
+            "ichimoku_lagging": self.latest_data_modifiable.get("ichimoku_lagging"),
+            "cloud_top": self.latest_data_modifiable.get("cloud_top"),
+            "cloud_bottom": self.latest_data_modifiable.get("cloud_bottom"),
+            "cloud_gap": self.latest_data_modifiable.get("cloud_gap"),
+            "price_cloud_gap": self.latest_data_modifiable.get("price_cloud_gap"),
+            "conversion_spread": self.latest_data_modifiable.get("conversion_spread"),
+            "lagging_confirmation": self.latest_data_modifiable.get(
+                "lagging_confirmation"
+            ),
+        }
+
     def _calculate_state(self) -> TrendSignalState:
         highs = [float(item["High"]) for item in self.data_list]
         lows = [float(item["Low"]) for item in self.data_list]
@@ -116,6 +135,12 @@ class IchimokuTrendStrategyAlertAlgorithm(BaseMovingAverageTrendAlertAlgorithm):
             else close_value - cloud_bottom
         )
         lagging_confirmation = lagging_value < close_value
+        self.latest_data_modifiable["cloud_top"] = cloud_top
+        self.latest_data_modifiable["cloud_bottom"] = cloud_bottom
+        self.latest_data_modifiable["cloud_gap"] = cloud_gap
+        self.latest_data_modifiable["price_cloud_gap"] = price_cloud_gap
+        self.latest_data_modifiable["conversion_spread"] = conversion_spread
+        self.latest_data_modifiable["lagging_confirmation"] = lagging_confirmation
         bullish = (
             close_value > cloud_top + self.minimum_cloud_gap
             and conversion_spread > 0.0

@@ -61,6 +61,13 @@ class MACDTrendStrategyAlertAlgorithm(BaseMovingAverageTrendAlertAlgorithm):
             "indicator": "macd",
         }
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {
+            "macd_line": self.latest_data_modifiable.get("macd_line"),
+            "macd_signal": self.latest_data_modifiable.get("macd_signal"),
+            "macd_histogram": self.latest_data_modifiable.get("macd_histogram"),
+        }
+
     def _calculate_state(self) -> TrendSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
         macd_line, signal_line, histogram = macd(

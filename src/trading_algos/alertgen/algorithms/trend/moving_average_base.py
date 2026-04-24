@@ -46,6 +46,9 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
     def _parameter_annotations(self) -> dict[str, object]:
         return {}
 
+    def _state_annotations(self) -> dict[str, object]:
+        return {}
+
     def _reason_codes(self, state: TrendSignalState) -> tuple[str, ...]:
         reason_codes: list[str] = []
         if state.primary_value is None and state.spread is None:
@@ -106,6 +109,7 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
             "warmup_ready": len(self.data_list) >= self.minimum_history(),
         }
         annotations.update(self._parameter_annotations())
+        annotations.update(self._state_annotations())
         return annotations
 
     def _record_state(self, state: TrendSignalState) -> None:
