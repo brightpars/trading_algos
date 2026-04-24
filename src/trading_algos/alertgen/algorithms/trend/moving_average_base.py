@@ -48,10 +48,12 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
 
     def _reason_codes(self, state: TrendSignalState) -> tuple[str, ...]:
         reason_codes: list[str] = []
-        if state.spread is None:
+        if state.primary_value is None and state.spread is None:
             reason_codes.append("warmup_pending")
             return tuple(reason_codes)
-        if state.bullish:
+        if state.reason_code:
+            reason_codes.append(state.reason_code)
+        elif state.bullish:
             reason_codes.append("bullish_setup")
         elif state.bearish:
             reason_codes.append("bearish_setup")
@@ -65,10 +67,16 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
     def _decision_annotations(self) -> dict[str, object]:
         annotations: dict[str, object] = {
             "alg_name": self.alg_name,
+            "catalog_ref": getattr(self, "catalog_ref", None),
+            "family": "trend",
+            "reporting_mode": self.reporting_mode(),
             "regime_label": self.latest_data_modifiable.get(
                 "regime_label", TREND.UNKNOWN
             ),
             "trend_score": self.latest_data_modifiable.get("trend_score", 0.0),
+            "primary_value": self.latest_data_modifiable.get("primary_value"),
+            "signal_value": self.latest_data_modifiable.get("signal_value"),
+            "threshold_value": self.latest_data_modifiable.get("threshold_value"),
             "spread_value": self.latest_data_modifiable.get("spread_value"),
             "reason_codes": tuple(self.latest_data_modifiable.get("reason_codes", ())),
             "aligned_count": self.latest_data_modifiable.get("aligned_count", 0),
@@ -82,6 +90,14 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
             "bearish_confirmed": self.latest_data_modifiable.get(
                 "bearish_confirmed", False
             ),
+            "bullish_confirmation_count": self.latest_data_modifiable.get(
+                "bullish_confirmation_count", 0
+            ),
+            "bearish_confirmation_count": self.latest_data_modifiable.get(
+                "bearish_confirmation_count", 0
+            ),
+            "warmup_period": self.minimum_history(),
+            "warmup_ready": len(self.data_list) >= self.minimum_history(),
         }
         annotations.update(self._parameter_annotations())
         return annotations
@@ -97,8 +113,15 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
         self.latest_data_modifiable["bearish_confirmed"] = False
         self.latest_data_modifiable["regime_label"] = state.regime
         self.latest_data_modifiable["reason_codes"] = self._reason_codes(state)
+        self.latest_data_modifiable["primary_value"] = state.primary_value
+        self.latest_data_modifiable["signal_value"] = state.signal_value
+        self.latest_data_modifiable["threshold_value"] = state.threshold_value
         if state.spread is not None:
             self.latest_data_modifiable["spread_value"] = state.spread
+        if state.upper_band is not None:
+            self.latest_data_modifiable["upper_band"] = state.upper_band
+        if state.lower_band is not None:
+            self.latest_data_modifiable["lower_band"] = state.lower_band
 
     def trend_prediction_logic(self) -> None:
         state = self._calculate_state()
@@ -147,3 +170,14 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
             no_signal=self.latest_predicted_trend not in [TREND.UP, TREND.DOWN],
             annotations=self._decision_annotations(),
         )
+
+    def _normalized_signal_score(self, item: dict[str, object]) -> float:
+        raw_score = item.get("trend_score", 0.0)
+        if isinstance(raw_score, (int, float)):
+            score = float(raw_score)
+            if score < -1.0:
+                return -1.0
+            if score > 1.0:
+                return 1.0
+            return score
+        return 0.0

@@ -4,9 +4,18 @@ from trading_algos.alertgen.algorithms.trend.boundary_breakout import (
     DoubleRedConfirmationAlertAlgorithm,
     LowAnchoredBoundaryBreakoutAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.trend.breakout_donchian_channel import (
+    BreakoutDonchianChannelAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.trend.channel_breakout_with_confirmation import (
+    ChannelBreakoutWithConfirmationAlertAlgorithm,
+)
 from trading_algos.alertgen.algorithms.trend.channel_breakout import (
     CloseHighChannelBreakoutAlertAlgorithm,
     RollingChannelBreakoutAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.trend.adx_trend_filter import (
+    ADXTrendFilterAlertAlgorithm,
 )
 from trading_algos.alertgen.algorithms.trend.exponential_moving_average_crossover import (
     ExponentialMovingAverageCrossoverAlertAlgorithm,
@@ -14,21 +23,32 @@ from trading_algos.alertgen.algorithms.trend.exponential_moving_average_crossove
 from trading_algos.alertgen.algorithms.trend.moving_average_ribbon_trend import (
     MovingAverageRibbonTrendAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.trend.parabolic_sar_trend_following import (
+    ParabolicSARTrendFollowingAlertAlgorithm,
+)
 from trading_algos.alertgen.algorithms.trend.price_vs_moving_average import (
     PriceVsMovingAverageAlertAlgorithm,
 )
 from trading_algos.alertgen.algorithms.trend.simple_moving_average_crossover import (
     SimpleMovingAverageCrossoverAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.trend.supertrend import (
+    SuperTrendAlertAlgorithm,
+)
 from trading_algos.alertgen.algorithms.trend.triple_moving_average_crossover import (
     TripleMovingAverageCrossoverAlertAlgorithm,
 )
 from trading_algos.alertgen.core.validation import (
+    require_adx_trend_filter_param,
+    require_breakout_donchian_param,
+    require_channel_confirmation_param,
     require_fast_medium_slow_window_param,
+    require_parabolic_sar_param,
     require_price_vs_ma_param,
     require_period_param,
     require_ribbon_param,
     require_short_long_window_param,
+    require_supertrend_param,
     require_window_param,
 )
 
@@ -118,6 +138,60 @@ def _build_moving_average_ribbon_trend(symbol, report_base_path, alg_param, **_k
         report_base_path=report_base_path,
         windows=alg_param["windows"],
         minimum_spread=alg_param["minimum_spread"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_breakout_donchian_channel(symbol, report_base_path, alg_param, **_kwargs):
+    return BreakoutDonchianChannelAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        minimum_breakout=alg_param["minimum_breakout"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_channel_breakout_with_confirmation(
+    symbol, report_base_path, alg_param, **_kwargs
+):
+    return ChannelBreakoutWithConfirmationAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        breakout_threshold=alg_param["breakout_threshold"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_adx_trend_filter(symbol, report_base_path, alg_param, **_kwargs):
+    return ADXTrendFilterAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        adx_threshold=alg_param["adx_threshold"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_parabolic_sar_trend_following(
+    symbol, report_base_path, alg_param, **_kwargs
+):
+    return ParabolicSARTrendFollowingAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        step=alg_param["step"],
+        max_step=alg_param["max_step"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_supertrend(symbol, report_base_path, alg_param, **_kwargs):
+    return SuperTrendAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        multiplier=alg_param["multiplier"],
         confirmation_bars=alg_param["confirmation_bars"],
     )
 
@@ -392,6 +466,231 @@ def register_trend_alert_algorithms() -> None:
             family="trend",
             subcategory="moving",
             warmup_period=30,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="breakout_donchian_channel",
+            name="Breakout (Donchian Channel)",
+            catalog_ref="algorithm:6",
+            builder=_build_breakout_donchian_channel,
+            default_param={
+                "window": 20,
+                "minimum_breakout": 0.0,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_breakout_donchian_param,
+            description="Buy on breakouts above the prior Donchian upper band and sell on breaks below the lower band.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Lookback used to form the Donchian channel.",
+                },
+                {
+                    "key": "minimum_breakout",
+                    "label": "Minimum breakout",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Minimum amount price must exceed the prior channel boundary before triggering.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of consecutive breakout bars required before the state is confirmed.",
+                },
+            ),
+            tags=("trend", "breakout", "donchian"),
+            category="trend",
+            family="trend",
+            subcategory="breakout",
+            warmup_period=20,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="channel_breakout_with_confirmation",
+            name="Channel Breakout with Confirmation",
+            catalog_ref="algorithm:7",
+            builder=_build_channel_breakout_with_confirmation,
+            default_param={
+                "window": 20,
+                "breakout_threshold": 0.0,
+                "confirmation_bars": 2,
+            },
+            param_normalizer=require_channel_confirmation_param,
+            description="Require a channel breakout to persist across confirmation bars before switching trend state.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Lookback used to form the confirmation channel.",
+                },
+                {
+                    "key": "breakout_threshold",
+                    "label": "Breakout threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Minimum distance beyond the channel boundary before a breakout counts toward confirmation.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of consecutive breakout bars required before the breakout is confirmed.",
+                },
+            ),
+            tags=("trend", "channel", "confirmation"),
+            category="trend",
+            family="trend",
+            subcategory="channel",
+            warmup_period=20,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="adx_trend_filter",
+            name="ADX Trend Filter",
+            catalog_ref="algorithm:8",
+            builder=_build_adx_trend_filter,
+            default_param={
+                "window": 14,
+                "adx_threshold": 25.0,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_adx_trend_filter_param,
+            description="Emit bullish or bearish trend states only when ADX exceeds the configured threshold and directional movement agrees.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Lookback used to compute ADX and directional indicators.",
+                },
+                {
+                    "key": "adx_threshold",
+                    "label": "ADX threshold",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Minimum ADX value required before the trend filter allows a directional state.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of consecutive bars required before the ADX-filtered state is confirmed.",
+                },
+            ),
+            tags=("trend", "adx", "filter"),
+            category="trend",
+            family="trend",
+            subcategory="adx",
+            warmup_period=27,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="parabolic_sar_trend_following",
+            name="Parabolic SAR Trend Following",
+            catalog_ref="algorithm:9",
+            builder=_build_parabolic_sar_trend_following,
+            default_param={
+                "step": 0.02,
+                "max_step": 0.2,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_parabolic_sar_param,
+            description="Follow the Parabolic SAR direction and flip the trend regime when price crosses the SAR level.",
+            param_schema=(
+                {
+                    "key": "step",
+                    "label": "Step",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.000001,
+                    "description": "Acceleration factor increment used by the Parabolic SAR calculation.",
+                },
+                {
+                    "key": "max_step",
+                    "label": "Max step",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.000001,
+                    "description": "Maximum acceleration factor allowed by the Parabolic SAR calculation.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of consecutive bars required before the SAR state is confirmed.",
+                },
+            ),
+            tags=("trend", "parabolic-sar"),
+            category="trend",
+            family="trend",
+            subcategory="parabolic",
+            warmup_period=2,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="supertrend",
+            name="SuperTrend",
+            catalog_ref="algorithm:10",
+            builder=_build_supertrend,
+            default_param={
+                "window": 10,
+                "multiplier": 3.0,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_supertrend_param,
+            description="Trend regime based on ATR-derived bands and direction flips.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "ATR lookback used to build the SuperTrend bands.",
+                },
+                {
+                    "key": "multiplier",
+                    "label": "Multiplier",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.000001,
+                    "description": "ATR multiplier used to offset the SuperTrend bands.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of consecutive bars required before the SuperTrend direction is confirmed.",
+                },
+            ),
+            tags=("trend", "supertrend", "atr"),
+            category="trend",
+            family="trend",
+            subcategory="supertrend",
+            warmup_period=10,
             output_modes=("signal", "score", "confidence"),
         ),
         AlertAlgorithmSpec(

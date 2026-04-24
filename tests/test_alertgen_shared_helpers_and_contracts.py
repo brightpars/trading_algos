@@ -11,14 +11,17 @@ from trading_algos.alertgen.contracts.outputs import (
 from trading_algos.alertgen.shared_utils.indicators import (
     average_true_range,
     detect_crossovers,
+    directional_movement_index,
     exponential_moving_average,
     macd,
+    parabolic_sar,
     rate_of_change,
     relative_strength_index,
     rolling_linear_regression,
     rolling_zscore,
     simple_moving_average,
     stochastic_oscillator,
+    supertrend,
 )
 
 
@@ -72,6 +75,25 @@ def test_volatility_momentum_and_oscillator_helpers_compute_expected_points() ->
     assert percent_k[:2] == [None, None]
     assert percent_k[-1] == pytest.approx(75.0)
     assert percent_d[-1] == pytest.approx(75.0)
+
+
+def test_trend_batch_two_indicator_helpers_produce_expected_shapes() -> None:
+    highs = [10, 11, 12, 13, 14, 15]
+    lows = [9, 10, 11, 12, 13, 14]
+    closes = [9.5, 10.5, 11.5, 12.5, 13.5, 14.5]
+
+    plus_di, minus_di, adx_values = directional_movement_index(highs, lows, closes, 3)
+    sar_values = parabolic_sar(highs, lows, step=0.02, max_step=0.2)
+    upper_band, lower_band, direction = supertrend(highs, lows, closes, 3, 2.0)
+
+    assert len(plus_di) == len(highs)
+    assert len(minus_di) == len(highs)
+    assert len(adx_values) == len(highs)
+    assert adx_values[-1] is not None
+    assert sar_values[-1] is not None
+    assert len(upper_band) == len(highs)
+    assert len(lower_band) == len(highs)
+    assert direction[-1] in (-1, 1)
 
 
 def test_zscore_macd_and_regression_helpers_produce_expected_outputs() -> None:

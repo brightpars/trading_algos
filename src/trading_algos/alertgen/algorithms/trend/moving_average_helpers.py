@@ -32,6 +32,14 @@ def minimum_history_for_windows(*windows: int) -> int:
     return max(windows)
 
 
+def clamp_unit(value: float) -> float:
+    if value < -1.0:
+        return -1.0
+    if value > 1.0:
+        return 1.0
+    return value
+
+
 @dataclass(frozen=True)
 class TrendSignalState:
     regime: str
@@ -40,3 +48,9 @@ class TrendSignalState:
     aligned_count: int
     bullish: bool
     bearish: bool
+    reason_code: str | None = None
+    primary_value: float | None = None
+    signal_value: float | None = None
+    threshold_value: float | None = None
+    upper_band: float | None = None
+    lower_band: float | None = None

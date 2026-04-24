@@ -162,6 +162,11 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "triple_moving_average_crossover",
         "price_vs_moving_average",
         "moving_average_ribbon_trend",
+        "breakout_donchian_channel",
+        "channel_breakout_with_confirmation",
+        "adx_trend_filter",
+        "parabolic_sar_trend_following",
+        "supertrend",
         "boundary_breakout",
         "double_red_confirmation",
         "low_anchored_boundary_breakout",
@@ -253,6 +258,46 @@ def test_factory_creates_registered_algorithm(tmp_path):
             {
                 "windows": [2, 3, 4],
                 "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "breakout_donchian_channel",
+            {
+                "window": 3,
+                "minimum_breakout": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "channel_breakout_with_confirmation",
+            {
+                "window": 3,
+                "breakout_threshold": 0.0,
+                "confirmation_bars": 2,
+            },
+        ),
+        (
+            "adx_trend_filter",
+            {
+                "window": 3,
+                "adx_threshold": 10.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "parabolic_sar_trend_following",
+            {
+                "step": 0.02,
+                "max_step": 0.2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "supertrend",
+            {
+                "window": 3,
+                "multiplier": 2.0,
                 "confirmation_bars": 1,
             },
         ),
@@ -417,6 +462,38 @@ def test_registered_algorithms_follow_basic_contract(tmp_path, alg_key, alg_para
                 "minimum_spread": 0.0,
                 "confirmation_bars": 1,
             },
+        ),
+        (
+            "breakout_donchian_channel",
+            {
+                "window": 2,
+                "minimum_breakout": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "channel_breakout_with_confirmation",
+            {
+                "window": 2,
+                "breakout_threshold": 0.0,
+                "confirmation_bars": 2,
+            },
+        ),
+        (
+            "adx_trend_filter",
+            {
+                "window": 2,
+                "adx_threshold": 5.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "parabolic_sar_trend_following",
+            {"step": 0.02, "max_step": 0.2, "confirmation_bars": 1},
+        ),
+        (
+            "supertrend",
+            {"window": 2, "multiplier": 2.0, "confirmation_bars": 1},
         ),
         ("boundary_breakout", {"period": 5}),
         ("rolling_channel_breakout", {"window": 2}),
@@ -1496,6 +1573,304 @@ def test_trend_wave_1_performance_smoke_on_representative_series(tmp_path):
         assert len(output.points) == len(rows)
         assert output.metadata["warmup_period"] == algorithm.minimum_history()
         assert "trend_score" in output.derived_series
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "breakout_donchian_channel",
+            {"window": 5, "minimum_breakout": 0.0, "confirmation_bars": 1},
+        ),
+        (
+            "channel_breakout_with_confirmation",
+            {"window": 5, "breakout_threshold": 0.0, "confirmation_bars": 2},
+        ),
+        (
+            "adx_trend_filter",
+            {"window": 5, "adx_threshold": 10.0, "confirmation_bars": 1},
+        ),
+        (
+            "parabolic_sar_trend_following",
+            {"step": 0.02, "max_step": 0.2, "confirmation_bars": 1},
+        ),
+        (
+            "supertrend",
+            {"window": 5, "multiplier": 2.0, "confirmation_bars": 1},
+        ),
+    ],
+)
+def test_trend_wave_2_fixture_monotonic_cross_produces_buy_without_late_sell(
+    tmp_path, alg_key, alg_param
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_fixture_rows("monotonic_cross.csv"))
+    buy_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("buy_SIGNAL")
+    ]
+    sell_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("sell_SIGNAL")
+    ]
+
+    assert buy_indices
+    assert sell_indices == [] or max(sell_indices) < min(buy_indices)
+
+
+def test_trend_wave_2_whipsaw_controls_reduce_or_limit_events(tmp_path) -> None:
+    rows = _load_fixture_rows("whipsaw_guard.csv")
+    loose_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "channel_breakout_with_confirmation",
+            "alg_param": {
+                "window": 3,
+                "breakout_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "loose"),
+    )
+    guarded_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "channel_breakout_with_confirmation",
+            "alg_param": {
+                "window": 3,
+                "breakout_threshold": 0.2,
+                "confirmation_bars": 2,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "guarded"),
+    )
+
+    loose_algorithm.process_list(rows)
+    guarded_algorithm.process_list(rows)
+
+    loose_events = len(loose_algorithm.buy_signals) + len(loose_algorithm.sell_signals)
+    guarded_events = len(guarded_algorithm.buy_signals) + len(
+        guarded_algorithm.sell_signals
+    )
+
+    assert guarded_events <= loose_events
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "breakout_donchian_channel",
+            {"window": 5, "minimum_breakout": 0.0, "confirmation_bars": 1},
+            5,
+        ),
+        (
+            "channel_breakout_with_confirmation",
+            {"window": 5, "breakout_threshold": 0.0, "confirmation_bars": 2},
+            5,
+        ),
+        (
+            "adx_trend_filter",
+            {"window": 5, "adx_threshold": 10.0, "confirmation_bars": 1},
+            9,
+        ),
+        (
+            "parabolic_sar_trend_following",
+            {"step": 0.02, "max_step": 0.2, "confirmation_bars": 1},
+            2,
+        ),
+        (
+            "supertrend",
+            {"window": 5, "multiplier": 2.0, "confirmation_bars": 1},
+            5,
+        ),
+    ],
+)
+def test_trend_wave_2_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(
+        _load_fixture_rows("monotonic_cross.csv")[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_reason_code", "expected_annotation_keys"),
+    [
+        (
+            "breakout_donchian_channel",
+            {"window": 5, "minimum_breakout": 0.0, "confirmation_bars": 1},
+            "donchian_breakout_up",
+            {"window", "minimum_breakout", "channel_type"},
+        ),
+        (
+            "channel_breakout_with_confirmation",
+            {"window": 5, "breakout_threshold": 0.0, "confirmation_bars": 2},
+            "confirmed_channel_breakout_up",
+            {"window", "breakout_threshold", "channel_type"},
+        ),
+        (
+            "adx_trend_filter",
+            {"window": 5, "adx_threshold": 10.0, "confirmation_bars": 1},
+            "adx_bullish_filter_pass",
+            {"window", "adx_threshold", "indicator"},
+        ),
+        (
+            "parabolic_sar_trend_following",
+            {"step": 0.02, "max_step": 0.2, "confirmation_bars": 1},
+            "parabolic_sar_bullish",
+            {"step", "max_step", "indicator"},
+        ),
+        (
+            "supertrend",
+            {"window": 5, "multiplier": 2.0, "confirmation_bars": 1},
+            "supertrend_bullish",
+            {"window", "multiplier", "indicator"},
+        ),
+    ],
+)
+def test_trend_wave_2_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, expected_reason_code, expected_annotation_keys
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_fixture_rows("monotonic_cross.csv"))
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    last_point = output.points[-1]
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert expected_reason_code in last_point.reason_codes
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+    }.issubset(output.derived_series)
+    assert child_output.signal_label == "buy"
+    assert expected_reason_code in child_output.diagnostics["reason_codes"]
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+
+
+def test_validation_rejects_invalid_trend_wave_2_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="max_step >= step"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "parabolic_sar_trend_following",
+                "alg_param": {
+                    "step": 0.2,
+                    "max_step": 0.1,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="multiplier must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "supertrend",
+                "alg_param": {
+                    "window": 5,
+                    "multiplier": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_trend_wave_2_performance_smoke_on_representative_series(tmp_path) -> None:
+    rows = _load_fixture_rows("monotonic_cross.csv") * 400
+    algorithms = [
+        (
+            "breakout_donchian_channel",
+            {"window": 5, "minimum_breakout": 0.0, "confirmation_bars": 1},
+        ),
+        (
+            "channel_breakout_with_confirmation",
+            {"window": 5, "breakout_threshold": 0.0, "confirmation_bars": 2},
+        ),
+        (
+            "adx_trend_filter",
+            {"window": 5, "adx_threshold": 10.0, "confirmation_bars": 1},
+        ),
+        (
+            "parabolic_sar_trend_following",
+            {"step": 0.02, "max_step": 0.2, "confirmation_bars": 1},
+        ),
+        (
+            "supertrend",
+            {"window": 5, "multiplier": 2.0, "confirmation_bars": 1},
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "bar_series"
 
 
 @pytest.mark.parametrize(

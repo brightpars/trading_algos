@@ -252,6 +252,105 @@ def require_ribbon_param(raw_alg_param, label):
     }
 
 
+def require_breakout_donchian_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "minimum_breakout", "confirmation_bars"],
+        label,
+    )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "minimum_breakout": _require_non_negative_float_like(
+            normalized["minimum_breakout"], f"{label} minimum_breakout"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_channel_confirmation_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "breakout_threshold", "confirmation_bars"],
+        label,
+    )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "breakout_threshold": _require_non_negative_float_like(
+            normalized["breakout_threshold"], f"{label} breakout_threshold"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_adx_trend_filter_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "adx_threshold", "confirmation_bars"],
+        label,
+    )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "adx_threshold": _require_non_negative_float_like(
+            normalized["adx_threshold"], f"{label} adx_threshold"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_parabolic_sar_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["step", "max_step", "confirmation_bars"],
+        label,
+    )
+    step = _require_non_negative_float_like(normalized["step"], f"{label} step")
+    max_step = _require_non_negative_float_like(
+        normalized["max_step"], f"{label} max_step"
+    )
+    if step == 0.0:
+        raise ValueError(f"{label} step must be > 0")
+    if max_step < step:
+        raise ValueError(f"{label} requires max_step >= step")
+    return {
+        "step": step,
+        "max_step": max_step,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_supertrend_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "multiplier", "confirmation_bars"],
+        label,
+    )
+    multiplier = _require_non_negative_float_like(
+        normalized["multiplier"], f"{label} multiplier"
+    )
+    if multiplier == 0.0:
+        raise ValueError(f"{label} multiplier must be > 0")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "multiplier": multiplier,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def require_roc_momentum_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(

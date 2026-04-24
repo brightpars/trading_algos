@@ -169,6 +169,187 @@ def average_true_range(
     return simple_moving_average(true_range(highs, lows, closes), window)
 
 
+def directional_movement_index(
+    highs: Sequence[float | int | None],
+    lows: Sequence[float | int | None],
+    closes: Sequence[float | int | None],
+    window: int,
+) -> tuple[list[float | None], list[float | None], list[float | None]]:
+    _validate_window(window)
+    cast_highs = _as_float_list(highs)
+    cast_lows = _as_float_list(lows)
+    cast_closes = _as_float_list(closes)
+    if not (len(cast_highs) == len(cast_lows) == len(cast_closes)):
+        raise ValueError("highs, lows, and closes must have equal length")
+    plus_dm: list[float | None] = [None]
+    minus_dm: list[float | None] = [None]
+    for previous_high, current_high, previous_low, current_low in zip(
+        cast_highs,
+        cast_highs[1:],
+        cast_lows,
+        cast_lows[1:],
+    ):
+        if (
+            previous_high is None
+            or current_high is None
+            or previous_low is None
+            or current_low is None
+        ):
+            plus_dm.append(None)
+            minus_dm.append(None)
+            continue
+        up_move = current_high - previous_high
+        down_move = previous_low - current_low
+        plus_dm.append(up_move if up_move > down_move and up_move > 0.0 else 0.0)
+        minus_dm.append(down_move if down_move > up_move and down_move > 0.0 else 0.0)
+    atr_values = average_true_range(cast_highs, cast_lows, cast_closes, window)
+    plus_dm_sma = simple_moving_average(plus_dm, window)
+    minus_dm_sma = simple_moving_average(minus_dm, window)
+    plus_di: list[float | None] = []
+    minus_di: list[float | None] = []
+    dx_values: list[float | None] = []
+    for atr_value, plus_value, minus_value in zip(
+        atr_values, plus_dm_sma, minus_dm_sma
+    ):
+        if (
+            atr_value is None
+            or atr_value == 0.0
+            or plus_value is None
+            or minus_value is None
+        ):
+            plus_di.append(None)
+            minus_di.append(None)
+            dx_values.append(None)
+            continue
+        plus_di_value = (plus_value / atr_value) * 100.0
+        minus_di_value = (minus_value / atr_value) * 100.0
+        denominator = plus_di_value + minus_di_value
+        plus_di.append(plus_di_value)
+        minus_di.append(minus_di_value)
+        dx_values.append(
+            0.0
+            if denominator == 0.0
+            else (abs(plus_di_value - minus_di_value) / denominator) * 100.0
+        )
+    adx_values = simple_moving_average(dx_values, window)
+    return plus_di, minus_di, adx_values
+
+
+def parabolic_sar(
+    highs: Sequence[float | int | None],
+    lows: Sequence[float | int | None],
+    *,
+    step: float = 0.02,
+    max_step: float = 0.2,
+) -> list[float | None]:
+    cast_highs = _as_float_list(highs)
+    cast_lows = _as_float_list(lows)
+    if len(cast_highs) != len(cast_lows):
+        raise ValueError("highs and lows must have equal length")
+    result: list[float | None] = []
+    if not cast_highs:
+        return result
+    trend_up = True
+    sar: float | None = cast_lows[0]
+    extreme_point: float | None = cast_highs[0]
+    acceleration = step
+    result.append(sar)
+    for index in range(1, len(cast_highs)):
+        high = cast_highs[index]
+        low = cast_lows[index]
+        if high is None or low is None or sar is None or extreme_point is None:
+            result.append(None)
+            trend_up = True
+            sar = low
+            extreme_point = high
+            acceleration = step
+            continue
+        sar = sar + acceleration * (extreme_point - sar)
+        previous_low = cast_lows[index - 1]
+        previous_high = cast_highs[index - 1]
+        if trend_up:
+            if previous_low is not None:
+                sar = min(sar, previous_low, low)
+            if low < sar:
+                trend_up = False
+                sar = extreme_point
+                extreme_point = low
+                acceleration = step
+            else:
+                if high > extreme_point:
+                    extreme_point = high
+                    acceleration = min(acceleration + step, max_step)
+        else:
+            if previous_high is not None:
+                sar = max(sar, previous_high, high)
+            if high > sar:
+                trend_up = True
+                sar = extreme_point
+                extreme_point = high
+                acceleration = step
+            else:
+                if low < extreme_point:
+                    extreme_point = low
+                    acceleration = min(acceleration + step, max_step)
+        result.append(sar)
+    return result
+
+
+def supertrend(
+    highs: Sequence[float | int | None],
+    lows: Sequence[float | int | None],
+    closes: Sequence[float | int | None],
+    window: int,
+    multiplier: float,
+) -> tuple[list[float | None], list[float | None], list[int | None]]:
+    atr_values = average_true_range(highs, lows, closes, window)
+    cast_highs = _as_float_list(highs)
+    cast_lows = _as_float_list(lows)
+    cast_closes = _as_float_list(closes)
+    upper_band: list[float | None] = []
+    lower_band: list[float | None] = []
+    direction: list[int | None] = []
+    final_upper: float | None = None
+    final_lower: float | None = None
+    current_direction: int | None = None
+    previous_close: float | None = None
+    for high, low, close, atr_value in zip(
+        cast_highs, cast_lows, cast_closes, atr_values
+    ):
+        if high is None or low is None or close is None or atr_value is None:
+            upper_band.append(None)
+            lower_band.append(None)
+            direction.append(None)
+            previous_close = close
+            continue
+        hl2 = (high + low) / 2.0
+        basic_upper = hl2 + (multiplier * atr_value)
+        basic_lower = hl2 - (multiplier * atr_value)
+        if final_upper is None or previous_close is None:
+            final_upper = basic_upper
+            final_lower = basic_lower
+            current_direction = 1 if close >= hl2 else -1
+        else:
+            assert final_lower is not None
+            if previous_close <= final_upper:
+                final_upper = min(basic_upper, final_upper)
+            else:
+                final_upper = basic_upper
+            if previous_close >= final_lower:
+                final_lower = max(basic_lower, final_lower)
+            else:
+                final_lower = basic_lower
+            if close > final_upper:
+                current_direction = 1
+            elif close < final_lower:
+                current_direction = -1
+        upper_band.append(final_upper)
+        lower_band.append(final_lower)
+        direction.append(current_direction)
+        previous_close = close
+    return upper_band, lower_band, direction
+
+
 def realized_volatility(
     values: Sequence[float | int | None], window: int
 ) -> list[float | None]:
