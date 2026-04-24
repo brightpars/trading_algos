@@ -35,6 +35,7 @@ OutputMode = Literal[
     "events",
     "calendar_window",
     "event_window_signal",
+    "event_metadata",
     "ranking",
     "selection",
     "weights",

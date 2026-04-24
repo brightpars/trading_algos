@@ -43,6 +43,7 @@ VOLATILITY_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "volat
 PATTERN_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "patterns"
 COMPOSITE_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "composite"
 FACTOR_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "factors"
+EVENT_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "events"
 
 
 def _build_cross_asset_fixture_rows() -> list[dict[str, object]]:
@@ -389,6 +390,46 @@ def _load_factor_fixture_rows(name: str) -> list[dict[str, object]]:
     return parsed_rows
 
 
+def _load_event_fixture_rows(name: str) -> list[dict[str, object]]:
+    with (EVENT_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
+        rows = list(DictReader(handle))
+    return [
+        {
+            "ts": row["ts"],
+            "symbol": row["symbol"],
+            "Close": float(row["Close"]),
+        }
+        for row in rows
+    ]
+
+
+def _build_event_wave_1_earnings_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "symbol": "AAA",
+            "event_timestamp": "2025-02-03 16:05:00",
+            "public_timestamp": "2025-02-03 16:05:00",
+            "event_type": "earnings",
+            "surprise": 0.15,
+            "pre_drift_score": 0.25,
+            "premium_score": 0.10,
+        }
+    ]
+
+
+def _build_event_wave_1_index_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "symbol": "AAA",
+            "event_timestamp": "2025-03-24 09:30:00",
+            "public_timestamp": "2025-03-21 09:30:00",
+            "event_type": "index_rebalance",
+            "expected_flow": 0.80,
+            "expected_direction": "buy",
+        }
+    ]
+
+
 def _load_fixture_rows(name: str) -> list[dict[str, object]]:
     with (FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
         rows = list(DictReader(handle))
@@ -694,6 +735,11 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "intermarket_confirmation",
         "seasonality_calendar_effects",
         "earnings_drift_post_event_momentum",
+        "post_earnings_announcement_drift",
+        "pre_earnings_announcement_drift",
+        "earnings_announcement_premium",
+        "index_rebalancing_effect_strategy",
+        "etf_rebalancing_anticipation_front_run_strategy",
         "hard_boolean_gating_and_or_majority",
         "rank_aggregation",
         "weighted_linear_score_blend",

@@ -1807,6 +1807,61 @@ def require_event_driven_param(raw_alg_param, label):
     return result
 
 
+def require_single_asset_event_window_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "event_rows", "event_value_field"],
+        label,
+    )
+    result = {
+        "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
+        "event_value_field": _require_non_empty_string(
+            normalized["event_value_field"], f"{label} event_value_field"
+        ),
+        "pre_event_window_days": _require_int_like(
+            normalized.get("pre_event_window_days", 0),
+            f"{label} pre_event_window_days",
+        ),
+        "post_event_window_days": _require_int_like(
+            normalized.get("post_event_window_days", 0),
+            f"{label} post_event_window_days",
+        ),
+        "bullish_phase": _require_choice(
+            normalized.get("bullish_phase", "post_event"),
+            f"{label} bullish_phase",
+            allowed={"pre_event", "post_event"},
+        ),
+        "minimum_score_threshold": _require_non_negative_float_like(
+            normalized.get("minimum_score_threshold", 0.0),
+            f"{label} minimum_score_threshold",
+        ),
+    }
+    if result["pre_event_window_days"] < 0:
+        raise ValueError(f"{label} pre_event_window_days must be >= 0")
+    if result["post_event_window_days"] < 0:
+        raise ValueError(f"{label} post_event_window_days must be >= 0")
+    event_rows = normalized["event_rows"]
+    if not isinstance(event_rows, list):
+        raise ValueError(f"{label} event_rows must be a list")
+    normalized_events: list[dict[str, object]] = []
+    for index, row in enumerate(event_rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"{label} event_rows[{index}] must be a dict")
+        if row.get("symbol") in (None, ""):
+            raise ValueError(f"{label} event_rows[{index}] symbol is required")
+        if row.get("event_timestamp") in (None, ""):
+            raise ValueError(f"{label} event_rows[{index}] event_timestamp is required")
+        normalized_events.append(dict(row))
+    result["event_rows"] = normalized_events
+    expected_direction_field = normalized.get("expected_direction_field")
+    if expected_direction_field is not None:
+        result["expected_direction_field"] = _require_non_empty_string(
+            expected_direction_field, f"{label} expected_direction_field"
+        )
+    return result
+
+
 def _require_float_like(value, label):
     try:
         return float(value)

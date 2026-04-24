@@ -132,7 +132,7 @@ fixtures:
   domain: event_calendar
   purpose: Earnings event arriving after close and traded next valid window.
   inputs:
-    dataset_path: tests/fixtures/events/earnings_after_close.parquet
+    dataset_path: tests/fixtures/events/earnings_after_close.csv
   expected_behaviors:
   - Event window starts from the correct public availability point
   - No signal appears before the after-close announcement timestamp
@@ -140,7 +140,7 @@ fixtures:
   domain: event_calendar
   purpose: Index add/delete flow window around a rebalance event.
   inputs:
-    dataset_path: tests/fixtures/events/index_rebalance.parquet
+    dataset_path: tests/fixtures/events/index_rebalance.csv
   expected_behaviors:
   - Expected flow direction is attached to the right symbols
   - Signal exists only inside the configured rebalance window

@@ -4,6 +4,9 @@ from trading_algos.alertgen.algorithms.composite.catalog import (
 from trading_algos.alertgen.algorithms.cross_asset_macro_carry.catalog import (
     register_cross_asset_macro_carry_alert_algorithms,
 )
+from trading_algos.alertgen.algorithms.event_driven.catalog import (
+    register_event_driven_alert_algorithms,
+)
 from trading_algos.alertgen.algorithms.factor_risk_premia.catalog import (
     register_factor_risk_premia_alert_algorithms,
 )
@@ -42,5 +45,6 @@ def register_builtin_alert_algorithms():
     register_mean_reversion_alert_algorithms()
     register_volatility_options_alert_algorithms()
     register_cross_asset_macro_carry_alert_algorithms()
+    register_event_driven_alert_algorithms()
     register_composite_alert_algorithms()
     _REGISTERED = True
