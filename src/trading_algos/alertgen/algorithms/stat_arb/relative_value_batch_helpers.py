@@ -108,6 +108,7 @@ def _append_pair_like_row(
                 "spread_volatility": snapshot.spread_volatility,
                 "zscore": zscore,
                 "hedge_ratio": snapshot.hedge_ratio,
+                "carry_adjustment": snapshot.carry_adjustment,
                 "spread_direction": "positive"
                 if snapshot.spread_value >= 0.0
                 else "negative",
@@ -293,6 +294,7 @@ def build_basket_relative_value_algorithm(
                     "spread_volatility": snapshot.spread_volatility,
                     "zscore": snapshot.zscore,
                     "hedge_ratio": snapshot.hedge_ratio,
+                    "carry_adjustment": snapshot.carry_adjustment,
                     "spread_direction": "positive"
                     if snapshot.spread_value >= 0.0
                     else "negative",
@@ -408,6 +410,7 @@ def build_triangular_relative_value_algorithm(
                     "spread_volatility": snapshot.spread_volatility,
                     "zscore": snapshot.zscore,
                     "hedge_ratio": snapshot.hedge_ratio,
+                    "carry_adjustment": snapshot.carry_adjustment,
                     "spread_direction": "positive"
                     if snapshot.spread_value >= 0.0
                     else "negative",

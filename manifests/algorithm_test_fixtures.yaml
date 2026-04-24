@@ -154,7 +154,7 @@ fixtures:
   domain: pair_prices
   purpose: Stable pair with one temporary spread divergence and convergence.
   inputs:
-    dataset_path: tests/fixtures/stat_arb/pair_divergence.parquet
+    dataset_path: tests/fixtures/stat_arb/pair_divergence.csv
   expected_behaviors:
   - Spread z-score crosses entry threshold during divergence
   - Paired trade exits when spread normalizes
@@ -165,7 +165,7 @@ fixtures:
   domain: multi_leg_curve_data
   purpose: Simple curve-spread distortion for relative-value strategies.
   inputs:
-    dataset_path: tests/fixtures/relative_value/curve_spread.parquet
+    dataset_path: tests/fixtures/relative_value/curve_spread.csv
   expected_behaviors:
   - Curve-spread metric becomes extreme on known dates
   - Strategy emits paired-leg directions rather than one-sided signal

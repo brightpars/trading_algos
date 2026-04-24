@@ -112,6 +112,44 @@ def _build_relative_value_curve_rows() -> list[dict[str, object]]:
     ]
 
 
+def _load_stat_arb_fixture_rows(name: str) -> list[dict[str, object]]:
+    fixture_root = Path(__file__).resolve().parent / "fixtures" / "stat_arb"
+    with (fixture_root / name).open(newline="", encoding="utf-8") as handle:
+        rows = list(DictReader(handle))
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed: dict[str, object] = {
+            "ts": row["ts"],
+            "symbol": row["symbol"],
+            "Close": float(row["Close"]),
+        }
+        for key in ("basis", "funding_rate"):
+            value = row.get(key)
+            if value not in (None, ""):
+                parsed[key] = float(cast(str, value))
+        parsed_rows.append(parsed)
+    return parsed_rows
+
+
+def _load_relative_value_curve_rows(name: str) -> list[dict[str, object]]:
+    fixture_root = Path(__file__).resolve().parent / "fixtures" / "relative_value"
+    with (fixture_root / name).open(newline="", encoding="utf-8") as handle:
+        rows = list(DictReader(handle))
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed: dict[str, object] = {
+            "ts": row["ts"],
+            "symbol": row["symbol"],
+            "Close": float(row["Close"]),
+        }
+        for key in ("carry", "fx_carry", "deal_spread"):
+            value = row.get(key)
+            if value not in (None, ""):
+                parsed[key] = float(cast(str, value))
+        parsed_rows.append(parsed)
+    return parsed_rows
+
+
 def _build_triangular_fixture_rows() -> list[dict[str, object]]:
     return [
         {"ts": "2025-01-01", "symbol": "EURUSD", "Close": 1.10},
@@ -3816,6 +3854,712 @@ def test_stat_arb_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> No
 
         assert len(output.points) == len(output.derived_series["spread_value"])
         assert output.metadata["reporting_mode"] == "multi_leg"
+        assert portfolio_output.rebalances
+
+
+@pytest.mark.parametrize(
+    (
+        "alg_key",
+        "expected_catalog_ref",
+        "expected_family",
+        "expected_subcategory",
+        "expected_asset_scope",
+    ),
+    [
+        ("kalman_filter_pairs_trading", "algorithm:41", "stat_arb", "kalman", "pair"),
+        ("index_arbitrage", "algorithm:42", "stat_arb", "index", "multi_leg"),
+        ("etf_nav_arbitrage", "algorithm:43", "stat_arb", "etf", "multi_leg"),
+        ("adr_dual_listing_arbitrage", "algorithm:44", "stat_arb", "adr", "multi_leg"),
+        (
+            "convertible_arbitrage",
+            "algorithm:45",
+            "stat_arb",
+            "convertible",
+            "multi_leg",
+        ),
+        ("merger_arbitrage", "algorithm:46", "stat_arb", "merger", "multi_leg"),
+        (
+            "futures_cash_and_carry_arbitrage",
+            "algorithm:47",
+            "stat_arb",
+            "futures",
+            "multi_leg",
+        ),
+        (
+            "reverse_cash_and_carry_arbitrage",
+            "algorithm:48",
+            "stat_arb",
+            "reverse",
+            "multi_leg",
+        ),
+        (
+            "triangular_arbitrage_fx_crypto",
+            "algorithm:49",
+            "stat_arb",
+            "triangular",
+            "multi_leg",
+        ),
+        (
+            "latency_exchange_arbitrage",
+            "algorithm:50",
+            "stat_arb",
+            "latency",
+            "multi_leg",
+        ),
+        (
+            "fixed_income_arbitrage",
+            "algorithm:115",
+            "fixed_income_relative_value",
+            "fixed",
+            "multi_leg",
+        ),
+        (
+            "swap_spread_arbitrage",
+            "algorithm:116",
+            "fixed_income_relative_value",
+            "swap",
+            "multi_leg",
+        ),
+    ],
+)
+def test_relative_value_wave_2_registration_metadata_matches_manifest_contract(
+    alg_key: str,
+    expected_catalog_ref: str,
+    expected_family: str,
+    expected_subcategory: str,
+    expected_asset_scope: str,
+) -> None:
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+
+    assert spec.catalog_ref == expected_catalog_ref
+    assert spec.family == expected_family
+    assert spec.subcategory == expected_subcategory
+    assert spec.asset_scope == expected_asset_scope
+    assert "multi_leg_signal" in spec.output_modes
+    assert "diagnostics" in spec.output_modes
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "catalog_ref", "alg_param", "expected_reason_codes"),
+    [
+        (
+            "kalman_filter_pairs_trading",
+            "algorithm:41",
+            {
+                "rows": _load_stat_arb_fixture_rows("pair_divergence.csv"),
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "process_variance": 0.0001,
+                "observation_variance": 1.0,
+            },
+            {"kalman_entry", "kalman_hold", "kalman_exit"},
+        ),
+        (
+            "index_arbitrage",
+            "algorithm:42",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "basket_symbols": ["ALT1", "ALT2"],
+                "basket_weights": [0.6, 0.4],
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+            },
+            {"index_arb_entry", "index_arb_hold", "index_arb_exit"},
+        ),
+        (
+            "etf_nav_arbitrage",
+            "algorithm:43",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "basket_symbols": ["ALT1", "ALT2"],
+                "basket_weights": [0.7, 0.3],
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+            },
+            {"etf_nav_entry", "etf_nav_hold", "etf_nav_exit"},
+        ),
+        (
+            "adr_dual_listing_arbitrage",
+            "algorithm:44",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "fx_carry",
+                "carry_weight": 1.0,
+            },
+            {"adr_arb_entry", "adr_arb_hold", "adr_arb_exit", "no_entry"},
+        ),
+        (
+            "convertible_arbitrage",
+            "algorithm:45",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "carry",
+                "carry_weight": 1.0,
+            },
+            {
+                "convertible_arb_entry",
+                "convertible_arb_hold",
+                "convertible_arb_exit",
+                "no_entry",
+            },
+        ),
+        (
+            "merger_arbitrage",
+            "algorithm:46",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "deal_spread",
+                "carry_weight": 1.0,
+            },
+            {"merger_arb_entry", "merger_arb_hold", "merger_arb_exit", "no_entry"},
+        ),
+        (
+            "futures_cash_and_carry_arbitrage",
+            "algorithm:47",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "carry",
+                "carry_weight": 1.0,
+            },
+            {
+                "cash_carry_entry",
+                "cash_carry_hold",
+                "cash_carry_exit",
+                "carry_below_threshold",
+                "no_entry",
+            },
+        ),
+        (
+            "reverse_cash_and_carry_arbitrage",
+            "algorithm:48",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "carry",
+                "carry_weight": 1.0,
+            },
+            {
+                "reverse_carry_entry",
+                "reverse_carry_hold",
+                "reverse_carry_exit",
+                "carry_below_threshold",
+                "no_entry",
+            },
+        ),
+        (
+            "triangular_arbitrage_fx_crypto",
+            "algorithm:49",
+            {
+                "rows": _build_triangular_fixture_rows(),
+                "base_symbol": "EURUSD",
+                "cross_symbol": "USDJPY",
+                "implied_symbol": "EURJPY",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+            },
+            {"triangular_arb_entry", "triangular_arb_hold", "triangular_arb_exit"},
+        ),
+        (
+            "latency_exchange_arbitrage",
+            "algorithm:50",
+            {
+                "rows": _load_stat_arb_fixture_rows("pair_divergence.csv"),
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+            },
+            {"latency_arb_entry", "latency_arb_hold", "latency_arb_exit"},
+        ),
+        (
+            "fixed_income_arbitrage",
+            "algorithm:115",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "carry",
+                "carry_weight": 1.0,
+            },
+            {
+                "fixed_income_arb_entry",
+                "fixed_income_arb_hold",
+                "fixed_income_arb_exit",
+                "no_entry",
+            },
+        ),
+        (
+            "swap_spread_arbitrage",
+            "algorithm:116",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "carry",
+                "carry_weight": 1.0,
+            },
+            {"swap_spread_entry", "swap_spread_hold", "swap_spread_exit", "no_entry"},
+        ),
+    ],
+)
+def test_relative_value_wave_2_normalized_output_exposes_dashboard_contract_fields(
+    tmp_path,
+    alg_key: str,
+    catalog_ref: str,
+    alg_param: dict[str, object],
+    expected_reason_codes: set[str],
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "PAIR",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+    last_reason_code = output.points[-1].reason_codes[0]
+
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert portfolio_output.metadata["catalog_ref"] == catalog_ref
+    assert output.metadata["reporting_mode"] == "multi_leg"
+    assert portfolio_output.metadata["reporting_mode"] == "multi_leg"
+    assert output.metadata["warmup_period"] == algorithm.minimum_history()
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref
+    assert child_output.diagnostics["family"] == output.metadata["family"]
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert last_reason_code in expected_reason_codes
+    assert child_output.diagnostics["decision_reason"] == last_reason_code
+    assert {
+        "spread_value",
+        "zscore",
+        "legs",
+        "selected_symbol",
+        "warmup_ready",
+        "hedge_ratio",
+        "carry_adjustment",
+        "gross_exposure",
+        "net_exposure",
+        "reason_codes",
+    }.issubset(output.derived_series)
+    assert portfolio_output.rebalances
+    assert (
+        portfolio_output.rebalances[-1].diagnostics["selection_reason"]
+        == last_reason_code
+    )
+    assert output.derived_series["warmup_ready"][-1] is True
+    assert output.derived_series["gross_exposure"][-1] >= abs(
+        output.derived_series["net_exposure"][-1]
+    )
+    if output.derived_series["legs"][-1]:
+        assert output.points[-1].signal_label == "buy"
+        assert portfolio_output.rebalances[-1].legs
+        assert all(
+            {"role"}.issubset(set(leg["diagnostics"].keys()))
+            for leg in output.derived_series["legs"][-1]
+        )
+    else:
+        assert output.points[-1].signal_label == "neutral"
+
+
+def test_relative_value_wave_2_curve_variants_expose_carry_adjustment_diagnostics(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "PAIR",
+            "alg_key": "adr_dual_listing_arbitrage",
+            "alg_param": {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "fx_carry",
+                "carry_weight": 1.0,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+
+    assert output.derived_series["carry_adjustment"] == pytest.approx(
+        [0.0, 0.0, 0.04, 0.01]
+    )
+    assert child_output.diagnostics["carry_adjustment"] == pytest.approx(0.01)
+    assert portfolio_output.rebalances[-1].diagnostics[
+        "carry_adjustment"
+    ] == pytest.approx(0.01)
+
+
+def test_relative_value_wave_2_triangular_fixture_emits_expected_leg_roles(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "PAIR",
+            "alg_key": "triangular_arbitrage_fx_crypto",
+            "alg_param": {
+                "rows": _build_triangular_fixture_rows(),
+                "base_symbol": "EURUSD",
+                "cross_symbol": "USDJPY",
+                "implied_symbol": "EURJPY",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    active_legs = next(legs for legs in output.derived_series["legs"] if legs)
+
+    assert len(active_legs) == 3
+    assert {leg["diagnostics"]["triangle_component"] for leg in active_legs} == {
+        "base",
+        "cross",
+        "implied",
+    }
+    assert (
+        sum(1 for leg in active_legs if leg["diagnostics"]["role"] == "synthetic_leg")
+        == 2
+    )
+    assert (
+        sum(1 for leg in active_legs if leg["diagnostics"]["role"] == "hedge_leg") == 1
+    )
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "kalman_filter_pairs_trading",
+            {
+                "rows": _load_stat_arb_fixture_rows("pair_divergence.csv")[:4],
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 5,
+                "process_variance": 0.0001,
+                "observation_variance": 1.0,
+            },
+        ),
+        (
+            "index_arbitrage",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv")[:8],
+                "base_symbol": "BASE",
+                "basket_symbols": ["ALT1", "ALT2"],
+                "basket_weights": [0.6, 0.4],
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 5,
+            },
+        ),
+        (
+            "triangular_arbitrage_fx_crypto",
+            {
+                "rows": _build_triangular_fixture_rows()[:6],
+                "base_symbol": "EURUSD",
+                "cross_symbol": "USDJPY",
+                "implied_symbol": "EURJPY",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 5,
+            },
+        ),
+        (
+            "fixed_income_arbitrage",
+            {
+                "rows": _load_relative_value_curve_rows("curve_spread.csv")[:8],
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 5,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "carry",
+                "carry_weight": 1.0,
+            },
+        ),
+    ],
+)
+def test_relative_value_wave_2_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key: str, alg_param: dict[str, object]
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "PAIR",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+    assert output.derived_series["warmup_ready"][-1] is False
+    assert output.derived_series["legs"][-1] == []
+    assert (
+        portfolio_output.rebalances[-1].diagnostics["selection_reason"]
+        == "warmup_pending"
+    )
+
+
+def test_relative_value_wave_2_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="observation_variance must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "PAIR",
+                "alg_key": "kalman_filter_pairs_trading",
+                "alg_param": {
+                    "rows": _load_stat_arb_fixture_rows("pair_divergence.csv"),
+                    "base_symbol": "AAA",
+                    "quote_symbol": "BBB",
+                    "lookback_window": 3,
+                    "entry_zscore": 1.0,
+                    "exit_zscore": 0.25,
+                    "rebalance_frequency": "all",
+                    "observation_variance": 0.0,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(
+        ValueError, match="basket_weights must match basket_symbols length"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "PAIR",
+                "alg_key": "index_arbitrage",
+                "alg_param": {
+                    "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                    "base_symbol": "BASE",
+                    "basket_symbols": ["ALT1", "ALT2"],
+                    "basket_weights": [1.0],
+                    "lookback_window": 3,
+                    "entry_zscore": 1.0,
+                    "exit_zscore": 0.25,
+                    "rebalance_frequency": "all",
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="carry_weight must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "PAIR",
+                "alg_key": "fixed_income_arbitrage",
+                "alg_param": {
+                    "rows": _load_relative_value_curve_rows("curve_spread.csv"),
+                    "base_symbol": "BASE",
+                    "quote_symbol": "HEDGE",
+                    "lookback_window": 3,
+                    "entry_zscore": 1.0,
+                    "exit_zscore": 0.25,
+                    "rebalance_frequency": "all",
+                    "carry_field": "carry",
+                    "carry_weight": -0.1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_relative_value_wave_2_performance_smoke_on_fixture_repetition(
+    tmp_path,
+) -> None:
+    pair_rows = _load_stat_arb_fixture_rows("pair_divergence.csv") * 80
+    curve_rows = _load_relative_value_curve_rows("curve_spread.csv") * 80
+    algorithms = [
+        (
+            "kalman_filter_pairs_trading",
+            {
+                "rows": pair_rows,
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "process_variance": 0.0001,
+                "observation_variance": 1.0,
+            },
+        ),
+        (
+            "index_arbitrage",
+            {
+                "rows": curve_rows,
+                "base_symbol": "BASE",
+                "basket_symbols": ["ALT1", "ALT2"],
+                "basket_weights": [0.6, 0.4],
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+            },
+        ),
+        (
+            "triangular_arbitrage_fx_crypto",
+            {
+                "rows": _build_triangular_fixture_rows() * 80,
+                "base_symbol": "EURUSD",
+                "cross_symbol": "USDJPY",
+                "implied_symbol": "EURJPY",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+            },
+        ),
+        (
+            "fixed_income_arbitrage",
+            {
+                "rows": curve_rows,
+                "base_symbol": "BASE",
+                "quote_symbol": "HEDGE",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+                "hedge_ratio_method": "ratio",
+                "carry_field": "carry",
+                "carry_weight": 1.0,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "PAIR",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+        portfolio_output = algorithm.portfolio_output()
+
+        assert len(output.points) == len(output.derived_series["spread_value"])
+        assert output.metadata["reporting_mode"] == "multi_leg"
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
         assert portfolio_output.rebalances
 
 

@@ -38,6 +38,14 @@ def _clamp_unit(value: float) -> float:
     return max(0.0, min(1.0, value))
 
 
+def _signed_leg_weight(weight: float, side: str) -> float:
+    if side == "short":
+        return -abs(weight)
+    if side == "long":
+        return abs(weight)
+    return 0.0
+
+
 def _metric_from_fields(row: PanelRow, field_names: Sequence[str]) -> float | None:
     extras = row.extras or {}
     values = [_coerce_float(extras.get(field_name)) for field_name in field_names]
@@ -337,7 +345,9 @@ def build_multi_leg_output(
                 legs=row.legs,
                 hedge_ratio=_coerce_float(row.diagnostics.get("hedge_ratio")) or 1.0,
                 gross_exposure=sum(abs(leg.weight) for leg in row.legs),
-                net_exposure=sum(leg.weight for leg in row.legs),
+                net_exposure=sum(
+                    _signed_leg_weight(leg.weight, leg.side) for leg in row.legs
+                ),
                 diagnostics=row.diagnostics,
             )
             for row in rows
@@ -485,6 +495,7 @@ def build_multi_leg_rebalance_output(
         "selected_symbol": [],
         "warmup_ready": [],
         "hedge_ratio": [],
+        "carry_adjustment": [],
         "gross_exposure": [],
         "net_exposure": [],
         "reason_codes": [],
@@ -509,9 +520,11 @@ def build_multi_leg_rebalance_output(
             bool(row.diagnostics.get("warmup_ready", False))
         )
         hedge_ratio = _coerce_float(row.diagnostics.get("hedge_ratio")) or 1.0
+        carry_adjustment = _coerce_float(row.diagnostics.get("carry_adjustment")) or 0.0
         gross_exposure = sum(abs(leg.weight) for leg in row.legs)
-        net_exposure = sum(leg.weight for leg in row.legs)
+        net_exposure = sum(_signed_leg_weight(leg.weight, leg.side) for leg in row.legs)
         derived_series["hedge_ratio"].append(hedge_ratio)
+        derived_series["carry_adjustment"].append(carry_adjustment)
         derived_series["gross_exposure"].append(gross_exposure)
         derived_series["net_exposure"].append(net_exposure)
         derived_series["zscore"].append(_coerce_float(row.diagnostics.get("zscore")))

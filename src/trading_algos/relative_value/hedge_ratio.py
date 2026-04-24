@@ -168,3 +168,4 @@ class RelativeValueSnapshot:
     zscore: float | None
     mean_spread: float
     spread_volatility: float
+    carry_adjustment: float = 0.0

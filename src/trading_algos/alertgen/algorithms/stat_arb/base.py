@@ -18,6 +18,14 @@ from trading_algos.contracts.multi_leg_output import (
 )
 
 
+def _signed_leg_weight(weight: float, side: str) -> float:
+    if side == "short":
+        return -abs(weight)
+    if side == "long":
+        return abs(weight)
+    return 0.0
+
+
 class BaseStatArbAlertAlgorithm:
     catalog_ref = ""
 
@@ -44,7 +52,10 @@ class BaseStatArbAlertAlgorithm:
     def minimum_history(self) -> int:
         if not self._rows:
             return 1
-        value = self._rows[-1].diagnostics.get("minimum_history", 1)
+        value = self._rows[-1].diagnostics.get(
+            "warmup_period",
+            self._rows[-1].diagnostics.get("minimum_history", 1),
+        )
         return int(cast(int | float | str, value))
 
     def algorithm_metadata(self) -> dict[str, Any]:
@@ -74,6 +85,10 @@ class BaseStatArbAlertAlgorithm:
     def portfolio_output(self) -> MultiLegOutput:
         multi_leg_rows: list[MultiLegRow] = []
         for row in self._rows:
+            gross_exposure = sum(abs(leg.weight) for leg in row.legs)
+            net_exposure = sum(
+                _signed_leg_weight(leg.weight, leg.side) for leg in row.legs
+            )
             multi_leg_rows.append(
                 MultiLegRow(
                     timestamp=row.timestamp,
@@ -82,8 +97,8 @@ class BaseStatArbAlertAlgorithm:
                     diagnostics={
                         **row.diagnostics,
                         "hedge_ratio": row.hedge_ratio,
-                        "gross_exposure": sum(abs(leg.weight) for leg in row.legs),
-                        "net_exposure": sum(leg.weight for leg in row.legs),
+                        "gross_exposure": gross_exposure,
+                        "net_exposure": net_exposure,
                     },
                 )
             )
@@ -120,6 +135,10 @@ class BaseStatArbAlertAlgorithm:
     def normalized_output(self):
         multi_leg_rows: list[MultiLegRow] = []
         for row in self._rows:
+            gross_exposure = sum(abs(leg.weight) for leg in row.legs)
+            net_exposure = sum(
+                _signed_leg_weight(leg.weight, leg.side) for leg in row.legs
+            )
             multi_leg_rows.append(
                 MultiLegRow(
                     timestamp=row.timestamp,
@@ -128,8 +147,8 @@ class BaseStatArbAlertAlgorithm:
                     diagnostics={
                         **row.diagnostics,
                         "hedge_ratio": row.hedge_ratio,
-                        "gross_exposure": sum(abs(leg.weight) for leg in row.legs),
-                        "net_exposure": sum(leg.weight for leg in row.legs),
+                        "gross_exposure": gross_exposure,
+                        "net_exposure": net_exposure,
                         "zscore": row.zscore,
                     },
                 )

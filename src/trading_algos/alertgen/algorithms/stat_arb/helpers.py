@@ -95,6 +95,7 @@ def pair_snapshot(
         zscore=zscores[-1],
         mean_spread=mean_spread,
         spread_volatility=spread_volatility,
+        carry_adjustment=0.0,
     )
 
 
@@ -151,6 +152,7 @@ def kalman_pair_snapshot(
         zscore=latest_zscore,
         mean_spread=mean_spread,
         spread_volatility=spread_volatility,
+        carry_adjustment=0.0,
     )
 
 
@@ -200,6 +202,7 @@ def basket_snapshot(
         zscore=zscores[-1],
         mean_spread=mean_spread,
         spread_volatility=spread_volatility,
+        carry_adjustment=0.0,
     )
 
 
@@ -237,6 +240,7 @@ def basis_snapshot(
         zscore=snapshot.zscore,
         mean_spread=snapshot.mean_spread,
         spread_volatility=snapshot.spread_volatility,
+        carry_adjustment=basis_value + funding_value,
     )
 
 
@@ -285,6 +289,7 @@ def curve_snapshot(
         zscore=snapshot.zscore,
         mean_spread=snapshot.mean_spread,
         spread_volatility=snapshot.spread_volatility,
+        carry_adjustment=carry_adjustment,
     )
 
 
@@ -323,6 +328,7 @@ def triangular_snapshot(
         zscore=zscores[-1],
         mean_spread=mean_spread,
         spread_volatility=spread_volatility,
+        carry_adjustment=0.0,
     )
 
 
