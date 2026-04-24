@@ -1592,8 +1592,8 @@ rows:
   display_category: Mean Reversion
   subcategory: z
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1638,7 +1638,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 26; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:27
   source_doc_ref: requirements_v4:algorithm:27
   kind: algorithm
@@ -1647,8 +1647,8 @@ rows:
   display_category: Mean Reversion
   subcategory: bollinger
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1694,7 +1694,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 27; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:28
   source_doc_ref: requirements_v4:algorithm:28
   kind: algorithm
@@ -1703,8 +1703,8 @@ rows:
   display_category: Mean Reversion
   subcategory: rsi
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1750,7 +1750,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 28; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:29
   source_doc_ref: requirements_v4:algorithm:29
   kind: algorithm
@@ -1759,8 +1759,8 @@ rows:
   display_category: Mean Reversion
   subcategory: stochastic
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1806,7 +1806,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 29; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:30
   source_doc_ref: requirements_v4:algorithm:30
   kind: algorithm
@@ -1815,8 +1815,8 @@ rows:
   display_category: Mean Reversion
   subcategory: cci
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1862,7 +1862,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 30; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:31
   source_doc_ref: requirements_v4:algorithm:31
   kind: algorithm

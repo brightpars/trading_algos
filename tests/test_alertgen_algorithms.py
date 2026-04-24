@@ -2228,12 +2228,24 @@ def test_mean_reversion_wave_1_normalized_output_exposes_dashboard_diagnostics(
     assert expected_reason_code in {
         code for point in output.points for code in point.reason_codes
     }
-    assert {"trend_score", "regime_label", "reason_codes", "primary_value"}.issubset(
-        output.derived_series
-    )
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+        "threshold_value",
+        "exit_value",
+        "bullish_confirmation_count",
+        "bearish_confirmation_count",
+        "bullish_confirmed",
+        "bearish_confirmed",
+    }.issubset(output.derived_series)
     assert last_point.signal_label in {"buy", "neutral", "sell"}
     assert child_output.regime_label == algorithm.latest_predicted_trend
     assert child_output.diagnostics["reason_codes"]
+    assert child_output.diagnostics["warmup_ready"] is True
+    assert child_output.diagnostics["warmup_period"] == algorithm.minimum_history()
     assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
     assert child_output.reason_codes == tuple(child_output.diagnostics.keys())
 
@@ -2402,7 +2414,104 @@ def test_mean_reversion_wave_1_fixture_one_overshoot_produces_buy_signal(
         if item.get("buy_SIGNAL")
     ]
 
+    first_buy_index = buy_indices[0]
+    post_entry_rows = algorithm.data_list[first_buy_index + 1 :]
+
     assert buy_indices
+    assert any(not bool(item.get("bullish_setup")) for item in post_entry_rows)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "z_score_mean_reversion",
+            {
+                "window": 5,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.5,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "bollinger_bands_reversion",
+            {
+                "window": 5,
+                "std_multiplier": 1.0,
+                "exit_band_fraction": 0.25,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "rsi_reversion",
+            {
+                "window": 3,
+                "oversold_threshold": 35.0,
+                "overbought_threshold": 65.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "stochastic_reversion",
+            {
+                "k_window": 3,
+                "d_window": 2,
+                "oversold_threshold": 25.0,
+                "overbought_threshold": 75.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "cci_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -50.0,
+                "overbought_threshold": 50.0,
+                "exit_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+    ],
+)
+def test_mean_reversion_wave_1_scores_and_child_output_match_dashboard_contract(
+    tmp_path, alg_key, alg_param
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_mean_reversion_fixture_rows("one_overshoot.csv"))
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.points[-1].score == pytest.approx(
+        output.derived_series["trend_score"][-1]
+    )
+    assert child_output.score == pytest.approx(output.derived_series["trend_score"][-1])
+    assert child_output.diagnostics["trend_score"] == pytest.approx(
+        output.derived_series["trend_score"][-1]
+    )
+    assert (
+        child_output.diagnostics["primary_value"]
+        == output.derived_series["primary_value"][-1]
+    )
+    assert (
+        child_output.diagnostics["threshold_value"]
+        == output.derived_series["threshold_value"][-1]
+    )
+    assert (
+        child_output.diagnostics["exit_value"]
+        == output.derived_series["exit_value"][-1]
+    )
 
 
 def test_mean_reversion_wave_1_performance_smoke_on_fixture_repetition(

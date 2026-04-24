@@ -48,6 +48,10 @@ fixtures:
   expected_behaviors:
   - Stretch metric reaches entry threshold once
   - Strategy exits when price or indicator reverts toward mean
+  - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - Overshoot-aware mean-reversion algorithms can emit at least one bullish reversion signal on the downside stretch
+  - Diagnostics expose primary value, signal value, threshold context, exit value, confirmation state, and reason codes for dashboard explanation
+  - Normalized output metadata identifies mean_reversion family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.mean_reversion_range_oscillation_v1
   domain: single_asset_ohlcv
   purpose: Range-bound oscillation used to validate repeated mean-reversion behavior.

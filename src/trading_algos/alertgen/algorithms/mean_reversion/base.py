@@ -9,6 +9,7 @@ from trading_algos.alertgen.algorithms.mean_reversion.mean_reversion_helpers imp
 from trading_algos.alertgen.core.base import BaseAlertAlgorithm
 from trading_algos.alertgen.shared_utils.common import TREND
 from trading_algos.alertgen.shared_utils.models import AlgorithmDecision
+from trading_algos.alertgen.contracts.outputs import NormalizedChildOutput
 
 
 class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
@@ -55,6 +56,9 @@ class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
     def _decision_annotations(self) -> dict[str, object]:
         annotations: dict[str, object] = {
             "alg_name": self.alg_name,
+            "catalog_ref": getattr(self, "catalog_ref", None),
+            "family": "mean_reversion",
+            "reporting_mode": self.reporting_mode(),
             "regime_label": self.latest_data_modifiable.get(
                 "regime_label", TREND.UNKNOWN
             ),
@@ -74,6 +78,14 @@ class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
             "bearish_confirmed": self.latest_data_modifiable.get(
                 "bearish_confirmed", False
             ),
+            "bullish_confirmation_count": self.latest_data_modifiable.get(
+                "bullish_confirmation_count", 0
+            ),
+            "bearish_confirmation_count": self.latest_data_modifiable.get(
+                "bearish_confirmation_count", 0
+            ),
+            "warmup_period": self.minimum_history(),
+            "warmup_ready": len(self.data_list) >= self.minimum_history(),
         }
         annotations.update(self._parameter_annotations())
         return annotations
@@ -139,4 +151,54 @@ class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
             sell_range_signal=self.latest_predicted_trend == TREND.RANGE_DOWN,
             no_signal=self.latest_predicted_trend not in [TREND.UP, TREND.DOWN],
             annotations=self._decision_annotations(),
+        )
+
+    def _normalized_signal_score(self, item: dict[str, object]) -> float:
+        raw_score = item.get("trend_score", 0.0)
+        if isinstance(raw_score, (int, float)):
+            score = float(raw_score)
+            if score < -1.0:
+                return -1.0
+            if score > 1.0:
+                return 1.0
+            return score
+        return 0.0
+
+    def _normalized_child_outputs(self) -> tuple[NormalizedChildOutput, ...]:
+        decision = self.current_decision()
+        signal_label = (
+            "buy"
+            if decision.buy_signal
+            else "sell"
+            if decision.sell_signal
+            else "neutral"
+        )
+        direction = 1 if decision.buy_signal else -1 if decision.sell_signal else 0
+        diagnostics = {
+            "symbol": self.symbol,
+            "warmup_period": self.minimum_history(),
+            "evaluate_window_len": self.evaluate_window_len,
+            "family": self.output_family(),
+            "reporting_mode": self.reporting_mode(),
+        }
+        diagnostics.update(decision.annotations)
+        reason_codes = tuple(diagnostics.keys())
+        raw_score = diagnostics.get("trend_score", 0.0)
+        score = float(raw_score) if isinstance(raw_score, (int, float)) else 0.0
+        if score < -1.0:
+            score = -1.0
+        elif score > 1.0:
+            score = 1.0
+        return (
+            NormalizedChildOutput(
+                child_key=self.alg_name,
+                output_kind="composite_child",
+                signal_label=signal_label,
+                score=score,
+                confidence=max(0.0, min(1.0, decision.confidence / 10.0)),
+                regime_label=decision.trend,
+                direction=direction,
+                diagnostics=diagnostics,
+                reason_codes=reason_codes,
+            ),
         )
