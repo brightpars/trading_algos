@@ -1,0 +1,296 @@
+from __future__ import annotations
+
+from trading_algos.algorithmspec import AlertAlgorithmSpec, register_algorithm
+from trading_algos.alertgen.algorithms.composite.machine_learning_ensemble.bagging_ensemble import (
+    build_bagging_ensemble_algorithm,
+)
+from trading_algos.alertgen.algorithms.composite.machine_learning_ensemble.boosting_ensemble import (
+    build_boosting_ensemble_algorithm,
+)
+from trading_algos.alertgen.algorithms.composite.machine_learning_ensemble.stacking_meta_learning import (
+    build_stacking_meta_learning_algorithm,
+)
+from trading_algos.alertgen.core.validation import (
+    require_bagging_ensemble_param,
+    require_boosting_ensemble_param,
+    require_stacking_meta_learning_param,
+)
+
+
+def register_machine_learning_ensemble_alert_algorithms() -> None:
+    specs = [
+        AlertAlgorithmSpec(
+            key="bagging_ensemble",
+            name="Bagging Ensemble",
+            catalog_ref="combination:8",
+            builder=lambda **kwargs: build_bagging_ensemble_algorithm(
+                algorithm_key="bagging_ensemble", **kwargs
+            ),
+            default_param={
+                "rows": [],
+                "buy_threshold": 0.2,
+                "sell_threshold": -0.2,
+                "min_history": 2,
+                "expected_child_count": 3,
+                "confidence_power": 1.0,
+                "bootstrap_diversity_multiplier": 1.0,
+                "child_weights": {},
+            },
+            param_normalizer=require_bagging_ensemble_param,
+            description="Average aligned child model predictions to reduce variance via a bagging-style ensemble.",
+            param_schema=(
+                {
+                    "key": "rows",
+                    "label": "Prediction rows",
+                    "type": "array",
+                    "required": True,
+                    "description": "Timestamped rows containing aligned child prediction outputs and optional meta-features.",
+                },
+                {
+                    "key": "buy_threshold",
+                    "label": "Buy threshold",
+                    "type": "number",
+                    "required": True,
+                    "description": "Composite score threshold at or above which the ensemble becomes buy.",
+                },
+                {
+                    "key": "sell_threshold",
+                    "label": "Sell threshold",
+                    "type": "number",
+                    "required": True,
+                    "description": "Composite score threshold at or below which the ensemble becomes sell.",
+                },
+                {
+                    "key": "min_history",
+                    "label": "Minimum history",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Minimum number of aligned rows required before output becomes actionable.",
+                },
+                {
+                    "key": "expected_child_count",
+                    "label": "Expected child count",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Expected number of child model predictions per aligned row.",
+                },
+                {
+                    "key": "confidence_power",
+                    "label": "Confidence power",
+                    "type": "number",
+                    "required": False,
+                    "description": "Exponent applied to child confidence when computing effective ensemble weights.",
+                },
+                {
+                    "key": "bootstrap_diversity_multiplier",
+                    "label": "Bootstrap diversity multiplier",
+                    "type": "number",
+                    "required": False,
+                    "description": "Scaling factor applied to the bagged score to reflect diversity across bootstrap replicas.",
+                },
+                {
+                    "key": "child_weights",
+                    "label": "Child weights",
+                    "type": "object",
+                    "required": False,
+                    "description": "Optional per-child override weights applied before averaging.",
+                },
+            ),
+            tags=("composite", "machine_learning_ensemble", "bagging"),
+            category="composite",
+            family="machine_learning_ensemble",
+            subcategory="bagging",
+            warmup_period=2,
+            input_domains=("feature_matrix",),
+            output_modes=("signal", "score", "diagnostics"),
+            composition_roles=("ensemble_member",),
+        ),
+        AlertAlgorithmSpec(
+            key="boosting_ensemble",
+            name="Boosting Ensemble",
+            catalog_ref="combination:9",
+            builder=lambda **kwargs: build_boosting_ensemble_algorithm(
+                algorithm_key="boosting_ensemble", **kwargs
+            ),
+            default_param={
+                "rows": [],
+                "buy_threshold": 0.25,
+                "sell_threshold": -0.25,
+                "min_history": 2,
+                "expected_child_count": 3,
+                "confidence_power": 1.5,
+                "learning_rate": 1.0,
+                "stage_weights": {},
+            },
+            param_normalizer=require_boosting_ensemble_param,
+            description="Blend aligned child model predictions with stage-style weighting to emulate boosting behavior.",
+            param_schema=(
+                {
+                    "key": "rows",
+                    "label": "Prediction rows",
+                    "type": "array",
+                    "required": True,
+                    "description": "Timestamped rows containing aligned child prediction outputs and optional meta-features.",
+                },
+                {
+                    "key": "buy_threshold",
+                    "label": "Buy threshold",
+                    "type": "number",
+                    "required": True,
+                    "description": "Composite score threshold at or above which the ensemble becomes buy.",
+                },
+                {
+                    "key": "sell_threshold",
+                    "label": "Sell threshold",
+                    "type": "number",
+                    "required": True,
+                    "description": "Composite score threshold at or below which the ensemble becomes sell.",
+                },
+                {
+                    "key": "min_history",
+                    "label": "Minimum history",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Minimum number of aligned rows required before output becomes actionable.",
+                },
+                {
+                    "key": "expected_child_count",
+                    "label": "Expected child count",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Expected number of child model predictions per aligned row.",
+                },
+                {
+                    "key": "confidence_power",
+                    "label": "Confidence power",
+                    "type": "number",
+                    "required": False,
+                    "description": "Exponent applied to child confidence when computing effective ensemble weights.",
+                },
+                {
+                    "key": "learning_rate",
+                    "label": "Learning rate",
+                    "type": "number",
+                    "required": False,
+                    "description": "Scale factor applied to the boosted ensemble score.",
+                },
+                {
+                    "key": "stage_weights",
+                    "label": "Stage weights",
+                    "type": "object",
+                    "required": False,
+                    "description": "Optional per-child stage weights representing boosted learner importance.",
+                },
+            ),
+            tags=("composite", "machine_learning_ensemble", "boosting"),
+            category="composite",
+            family="machine_learning_ensemble",
+            subcategory="boosting",
+            warmup_period=2,
+            input_domains=("feature_matrix",),
+            output_modes=("signal", "score", "diagnostics"),
+            composition_roles=("ensemble_member",),
+        ),
+        AlertAlgorithmSpec(
+            key="stacking_meta_learning",
+            name="Stacking / Meta-Learning",
+            catalog_ref="combination:10",
+            builder=lambda **kwargs: build_stacking_meta_learning_algorithm(
+                algorithm_key="stacking_meta_learning", **kwargs
+            ),
+            default_param={
+                "rows": [],
+                "buy_threshold": 0.15,
+                "sell_threshold": -0.15,
+                "min_history": 2,
+                "expected_child_count": 3,
+                "confidence_power": 1.0,
+                "meta_bias": 0.0,
+                "meta_feature_scale": 0.0,
+                "meta_model_weights": {},
+            },
+            param_normalizer=require_stacking_meta_learning_param,
+            description="Combine aligned child predictions with optional meta-features to emulate a second-stage stacking model.",
+            param_schema=(
+                {
+                    "key": "rows",
+                    "label": "Prediction rows",
+                    "type": "array",
+                    "required": True,
+                    "description": "Timestamped rows containing aligned child prediction outputs and optional meta-features.",
+                },
+                {
+                    "key": "buy_threshold",
+                    "label": "Buy threshold",
+                    "type": "number",
+                    "required": True,
+                    "description": "Composite score threshold at or above which the ensemble becomes buy.",
+                },
+                {
+                    "key": "sell_threshold",
+                    "label": "Sell threshold",
+                    "type": "number",
+                    "required": True,
+                    "description": "Composite score threshold at or below which the ensemble becomes sell.",
+                },
+                {
+                    "key": "min_history",
+                    "label": "Minimum history",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Minimum number of aligned rows required before output becomes actionable.",
+                },
+                {
+                    "key": "expected_child_count",
+                    "label": "Expected child count",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Expected number of child model predictions per aligned row.",
+                },
+                {
+                    "key": "confidence_power",
+                    "label": "Confidence power",
+                    "type": "number",
+                    "required": False,
+                    "description": "Exponent applied to child confidence when computing effective ensemble weights.",
+                },
+                {
+                    "key": "meta_bias",
+                    "label": "Meta bias",
+                    "type": "number",
+                    "required": False,
+                    "description": "Bias term applied by the meta-model before thresholding.",
+                },
+                {
+                    "key": "meta_feature_scale",
+                    "label": "Meta feature scale",
+                    "type": "number",
+                    "required": False,
+                    "description": "Scale factor applied to summed meta-feature values.",
+                },
+                {
+                    "key": "meta_model_weights",
+                    "label": "Meta model weights",
+                    "type": "object",
+                    "required": False,
+                    "description": "Optional per-child weights for the second-stage meta-model.",
+                },
+            ),
+            tags=("composite", "machine_learning_ensemble", "stacking"),
+            category="composite",
+            family="machine_learning_ensemble",
+            subcategory="stacking",
+            warmup_period=2,
+            input_domains=("feature_matrix",),
+            output_modes=("signal", "score", "diagnostics"),
+            composition_roles=("ensemble_member",),
+        ),
+    ]
+    for spec in specs:
+        register_algorithm(spec)

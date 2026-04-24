@@ -2500,6 +2500,108 @@ def require_regime_switching_hmm_gating_param(raw_alg_param, label):
     }
 
 
+def _require_machine_learning_ensemble_base_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "buy_threshold",
+            "sell_threshold",
+            "min_history",
+            "expected_child_count",
+        ],
+        label,
+    )
+    buy_threshold = _require_float_like(
+        normalized["buy_threshold"], f"{label} buy_threshold"
+    )
+    sell_threshold = _require_float_like(
+        normalized["sell_threshold"], f"{label} sell_threshold"
+    )
+    if sell_threshold > buy_threshold:
+        raise ValueError(f"{label} requires sell_threshold <= buy_threshold")
+    result = {
+        "rows": _require_dict_rows(normalized["rows"], label),
+        "buy_threshold": buy_threshold,
+        "sell_threshold": sell_threshold,
+        "min_history": _require_positive_int_like(
+            normalized["min_history"], f"{label} min_history"
+        ),
+        "expected_child_count": _require_positive_int_like(
+            normalized["expected_child_count"], f"{label} expected_child_count"
+        ),
+    }
+    confidence_power = normalized.get("confidence_power")
+    if confidence_power is not None:
+        result["confidence_power"] = _require_non_negative_float_like(
+            confidence_power,
+            f"{label} confidence_power",
+        )
+    return result
+
+
+def require_bagging_ensemble_param(raw_alg_param, label):
+    normalized = _require_machine_learning_ensemble_base_param(raw_alg_param, label)
+    raw = _require_param_dict(raw_alg_param, label)
+    child_weights = raw.get("child_weights", {})
+    if not isinstance(child_weights, dict):
+        raise ValueError(f"{label} child_weights must be a dict")
+    normalized["child_weights"] = {
+        _require_non_empty_string(
+            key, f"{label} child_weights key"
+        ): _require_float_like(value, f"{label} child_weights[{key}]")
+        for key, value in child_weights.items()
+    }
+    normalized["bootstrap_diversity_multiplier"] = _require_non_negative_float_like(
+        raw.get("bootstrap_diversity_multiplier", 1.0),
+        f"{label} bootstrap_diversity_multiplier",
+    )
+    return normalized
+
+
+def require_boosting_ensemble_param(raw_alg_param, label):
+    normalized = _require_machine_learning_ensemble_base_param(raw_alg_param, label)
+    raw = _require_param_dict(raw_alg_param, label)
+    stage_weights = raw.get("stage_weights", {})
+    if not isinstance(stage_weights, dict):
+        raise ValueError(f"{label} stage_weights must be a dict")
+    normalized["stage_weights"] = {
+        _require_non_empty_string(
+            key, f"{label} stage_weights key"
+        ): _require_float_like(value, f"{label} stage_weights[{key}]")
+        for key, value in stage_weights.items()
+    }
+    learning_rate = _require_non_negative_float_like(
+        raw.get("learning_rate", 1.0), f"{label} learning_rate"
+    )
+    if learning_rate == 0.0:
+        raise ValueError(f"{label} learning_rate must be > 0")
+    normalized["learning_rate"] = learning_rate
+    return normalized
+
+
+def require_stacking_meta_learning_param(raw_alg_param, label):
+    normalized = _require_machine_learning_ensemble_base_param(raw_alg_param, label)
+    raw = _require_param_dict(raw_alg_param, label)
+    meta_model_weights = raw.get("meta_model_weights", {})
+    if not isinstance(meta_model_weights, dict):
+        raise ValueError(f"{label} meta_model_weights must be a dict")
+    normalized["meta_model_weights"] = {
+        _require_non_empty_string(
+            key, f"{label} meta_model_weights key"
+        ): _require_float_like(value, f"{label} meta_model_weights[{key}]")
+        for key, value in meta_model_weights.items()
+    }
+    normalized["meta_bias"] = _require_float_like(
+        raw.get("meta_bias", 0.0), f"{label} meta_bias"
+    )
+    normalized["meta_feature_scale"] = _require_float_like(
+        raw.get("meta_feature_scale", 0.0), f"{label} meta_feature_scale"
+    )
+    return normalized
+
+
 def normalize_alertgen_sensor_config(
     sensor_config, label="Alert generator sensor_config"
 ):
