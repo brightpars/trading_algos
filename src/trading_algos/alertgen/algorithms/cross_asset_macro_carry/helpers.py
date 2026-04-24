@@ -367,6 +367,11 @@ def build_rebalance_output(
         "top_score": [],
         "warmup_ready": [],
         "selection_strength": [],
+        "selected_count": [],
+        "gross_exposure": [],
+        "net_exposure": [],
+        "reason_codes": [],
+        "regime_label": [],
     }
     child_outputs: tuple[NormalizedChildOutput, ...] = ()
     for row in rows:
@@ -392,6 +397,25 @@ def build_rebalance_output(
             bool(row.diagnostics.get("warmup_ready", False))
         )
         derived_series["selection_strength"].append(confidence)
+        selected_count_raw = row.diagnostics.get(
+            "selected_count", len(row.selected_symbols)
+        )
+        selected_count = (
+            selected_count_raw
+            if isinstance(selected_count_raw, int)
+            else len(row.selected_symbols)
+        )
+        derived_series["selected_count"].append(selected_count)
+        derived_series["gross_exposure"].append(
+            _coerce_float(row.diagnostics.get("gross_exposure")) or 0.0
+        )
+        derived_series["net_exposure"].append(
+            _coerce_float(row.diagnostics.get("net_exposure")) or 0.0
+        )
+        derived_series["reason_codes"].append([reason_code])
+        derived_series["regime_label"].append(
+            "selected" if row.selected_symbols else "neutral"
+        )
     if rows:
         latest = rows[-1]
         reason_code = str(latest.diagnostics.get("selection_reason", "no_selection"))
@@ -411,6 +435,11 @@ def build_rebalance_output(
                     "subcategory": subcategory,
                     "catalog_ref": catalog_ref,
                     "reporting_mode": "rebalance_report",
+                    "reason_codes": [reason_code],
+                    "decision_reason": reason_code,
+                    "regime_label": "selected"
+                    if latest.selected_symbols
+                    else "neutral",
                     **latest.diagnostics,
                 },
                 reason_codes=(reason_code,),
@@ -451,6 +480,9 @@ def build_multi_leg_rebalance_output(
         "legs": [],
         "selected_symbol": [],
         "warmup_ready": [],
+        "hedge_ratio": [],
+        "reason_codes": [],
+        "regime_label": [],
     }
     child_outputs: tuple[NormalizedChildOutput, ...] = ()
     for row in rows:
@@ -470,6 +502,11 @@ def build_multi_leg_rebalance_output(
         derived_series["warmup_ready"].append(
             bool(row.diagnostics.get("warmup_ready", False))
         )
+        derived_series["hedge_ratio"].append(1.0)
+        derived_series["reason_codes"].append([reason_code])
+        derived_series["regime_label"].append(
+            "spread_active" if row.legs else "neutral"
+        )
     if rows:
         latest = rows[-1]
         reason_code = str(latest.diagnostics.get("selection_reason", "warmup_pending"))
@@ -487,6 +524,10 @@ def build_multi_leg_rebalance_output(
                     "subcategory": subcategory,
                     "catalog_ref": catalog_ref,
                     "reporting_mode": "rebalance_report",
+                    "reason_codes": [reason_code],
+                    "decision_reason": reason_code,
+                    "regime_label": "spread_active" if latest.legs else "neutral",
+                    "hedge_ratio": 1.0,
                     **latest.diagnostics,
                 },
                 reason_codes=(reason_code,),

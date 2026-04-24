@@ -781,7 +781,7 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
             },
             "algorithm:85",
             "cross_asset_macro_carry",
-            "AAA",
+            None,
         ),
     ],
 )
@@ -814,10 +814,111 @@ def test_cross_asset_wave_1_registration_and_fixture_behavior(
     assert output.metadata["catalog_ref"] == expected_catalog_ref
     assert output.metadata["family"] == expected_family
     assert output.metadata["reporting_mode"] == "rebalance_report"
+    assert output.metadata["warmup_period"] == algorithm.minimum_history()
     assert output.derived_series["top_symbol"][-1] == expected_top_symbol
+    assert "reason_codes" in output.derived_series
+    assert "regime_label" in output.derived_series
+    assert output.child_outputs[0].diagnostics["catalog_ref"] == expected_catalog_ref
+    assert output.child_outputs[0].diagnostics["reporting_mode"] == "rebalance_report"
+    assert output.child_outputs[0].reason_codes == tuple(
+        output.child_outputs[0].diagnostics["reason_codes"]
+    )
     assert payload_name.startswith(f"rebalance_report_{alg_key}_")
     assert payload["data"]["metadata"]["catalog_ref"] == expected_catalog_ref
+    assert payload["portfolio"]["metadata"]["catalog_ref"] == expected_catalog_ref
     assert output.child_outputs[0].diagnostics["family"] == expected_family
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "carry_trade_fx_rates",
+            {
+                "rows": _build_cross_asset_fixture_rows()[:1],
+                "field_names": ["carry", "yield_diff"],
+                "rebalance_frequency": "all",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "risk_on_risk_off_regime",
+            {
+                "rows": _build_cross_asset_fixture_rows()[:1],
+                "field_names": ["risk_score", "credit_impulse"],
+                "rebalance_frequency": "all",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "intermarket_confirmation",
+            {
+                "rows": _build_cross_asset_fixture_rows()[:1],
+                "field_names": ["confirmation", "leader_return"],
+                "rebalance_frequency": "all",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "seasonality_calendar_effects",
+            {
+                "rows": _build_cross_asset_fixture_rows()[:1],
+                "rebalance_frequency": "all",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "calendar_pattern": "month_end",
+            },
+        ),
+        (
+            "earnings_drift_post_event_momentum",
+            {
+                "rows": _build_cross_asset_fixture_rows()[:1],
+                "event_rows": _build_event_fixture_rows(),
+                "field_names": ["surprise"],
+                "rebalance_frequency": "all",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "post_event_window_days": 3,
+                "surprise_field": "surprise",
+            },
+        ),
+    ],
+)
+def test_cross_asset_wave_1_short_history_stays_neutral_until_minimum_universe_size(
+    tmp_path, alg_key, alg_param
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert all("warmup_pending" in point.reason_codes for point in output.points)
+    assert all(flag is False for flag in output.derived_series["warmup_ready"])
+    assert output.child_outputs[0].diagnostics["decision_reason"] == "warmup_pending"
+    assert output.child_outputs[0].diagnostics["warmup_ready"] is False
 
 
 @pytest.mark.parametrize(
@@ -877,7 +978,7 @@ def test_cross_asset_wave_1_registration_and_fixture_behavior(
                 "minimum_universe_size": 1,
                 "post_event_window_days": 3,
             },
-            "event_rows\[0\] event_timestamp is required",
+            r"event_rows\[0\] event_timestamp is required",
         ),
     ],
 )
@@ -964,6 +1065,298 @@ def test_cross_asset_wave_1_multi_leg_outputs_expose_leg_diagnostics(
     assert len(portfolio_output.rebalances[-1].legs) == 2
     assert portfolio_output.metadata["reporting_mode"] == "rebalance_report"
     assert output.child_outputs[0].diagnostics["selected_symbol"] in {"AAA", "BBB"}
+    assert output.derived_series["hedge_ratio"][-1] == pytest.approx(1.0)
+    assert output.child_outputs[0].diagnostics["hedge_ratio"] == pytest.approx(1.0)
+    assert output.child_outputs[0].diagnostics["decision_reason"] == "selection_ready"
+
+
+def test_cross_asset_wave_1_fixture_behavior_matches_manifest_expectations(
+    tmp_path,
+) -> None:
+    carry_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "carry_trade_fx_rates",
+            "alg_param": {
+                "rows": _build_cross_asset_fixture_rows(),
+                "field_names": ["carry", "yield_diff"],
+                "rebalance_frequency": "monthly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path / "carry"),
+    )
+    carry_output = carry_algorithm.normalized_output()
+
+    assert carry_output.derived_series["top_symbol"] == ["AAA", "AAA"]
+    assert all(
+        symbol == ["AAA"] for symbol in carry_output.derived_series["selected_symbols"]
+    )
+    assert carry_output.child_outputs[0].diagnostics["selected_count"] == 1
+    assert carry_output.child_outputs[0].diagnostics["gross_exposure"] == pytest.approx(
+        1.0
+    )
+
+    regime_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "risk_on_risk_off_regime",
+            "alg_param": {
+                "rows": _build_cross_asset_fixture_rows(),
+                "field_names": ["risk_score", "credit_impulse"],
+                "rebalance_frequency": "monthly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 1,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path / "regime"),
+    )
+    regime_output = regime_algorithm.normalized_output()
+
+    assert regime_output.derived_series["top_symbol"] == ["AAA", "BBB"]
+    assert regime_output.derived_series["regime_label"] == ["selected", "selected"]
+    assert regime_output.child_outputs[0].diagnostics["top_ranked_symbol"] == "BBB"
+
+    seasonality_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "seasonality_calendar_effects",
+            "alg_param": {
+                "rows": _build_cross_asset_fixture_rows(),
+                "rebalance_frequency": "monthly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 1,
+                "calendar_pattern": "month_end",
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path / "seasonality"),
+    )
+    seasonality_output = seasonality_algorithm.normalized_output()
+
+    assert seasonality_output.derived_series["top_score"] == [0.0, 0.0]
+    assert (
+        seasonality_output.child_outputs[0].diagnostics["score_label"]
+        == "calendar_score"
+    )
+
+    earnings_rows = [
+        *_build_cross_asset_fixture_rows(),
+        {
+            "ts": "2025-02-04",
+            "symbol": "AAA",
+            "Close": 102.0,
+            "carry": 0.06,
+            "yield_diff": 0.05,
+            "risk_score": 0.20,
+            "credit_impulse": 0.25,
+            "confirmation": 0.45,
+            "leader_return": 0.01,
+            "yield_2y": 0.022,
+            "yield_10y": 0.046,
+            "front_roll": 0.027,
+            "back_roll": 0.012,
+            "near_contract": 103.0,
+            "far_contract": 100.0,
+        },
+        {
+            "ts": "2025-02-04",
+            "symbol": "BBB",
+            "Close": 98.0,
+            "carry": 0.01,
+            "yield_diff": 0.02,
+            "risk_score": 0.90,
+            "credit_impulse": 0.70,
+            "confirmation": 0.80,
+            "leader_return": 0.03,
+            "yield_2y": 0.031,
+            "yield_10y": 0.033,
+            "front_roll": 0.007,
+            "back_roll": 0.019,
+            "near_contract": 96.0,
+            "far_contract": 102.0,
+        },
+    ]
+    earnings_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "earnings_drift_post_event_momentum",
+            "alg_param": {
+                "rows": earnings_rows,
+                "event_rows": _build_event_fixture_rows(),
+                "field_names": ["surprise"],
+                "rebalance_frequency": "all",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 1,
+                "post_event_window_days": 3,
+                "surprise_field": "surprise",
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path / "earnings"),
+    )
+    earnings_output = earnings_algorithm.normalized_output()
+
+    assert earnings_output.points[0].signal_label == "neutral"
+    assert "warmup_pending" in earnings_output.points[0].reason_codes
+    assert earnings_output.points[-1].signal_label == "buy"
+    assert earnings_output.child_outputs[0].diagnostics["event_window_active"] is True
+    assert earnings_output.child_outputs[0].diagnostics["latest_event_timestamp"] == (
+        "2025-02-03 16:05:00"
+    )
+    assert earnings_output.child_outputs[0].diagnostics[
+        "latest_event_surprise"
+    ] == pytest.approx(0.15)
+
+
+def test_cross_asset_wave_1_registration_metadata_matches_manifest_contract() -> None:
+    expected = {
+        "carry_trade_fx_rates": ("algorithm:78", "cross_asset_macro_carry", "carry", 1),
+        "yield_curve_steepener_flattener": (
+            "algorithm:79",
+            "cross_asset_macro_carry",
+            "yield",
+            1,
+        ),
+        "curve_roll_down_strategy": (
+            "algorithm:80",
+            "cross_asset_macro_carry",
+            "curve",
+            1,
+        ),
+        "commodity_term_structure_roll_yield": (
+            "algorithm:81",
+            "cross_asset_macro_carry",
+            "commodity",
+            1,
+        ),
+        "risk_on_risk_off_regime": (
+            "algorithm:82",
+            "cross_asset_macro_carry",
+            "risk",
+            1,
+        ),
+        "intermarket_confirmation": (
+            "algorithm:83",
+            "cross_asset_macro_carry",
+            "intermarket",
+            1,
+        ),
+        "seasonality_calendar_effects": (
+            "algorithm:84",
+            "cross_asset_macro_carry",
+            "seasonality",
+            1,
+        ),
+        "earnings_drift_post_event_momentum": (
+            "algorithm:85",
+            "cross_asset_macro_carry",
+            "earnings",
+            1,
+        ),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.category == "cross_asset_macro_carry"
+        assert spec.asset_scope == "portfolio"
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "catalog_ref", "alg_param"),
+    [
+        (
+            "carry_trade_fx_rates",
+            "algorithm:78",
+            {
+                "rows": _build_cross_asset_fixture_rows(),
+                "field_names": ["carry", "yield_diff"],
+                "rebalance_frequency": "monthly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "risk_on_risk_off_regime",
+            "algorithm:82",
+            {
+                "rows": _build_cross_asset_fixture_rows(),
+                "field_names": ["risk_score", "credit_impulse"],
+                "rebalance_frequency": "monthly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 1,
+            },
+        ),
+        (
+            "earnings_drift_post_event_momentum",
+            "algorithm:85",
+            {
+                "rows": _build_cross_asset_fixture_rows(),
+                "event_rows": _build_event_fixture_rows(),
+                "field_names": ["surprise"],
+                "rebalance_frequency": "all",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 1,
+                "post_event_window_days": 3,
+                "surprise_field": "surprise",
+            },
+        ),
+    ],
+)
+def test_cross_asset_wave_1_normalized_output_metadata_exposes_dashboard_contract_fields(
+    tmp_path, alg_key, catalog_ref, alg_param
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.metadata["family"] == "cross_asset_macro_carry"
+    assert output.metadata["reporting_mode"] == "rebalance_report"
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert child_output.diagnostics["family"] == "cross_asset_macro_carry"
+    assert child_output.diagnostics["reporting_mode"] == "rebalance_report"
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert (
+        child_output.diagnostics["decision_reason"]
+        in child_output.diagnostics["reason_codes"]
+    )
 
 
 def test_cross_asset_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:

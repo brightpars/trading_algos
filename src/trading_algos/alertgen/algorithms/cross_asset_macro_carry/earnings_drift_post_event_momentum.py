@@ -31,6 +31,27 @@ def _parse_timestamp(value: str, *, end_of_day: bool = False) -> datetime:
     return datetime.fromisoformat(normalized)
 
 
+def _latest_eligible_event(
+    symbol_events: list[dict[str, object]],
+    *,
+    row_timestamp: str,
+    post_event_window_days: int,
+) -> dict[str, object] | None:
+    row_ts = _parse_timestamp(row_timestamp, end_of_day=False)
+    eligible_events = [
+        event
+        for event in symbol_events
+        if _parse_timestamp(str(event["event_timestamp"])) <= row_ts
+    ]
+    if not eligible_events:
+        return None
+    latest_event = eligible_events[-1]
+    event_ts = _parse_timestamp(str(latest_event["event_timestamp"]))
+    if (row_ts.date() - event_ts.date()).days > post_event_window_days:
+        return None
+    return latest_event
+
+
 class EarningsDriftPostEventMomentumAlertAlgorithm(CrossAssetRankingAlertAlgorithm):
     catalog_ref = "algorithm:85"
 
@@ -48,19 +69,12 @@ def build_earnings_drift_post_event_momentum_algorithm(
 
     def _score(symbol_key: str, row: PanelRow) -> float | None:
         symbol_events = event_lookup.get(symbol_key, [])
-        row_ts = _parse_timestamp(row.timestamp, end_of_day=True)
-        eligible_events = [
-            event
-            for event in symbol_events
-            if _parse_timestamp(str(event["event_timestamp"])) <= row_ts
-        ]
-        if not eligible_events:
-            return None
-        latest_event = eligible_events[-1]
-        event_ts = _parse_timestamp(str(latest_event["event_timestamp"]))
-        if row_ts < event_ts:
-            return None
-        if (row_ts.date() - event_ts.date()).days > post_event_window_days:
+        latest_event = _latest_eligible_event(
+            symbol_events,
+            row_timestamp=row.timestamp,
+            post_event_window_days=post_event_window_days,
+        )
+        if latest_event is None:
             return None
         surprise_value = latest_event.get(surprise_field)
         if isinstance(surprise_value, bool):
@@ -82,6 +96,41 @@ def build_earnings_drift_post_event_momentum_algorithm(
         minimum_universe_size=int(alg_param["minimum_universe_size"]),
         score_label="event_drift_score",
     )
+    for row in rows:
+        selected_symbol = row.diagnostics.get("top_ranked_symbol")
+        if not isinstance(selected_symbol, str):
+            row.diagnostics.update(
+                {
+                    "event_window_active": False,
+                    "latest_event_timestamp": None,
+                    "latest_event_surprise": None,
+                    "event_window_days": post_event_window_days,
+                    "surprise_field": surprise_field,
+                }
+            )
+            continue
+        latest_event = _latest_eligible_event(
+            event_lookup.get(selected_symbol, []),
+            row_timestamp=row.timestamp,
+            post_event_window_days=post_event_window_days,
+        )
+        row.diagnostics.update(
+            {
+                "event_window_active": latest_event is not None,
+                "latest_event_timestamp": (
+                    str(latest_event["event_timestamp"])
+                    if latest_event is not None
+                    else None
+                ),
+                "latest_event_surprise": (
+                    latest_event.get(surprise_field)
+                    if latest_event is not None
+                    else None
+                ),
+                "event_window_days": post_event_window_days,
+                "surprise_field": surprise_field,
+            }
+        )
     return EarningsDriftPostEventMomentumAlertAlgorithm(
         algorithm_key=algorithm_key,
         symbol=symbol,
