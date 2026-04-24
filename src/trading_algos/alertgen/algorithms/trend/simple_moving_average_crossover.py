@@ -42,6 +42,13 @@ class SimpleMovingAverageCrossoverAlertAlgorithm(BaseMovingAverageTrendAlertAlgo
     def minimum_history(self) -> int:
         return minimum_history_for_windows(self.short_window, self.long_window)
 
+    def _parameter_annotations(self) -> dict[str, object]:
+        return {
+            "average_type": "sma",
+            "short_window": self.short_window,
+            "long_window": self.long_window,
+        }
+
     def _calculate_state(self) -> TrendSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
         short_values = moving_average(closes, self.short_window, "sma")

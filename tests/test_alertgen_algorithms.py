@@ -624,3 +624,296 @@ def test_validation_rejects_invalid_trend_wave_1_parameter_shapes():
                 "sell": True,
             }
         )
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "simple_moving_average_crossover",
+            {
+                "short_window": 3,
+                "long_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "exponential_moving_average_crossover",
+            {
+                "short_window": 3,
+                "long_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "triple_moving_average_crossover",
+            {
+                "fast_window": 2,
+                "medium_window": 4,
+                "slow_window": 6,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            6,
+        ),
+        (
+            "price_vs_moving_average",
+            {
+                "window": 5,
+                "average_type": "ema",
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "moving_average_ribbon_trend",
+            {
+                "windows": [2, 3, 5, 7],
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            7,
+        ),
+    ],
+)
+def test_trend_wave_1_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(
+        _load_fixture_rows("monotonic_cross.csv")[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_reason_code", "expected_annotation_keys"),
+    [
+        (
+            "simple_moving_average_crossover",
+            {
+                "short_window": 3,
+                "long_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            "bullish_setup",
+            {"short_window", "long_window", "average_type"},
+        ),
+        (
+            "exponential_moving_average_crossover",
+            {
+                "short_window": 3,
+                "long_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            "bullish_setup",
+            {"short_window", "long_window", "average_type"},
+        ),
+        (
+            "triple_moving_average_crossover",
+            {
+                "fast_window": 2,
+                "medium_window": 3,
+                "slow_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            "bullish_setup",
+            {"fast_window", "medium_window", "slow_window", "average_type"},
+        ),
+        (
+            "price_vs_moving_average",
+            {
+                "window": 4,
+                "average_type": "sma",
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            "bullish_setup",
+            {"window", "average_type"},
+        ),
+        (
+            "moving_average_ribbon_trend",
+            {
+                "windows": [2, 3, 4, 5],
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            "bullish_setup",
+            {"windows", "average_type"},
+        ),
+    ],
+)
+def test_trend_wave_1_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, expected_reason_code, expected_annotation_keys
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_fixture_rows("monotonic_cross.csv"))
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    last_point = output.points[-1]
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert payloads[0][0]["data"]
+    assert expected_reason_code in last_point.reason_codes
+    assert {"trend_score", "regime_label", "spread_value", "reason_codes"}.issubset(
+        output.derived_series
+    )
+    assert child_output.signal_label == "buy"
+    assert child_output.regime_label == algorithm.latest_predicted_trend
+    assert expected_reason_code in child_output.diagnostics["reason_codes"]
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+    assert child_output.reason_codes == tuple(child_output.diagnostics.keys())
+
+
+def test_trend_wave_1_validation_rejects_invalid_additional_parameter_shapes():
+    with pytest.raises(ValueError, match="fast_window < medium_window < slow_window"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "triple_moving_average_crossover",
+                "alg_param": {
+                    "fast_window": 4,
+                    "medium_window": 4,
+                    "slow_window": 5,
+                    "minimum_spread": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="average_type must be one of"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "price_vs_moving_average",
+                "alg_param": {
+                    "window": 4,
+                    "average_type": "wma",
+                    "minimum_spread": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="windows must not contain duplicates"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "moving_average_ribbon_trend",
+                "alg_param": {
+                    "windows": [2, 3, 3],
+                    "minimum_spread": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_trend_wave_1_performance_smoke_on_representative_series(tmp_path):
+    rows = _load_fixture_rows("monotonic_cross.csv") * 400
+    algorithms = [
+        (
+            "simple_moving_average_crossover",
+            {
+                "short_window": 3,
+                "long_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "exponential_moving_average_crossover",
+            {
+                "short_window": 3,
+                "long_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "triple_moving_average_crossover",
+            {
+                "fast_window": 2,
+                "medium_window": 3,
+                "slow_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "price_vs_moving_average",
+            {
+                "window": 4,
+                "average_type": "sma",
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "moving_average_ribbon_trend",
+            {
+                "windows": [2, 3, 4, 5],
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert "trend_score" in output.derived_series

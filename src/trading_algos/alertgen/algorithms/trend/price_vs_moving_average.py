@@ -41,6 +41,12 @@ class PriceVsMovingAverageAlertAlgorithm(BaseMovingAverageTrendAlertAlgorithm):
     def minimum_history(self) -> int:
         return minimum_history_for_windows(self.window)
 
+    def _parameter_annotations(self) -> dict[str, object]:
+        return {
+            "average_type": self.average_type,
+            "window": self.window,
+        }
+
     def _calculate_state(self) -> TrendSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
         ma_values = moving_average(closes, self.window, self.average_type)

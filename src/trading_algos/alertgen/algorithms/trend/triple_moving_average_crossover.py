@@ -48,6 +48,14 @@ class TripleMovingAverageCrossoverAlertAlgorithm(BaseMovingAverageTrendAlertAlgo
             self.slow_window,
         )
 
+    def _parameter_annotations(self) -> dict[str, object]:
+        return {
+            "average_type": "sma",
+            "fast_window": self.fast_window,
+            "medium_window": self.medium_window,
+            "slow_window": self.slow_window,
+        }
+
     def _calculate_state(self) -> TrendSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
         fast_values = moving_average(closes, self.fast_window, "sma")

@@ -38,6 +38,12 @@ class MovingAverageRibbonTrendAlertAlgorithm(BaseMovingAverageTrendAlertAlgorith
     def minimum_history(self) -> int:
         return minimum_history_for_windows(*self.windows)
 
+    def _parameter_annotations(self) -> dict[str, object]:
+        return {
+            "average_type": "sma",
+            "windows": tuple(self.windows),
+        }
+
     def _calculate_state(self) -> TrendSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
         latest_values: list[float] = []

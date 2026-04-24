@@ -177,8 +177,8 @@ rows:
   display_category: Trend Following
   subcategory: simple
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -224,7 +224,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 1; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:2
   source_doc_ref: requirements_v4:algorithm:2
   kind: algorithm
@@ -233,8 +233,8 @@ rows:
   display_category: Trend Following
   subcategory: exponential
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -280,7 +280,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 2; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:3
   source_doc_ref: requirements_v4:algorithm:3
   kind: algorithm
@@ -289,8 +289,8 @@ rows:
   display_category: Trend Following
   subcategory: triple
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -335,7 +335,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 3; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:4
   source_doc_ref: requirements_v4:algorithm:4
   kind: algorithm
@@ -344,8 +344,8 @@ rows:
   display_category: Trend Following
   subcategory: price
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -391,7 +391,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 4; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:5
   source_doc_ref: requirements_v4:algorithm:5
   kind: algorithm
@@ -400,8 +400,8 @@ rows:
   display_category: Trend Following
   subcategory: moving
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -446,7 +446,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 5; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:6
   source_doc_ref: requirements_v4:algorithm:6
   kind: algorithm

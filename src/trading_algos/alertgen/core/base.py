@@ -386,6 +386,13 @@ class BaseAlertAlgorithm(ABC):
             else "neutral"
         )
         direction = 1 if decision.buy_signal else -1 if decision.sell_signal else 0
+        diagnostics = {
+            "symbol": self.symbol,
+            "warmup_period": self.minimum_history(),
+            "evaluate_window_len": self.evaluate_window_len,
+        }
+        diagnostics.update(decision.annotations)
+        reason_codes = tuple(diagnostics.keys())
         return (
             NormalizedChildOutput(
                 child_key=self.alg_name,
@@ -395,11 +402,7 @@ class BaseAlertAlgorithm(ABC):
                 confidence=max(0.0, min(1.0, decision.confidence / 10.0)),
                 regime_label=decision.trend,
                 direction=direction,
-                diagnostics={
-                    "symbol": self.symbol,
-                    "warmup_period": self.minimum_history(),
-                    "evaluate_window_len": self.evaluate_window_len,
-                },
-                reason_codes=tuple(decision.annotations.keys()),
+                diagnostics=diagnostics,
+                reason_codes=reason_codes,
             ),
         )
