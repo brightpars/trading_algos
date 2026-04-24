@@ -1042,6 +1042,109 @@ def require_volatility_adjusted_reversion_param(raw_alg_param, label):
     }
 
 
+def require_volatility_breakout_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "atr_window",
+            "compression_window",
+            "compression_threshold",
+            "breakout_lookback",
+            "breakout_buffer",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    compression_threshold = _require_non_negative_float_like(
+        normalized["compression_threshold"], f"{label} compression_threshold"
+    )
+    if compression_threshold == 0.0:
+        raise ValueError(f"{label} compression_threshold must be > 0")
+    return {
+        "atr_window": _require_positive_int_like(
+            normalized["atr_window"], f"{label} atr_window"
+        ),
+        "compression_window": _require_positive_int_like(
+            normalized["compression_window"], f"{label} compression_window"
+        ),
+        "compression_threshold": compression_threshold,
+        "breakout_lookback": _require_positive_int_like(
+            normalized["breakout_lookback"], f"{label} breakout_lookback"
+        ),
+        "breakout_buffer": _require_non_negative_float_like(
+            normalized["breakout_buffer"], f"{label} breakout_buffer"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_atr_channel_breakout_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["channel_window", "atr_window", "atr_multiplier", "confirmation_bars"],
+        label,
+    )
+    atr_multiplier = _require_non_negative_float_like(
+        normalized["atr_multiplier"], f"{label} atr_multiplier"
+    )
+    if atr_multiplier == 0.0:
+        raise ValueError(f"{label} atr_multiplier must be > 0")
+    return {
+        "channel_window": _require_positive_int_like(
+            normalized["channel_window"], f"{label} channel_window"
+        ),
+        "atr_window": _require_positive_int_like(
+            normalized["atr_window"], f"{label} atr_window"
+        ),
+        "atr_multiplier": atr_multiplier,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_volatility_mean_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "volatility_window",
+            "baseline_window",
+            "high_threshold",
+            "low_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    high_threshold = _require_non_negative_float_like(
+        normalized["high_threshold"], f"{label} high_threshold"
+    )
+    low_threshold = _require_non_negative_float_like(
+        normalized["low_threshold"], f"{label} low_threshold"
+    )
+    if high_threshold <= 1.0:
+        raise ValueError(f"{label} high_threshold must be > 1")
+    if low_threshold <= 0.0 or low_threshold >= 1.0:
+        raise ValueError(f"{label} low_threshold must be within (0, 1)")
+    return {
+        "volatility_window": _require_positive_int_like(
+            normalized["volatility_window"], f"{label} volatility_window"
+        ),
+        "baseline_window": _require_positive_int_like(
+            normalized["baseline_window"], f"{label} baseline_window"
+        ),
+        "high_threshold": high_threshold,
+        "low_threshold": low_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def _require_rows_param(raw_rows, label):
     if not isinstance(raw_rows, list):
         raise ValueError(f"{label} rows must be a list")

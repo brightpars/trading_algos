@@ -39,6 +39,7 @@ MOMENTUM_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "momentu
 MEAN_REVERSION_FIXTURES_ROOT = (
     Path(__file__).resolve().parent / "fixtures" / "mean_reversion"
 )
+VOLATILITY_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "volatility"
 COMPOSITE_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "composite"
 
 
@@ -82,6 +83,24 @@ def _load_mean_reversion_fixture_rows(name: str) -> list[dict[str, object]]:
     with (MEAN_REVERSION_FIXTURES_ROOT / name).open(
         newline="", encoding="utf-8"
     ) as handle:
+        rows = list(DictReader(handle))
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed_rows.append(
+            {
+                "ts": row["ts"],
+                "Open": float(row["Open"]),
+                "High": float(row["High"]),
+                "Low": float(row["Low"]),
+                "Close": float(row["Close"]),
+                "Volume": float(row["Volume"]),
+            }
+        )
+    return parsed_rows
+
+
+def _load_volatility_fixture_rows(name: str) -> list[dict[str, object]]:
+    with (VOLATILITY_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
         rows = list(DictReader(handle))
     parsed_rows: list[dict[str, object]] = []
     for row in rows:
@@ -192,6 +211,9 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "range_reversion",
         "long_horizon_reversal",
         "volatility_adjusted_reversion",
+        "volatility_breakout",
+        "atr_channel_breakout",
+        "volatility_mean_reversion",
         "hard_boolean_gating_and_or_majority",
         "weighted_linear_score_blend",
         "aggregate_boundary_and_channel",
@@ -4689,3 +4711,421 @@ def test_mean_reversion_wave_2_normalized_output_metadata_exposes_dashboard_cont
     assert child_output.diagnostics["catalog_ref"] == catalog_ref
     assert child_output.diagnostics["catalog_ref"] == catalog_ref
     assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "volatility_breakout",
+            {
+                "atr_window": 5,
+                "compression_window": 5,
+                "compression_threshold": 2.0,
+                "breakout_lookback": 5,
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+            6,
+        ),
+        (
+            "atr_channel_breakout",
+            {
+                "channel_window": 5,
+                "atr_window": 5,
+                "atr_multiplier": 1.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "volatility_mean_reversion",
+            {
+                "volatility_window": 5,
+                "baseline_window": 8,
+                "high_threshold": 1.2,
+                "low_threshold": 0.8,
+                "confirmation_bars": 1,
+            },
+            13,
+        ),
+    ],
+)
+def test_volatility_wave_1_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(
+        _load_volatility_fixture_rows("compression_release.csv")[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_reason_code", "expected_annotation_keys"),
+    [
+        (
+            "volatility_breakout",
+            {
+                "atr_window": 5,
+                "compression_window": 5,
+                "compression_threshold": 2.0,
+                "breakout_lookback": 5,
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+            "volatility_breakout_up",
+            {
+                "atr_window",
+                "compression_window",
+                "compression_threshold",
+                "breakout_lookback",
+                "indicator",
+            },
+        ),
+        (
+            "atr_channel_breakout",
+            {
+                "channel_window": 5,
+                "atr_window": 5,
+                "atr_multiplier": 1.0,
+                "confirmation_bars": 1,
+            },
+            "atr_channel_breakout_up",
+            {"channel_window", "atr_window", "atr_multiplier", "indicator"},
+        ),
+        (
+            "volatility_mean_reversion",
+            {
+                "volatility_window": 5,
+                "baseline_window": 8,
+                "high_threshold": 1.2,
+                "low_threshold": 0.8,
+                "confirmation_bars": 1,
+            },
+            "volatility_ratio_high",
+            {
+                "volatility_window",
+                "baseline_window",
+                "high_threshold",
+                "low_threshold",
+                "indicator",
+            },
+        ),
+    ],
+)
+def test_volatility_wave_1_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, expected_reason_code, expected_annotation_keys
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_volatility_fixture_rows("compression_release.csv"))
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert any(expected_reason_code in point.reason_codes for point in output.points)
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+        "threshold_value",
+        "confirmation_state_label",
+        "warmup_ready",
+    }.issubset(output.derived_series)
+    assert output.metadata["family"] == "volatility_options"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+    assert child_output.diagnostics["family"] == "volatility_options"
+    assert child_output.diagnostics["reporting_mode"] == "bar_series"
+    assert child_output.diagnostics["warmup_ready"] is True
+    if alg_key == "volatility_breakout":
+        assert any(output.derived_series["compression_flag"][:-1])
+        assert any(point.signal_label == "buy" for point in output.points)
+    elif alg_key == "atr_channel_breakout":
+        assert "upper_band" in output.derived_series
+        assert any(point.signal_label == "buy" for point in output.points)
+    else:
+        assert "volatility_ratio" in output.derived_series
+        assert child_output.diagnostics["primary_value"] == pytest.approx(
+            output.derived_series["volatility_ratio"][-1]
+        )
+
+
+def test_volatility_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="compression_threshold must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "volatility_breakout",
+                "alg_param": {
+                    "atr_window": 5,
+                    "compression_window": 5,
+                    "compression_threshold": 0.0,
+                    "breakout_lookback": 5,
+                    "breakout_buffer": 0.1,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="atr_multiplier must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "atr_channel_breakout",
+                "alg_param": {
+                    "channel_window": 5,
+                    "atr_window": 5,
+                    "atr_multiplier": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="high_threshold must be > 1"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "volatility_mean_reversion",
+                "alg_param": {
+                    "volatility_window": 5,
+                    "baseline_window": 8,
+                    "high_threshold": 1.0,
+                    "low_threshold": 0.8,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match=r"low_threshold must be within \(0, 1\)"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "volatility_mean_reversion",
+                "alg_param": {
+                    "volatility_window": 5,
+                    "baseline_window": 8,
+                    "high_threshold": 1.2,
+                    "low_threshold": 1.1,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_volatility_wave_1_fixture_behavior_matches_manifest_expectations(
+    tmp_path,
+) -> None:
+    breakout_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "volatility_breakout",
+            "alg_param": {
+                "atr_window": 5,
+                "compression_window": 5,
+                "compression_threshold": 2.0,
+                "breakout_lookback": 5,
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "breakout"),
+    )
+    breakout_algorithm.process_list(
+        _load_volatility_fixture_rows("compression_release.csv")
+    )
+    breakout_output = breakout_algorithm.normalized_output()
+
+    compression_indices = [
+        index
+        for index, flag in enumerate(breakout_output.derived_series["compression_flag"])
+        if flag
+    ]
+    breakout_indices = [
+        index
+        for index, point in enumerate(breakout_output.points)
+        if point.signal_label == "buy"
+    ]
+
+    assert compression_indices
+    assert breakout_indices
+    assert min(compression_indices) < min(breakout_indices)
+
+
+def test_volatility_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = _load_volatility_fixture_rows("compression_release.csv") * 300
+    algorithms = [
+        (
+            "volatility_breakout",
+            {
+                "atr_window": 5,
+                "compression_window": 5,
+                "compression_threshold": 2.0,
+                "breakout_lookback": 5,
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "atr_channel_breakout",
+            {
+                "channel_window": 5,
+                "atr_window": 5,
+                "atr_multiplier": 1.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volatility_mean_reversion",
+            {
+                "volatility_window": 5,
+                "baseline_window": 8,
+                "high_threshold": 1.2,
+                "low_threshold": 0.8,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "bar_series"
+
+
+def test_volatility_wave_1_registration_metadata_matches_manifest_contract() -> None:
+    expected = {
+        "volatility_breakout": ("algorithm:52", "volatility_options", "volatility", 6),
+        "atr_channel_breakout": ("algorithm:53", "volatility_options", "atr", 5),
+        "volatility_mean_reversion": (
+            "algorithm:54",
+            "volatility_options",
+            "volatility",
+            13,
+        ),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.output_modes == ("signal", "score", "confidence")
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "catalog_ref", "alg_param"),
+    [
+        (
+            "volatility_breakout",
+            "algorithm:52",
+            {
+                "atr_window": 5,
+                "compression_window": 5,
+                "compression_threshold": 2.0,
+                "breakout_lookback": 5,
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "atr_channel_breakout",
+            "algorithm:53",
+            {
+                "channel_window": 5,
+                "atr_window": 5,
+                "atr_multiplier": 1.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volatility_mean_reversion",
+            "algorithm:54",
+            {
+                "volatility_window": 5,
+                "baseline_window": 8,
+                "high_threshold": 1.2,
+                "low_threshold": 0.8,
+                "confirmation_bars": 1,
+            },
+        ),
+    ],
+)
+def test_volatility_wave_1_normalized_output_metadata_exposes_dashboard_contract_fields(
+    tmp_path, alg_key, catalog_ref, alg_param
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_volatility_fixture_rows("compression_release.csv"))
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.metadata["family"] == "volatility_options"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert child_output.diagnostics["family"] == "volatility_options"
+    assert child_output.diagnostics["reporting_mode"] == "bar_series"
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref

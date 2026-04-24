@@ -10,6 +10,7 @@ from trading_algos.alertgen.contracts.outputs import (
 )
 from trading_algos.alertgen.shared_utils.indicators import (
     average_true_range,
+    compression_ratio,
     detect_crossovers,
     directional_movement_index,
     exponential_moving_average,
@@ -19,6 +20,7 @@ from trading_algos.alertgen.shared_utils.indicators import (
     rate_of_change,
     relative_strength_index,
     rolling_linear_regression,
+    rolling_price_range,
     rolling_zscore,
     simple_moving_average,
     stochastic_oscillator,
@@ -76,6 +78,23 @@ def test_volatility_momentum_and_oscillator_helpers_compute_expected_points() ->
     assert percent_k[:2] == [None, None]
     assert percent_k[-1] == pytest.approx(75.0)
     assert percent_d[-1] == pytest.approx(75.0)
+
+
+def test_volatility_compression_helpers_compute_expected_shapes() -> None:
+    highs = [10.0, 10.2, 10.1, 10.15, 10.2, 10.9]
+    lows = [9.8, 9.9, 9.95, 10.0, 10.0, 10.2]
+    closes = [10.0, 10.05, 10.0, 10.1, 10.15, 10.8]
+
+    price_ranges = rolling_price_range(highs, lows, 3)
+    atr_values, compression_ranges, ratio_values = compression_ratio(
+        highs, lows, closes, atr_window=3, compression_window=3
+    )
+
+    assert price_ranges[:2] == [None, None]
+    assert price_ranges[-1] == pytest.approx(0.9)
+    assert atr_values[-1] is not None
+    assert compression_ranges[-1] == pytest.approx(price_ranges[-1])
+    assert ratio_values[-1] is not None
 
 
 def test_trend_batch_two_indicator_helpers_produce_expected_shapes() -> None:

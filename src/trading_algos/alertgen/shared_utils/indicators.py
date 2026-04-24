@@ -364,6 +364,39 @@ def realized_volatility(
     return rolling_std(returns, window)
 
 
+def rolling_price_range(
+    highs: Sequence[float | int | None],
+    lows: Sequence[float | int | None],
+    window: int,
+) -> list[float | None]:
+    rolling_highs = rolling_high(highs, window)
+    rolling_lows = rolling_low(lows, window)
+    return [
+        None if high_value is None or low_value is None else high_value - low_value
+        for high_value, low_value in zip(rolling_highs, rolling_lows)
+    ]
+
+
+def compression_ratio(
+    highs: Sequence[float | int | None],
+    lows: Sequence[float | int | None],
+    closes: Sequence[float | int | None],
+    *,
+    atr_window: int,
+    compression_window: int,
+) -> tuple[list[float | None], list[float | None], list[float | None]]:
+    atr_values = average_true_range(highs, lows, closes, atr_window)
+    range_values = rolling_price_range(highs, lows, compression_window)
+    ratio_values: list[float | None] = []
+    for atr_value, range_value in zip(atr_values, range_values):
+        if atr_value in (None, 0.0) or range_value is None:
+            ratio_values.append(None)
+            continue
+        assert atr_value is not None
+        ratio_values.append(range_value / atr_value)
+    return atr_values, range_values, ratio_values
+
+
 def rolling_mean(
     values: Sequence[float | int | None], window: int
 ) -> list[float | None]:
