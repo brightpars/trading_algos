@@ -26,6 +26,10 @@ from trading_algos.alertgen.shared_utils.indicators import (
     stochastic_oscillator,
     supertrend,
 )
+from trading_algos.alertgen.algorithms.mean_reversion.mean_reversion_helpers import (
+    cumulative_session_vwap,
+    rolling_ou_reversion_ratio,
+)
 
 
 def test_simple_and_exponential_moving_averages_return_expected_shapes() -> None:
@@ -134,6 +138,33 @@ def test_zscore_macd_and_regression_helpers_produce_expected_outputs() -> None:
     assert slopes[-1] == pytest.approx(1.0)
     assert intercepts[-1] == pytest.approx(4.0)
     assert r_squared_values[-1] == pytest.approx(1.0)
+
+
+def test_mean_reversion_wave_3_shared_helpers_compute_session_vwap_and_ou_state() -> (
+    None
+):
+    timestamps = [
+        "2025-01-01 09:30:00",
+        "2025-01-01 09:35:00",
+        "2025-01-02 09:30:00",
+    ]
+    highs = [10.0, 11.0, 12.0]
+    lows = [9.0, 10.0, 11.0]
+    closes = [9.5, 10.5, 11.5]
+    volumes = [100.0, 200.0, 300.0]
+
+    vwap_values = cumulative_session_vwap(timestamps, highs, lows, closes, volumes)
+    mean_reversion_speed, equilibrium, residual, residual_zscore = (
+        rolling_ou_reversion_ratio([100.0, 99.0, 98.0, 99.0, 100.0], 4)
+    )
+
+    assert vwap_values[0] == pytest.approx(9.5)
+    assert vwap_values[1] == pytest.approx((9.5 * 100.0 + 10.5 * 200.0) / 300.0)
+    assert vwap_values[2] == pytest.approx(11.5)
+    assert mean_reversion_speed[-1] is not None
+    assert equilibrium[-1] is not None
+    assert residual[-1] is not None
+    assert residual_zscore[-1] is not None
 
 
 def test_ichimoku_helper_produces_expected_shapes() -> None:

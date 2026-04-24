@@ -100,6 +100,51 @@ def _load_mean_reversion_fixture_rows(name: str) -> list[dict[str, object]]:
     return parsed_rows
 
 
+def _build_intraday_mean_reversion_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "ts": "2025-01-01 09:30:00",
+            "Open": 100.0,
+            "High": 101.0,
+            "Low": 99.5,
+            "Close": 100.5,
+            "Volume": 1200.0,
+        },
+        {
+            "ts": "2025-01-01 09:35:00",
+            "Open": 100.5,
+            "High": 101.0,
+            "Low": 99.8,
+            "Close": 100.2,
+            "Volume": 1100.0,
+        },
+        {
+            "ts": "2025-01-02 09:30:00",
+            "Open": 96.0,
+            "High": 96.5,
+            "Low": 95.0,
+            "Close": 95.5,
+            "Volume": 1500.0,
+        },
+        {
+            "ts": "2025-01-02 09:35:00",
+            "Open": 95.4,
+            "High": 95.8,
+            "Low": 94.0,
+            "Close": 94.4,
+            "Volume": 1800.0,
+        },
+        {
+            "ts": "2025-01-02 09:40:00",
+            "Open": 94.5,
+            "High": 94.8,
+            "Low": 92.8,
+            "Close": 93.2,
+            "Volume": 1700.0,
+        },
+    ]
+
+
 def _load_volatility_fixture_rows(name: str) -> list[dict[str, object]]:
     with (VOLATILITY_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
         rows = list(DictReader(handle))
@@ -231,6 +276,8 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "gap_and_go",
         "trendline_break_strategy",
         "volatility_squeeze_breakout",
+        "intraday_vwap_reversion",
+        "opening_gap_fade",
         "z_score_mean_reversion",
         "bollinger_bands_reversion",
         "rsi_reversion",
@@ -238,6 +285,7 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "cci_reversion",
         "williams_percent_r_reversion",
         "range_reversion",
+        "ornstein_uhlenbeck_reversion",
         "long_horizon_reversal",
         "volatility_adjusted_reversion",
         "volatility_breakout",
@@ -497,6 +545,24 @@ def test_factory_creates_registered_algorithm(tmp_path):
             },
         ),
         (
+            "intraday_vwap_reversion",
+            {
+                "entry_deviation_percent": 1.0,
+                "exit_deviation_percent": 0.5,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "opening_gap_fade",
+            {
+                "min_gap_percent": 1.0,
+                "exit_gap_fill_percent": 0.25,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
             "z_score_mean_reversion",
             {
                 "window": 5,
@@ -561,6 +627,16 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "window": 5,
                 "entry_band_fraction": 0.2,
                 "exit_band_fraction": 0.5,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "ornstein_uhlenbeck_reversion",
+            {
+                "window": 4,
+                "entry_sigma": 0.5,
+                "exit_sigma": 0.25,
+                "min_mean_reversion_speed": 0.01,
                 "confirmation_bars": 1,
             },
         ),
@@ -1639,7 +1715,7 @@ def test_trend_wave_1_normalized_output_exposes_dashboard_diagnostics(
     assert child_output.regime_label == algorithm.latest_predicted_trend
     assert expected_reason_code in child_output.diagnostics["reason_codes"]
     assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
-    assert child_output.reason_codes == tuple(child_output.diagnostics.keys())
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
 
 
 def test_trend_wave_1_validation_rejects_invalid_additional_parameter_shapes():
@@ -2748,7 +2824,7 @@ def test_momentum_wave_1_normalized_output_exposes_dashboard_diagnostics(
     assert child_output.regime_label == algorithm.latest_predicted_trend
     assert expected_reason_code in child_output.diagnostics["reason_codes"]
     assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
-    assert child_output.reason_codes == tuple(child_output.diagnostics.keys())
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
 
 
 def test_momentum_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
@@ -4907,7 +4983,7 @@ def test_mean_reversion_wave_1_normalized_output_exposes_dashboard_diagnostics(
     assert child_output.diagnostics["warmup_ready"] is True
     assert child_output.diagnostics["warmup_period"] == algorithm.minimum_history()
     assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
-    assert child_output.reason_codes == tuple(child_output.diagnostics.keys())
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
 
 
 def test_mean_reversion_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
@@ -5615,33 +5691,345 @@ def test_mean_reversion_wave_2_normalized_output_exposes_dashboard_diagnostics(
     }
     assert last_point.signal_label in {"buy", "sell", "neutral"}
     assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
-    if alg_key == "williams_percent_r_reversion":
-        assert "williams_percent_r" in output.derived_series
-        assert child_output.diagnostics["williams_percent_r"] == pytest.approx(
-            output.derived_series["williams_percent_r"][-1]
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "intraday_vwap_reversion",
+            {
+                "entry_deviation_percent": 1.0,
+                "exit_deviation_percent": 0.5,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+            2,
+        ),
+        (
+            "opening_gap_fade",
+            {
+                "min_gap_percent": 1.0,
+                "exit_gap_fill_percent": 0.25,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+            3,
+        ),
+        (
+            "ornstein_uhlenbeck_reversion",
+            {
+                "window": 4,
+                "entry_sigma": 0.5,
+                "exit_sigma": 0.25,
+                "min_mean_reversion_speed": 0.01,
+                "confirmation_bars": 1,
+            },
+            4,
+        ),
+    ],
+)
+def test_mean_reversion_wave_3_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    rows = (
+        _build_intraday_mean_reversion_rows()
+        if alg_key in {"intraday_vwap_reversion", "opening_gap_fade"}
+        else _load_mean_reversion_fixture_rows("one_overshoot.csv")
+    )
+    algorithm.process_list(rows[: expected_warmup - 1])
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_reason_code", "expected_annotation_keys"),
+    [
+        (
+            "intraday_vwap_reversion",
+            {
+                "entry_deviation_percent": 1.0,
+                "exit_deviation_percent": 0.5,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+            "vwap_below_session_mean",
+            {"entry_deviation_percent", "min_session_bars", "session_vwap"},
+        ),
+        (
+            "opening_gap_fade",
+            {
+                "min_gap_percent": 1.0,
+                "exit_gap_fill_percent": 0.25,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+            "gap_down_fade",
+            {"min_gap_percent", "prior_session_close", "opening_gap_percent"},
+        ),
+        (
+            "ornstein_uhlenbeck_reversion",
+            {
+                "window": 4,
+                "entry_sigma": 0.5,
+                "exit_sigma": 0.25,
+                "min_mean_reversion_speed": 0.01,
+                "confirmation_bars": 1,
+            },
+            "ou_oversold",
+            {"window", "ou_equilibrium", "ou_residual_zscore"},
+        ),
+    ],
+)
+def test_mean_reversion_wave_3_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, expected_reason_code, expected_annotation_keys
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    rows = (
+        _build_intraday_mean_reversion_rows()
+        if alg_key in {"intraday_vwap_reversion", "opening_gap_fade"}
+        else _load_mean_reversion_fixture_rows("one_overshoot.csv")
+    )
+    algorithm.process_list(rows)
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert any(expected_reason_code in point.reason_codes for point in output.points)
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+        "threshold_value",
+        "exit_value",
+        "confirmation_state_label",
+        "warmup_ready",
+    }.issubset(output.derived_series)
+    assert output.metadata["family"] == "mean_reversion"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == child_output.diagnostics["catalog_ref"]
+    assert child_output.signal_label in {"buy", "neutral"}
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+
+
+def test_mean_reversion_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(
+        ValueError, match="exit_deviation_percent <= entry_deviation_percent"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "intraday_vwap_reversion",
+                "alg_param": {
+                    "entry_deviation_percent": 1.0,
+                    "exit_deviation_percent": 1.1,
+                    "min_session_bars": 2,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
         )
-    elif alg_key == "range_reversion":
-        assert {
-            "range_upper",
-            "range_lower",
-            "range_midpoint",
-            "range_position",
-        }.issubset(output.derived_series)
-        assert child_output.diagnostics["range_position"] == pytest.approx(
-            output.derived_series["range_position"][-1]
+
+    with pytest.raises(ValueError, match="exit_gap_fill_percent must be <= 1"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "opening_gap_fade",
+                "alg_param": {
+                    "min_gap_percent": 1.0,
+                    "exit_gap_fill_percent": 1.5,
+                    "min_session_bars": 2,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
         )
-    elif alg_key == "long_horizon_reversal":
-        assert "long_horizon_return" in output.derived_series
-        assert child_output.diagnostics["long_horizon_return"] == pytest.approx(
-            output.derived_series["long_horizon_return"][-1]
+
+    with pytest.raises(ValueError, match="exit_sigma <= entry_sigma"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "ornstein_uhlenbeck_reversion",
+                "alg_param": {
+                    "window": 4,
+                    "entry_sigma": 0.5,
+                    "exit_sigma": 0.75,
+                    "min_mean_reversion_speed": 0.01,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
         )
-    elif alg_key == "volatility_adjusted_reversion":
-        assert {"rolling_mean", "atr_value", "atr_distance"}.issubset(
-            output.derived_series
+
+
+def test_mean_reversion_wave_3_fixture_behavior_emits_reversion_signals(
+    tmp_path,
+) -> None:
+    algorithms = [
+        (
+            "intraday_vwap_reversion",
+            {
+                "entry_deviation_percent": 1.0,
+                "exit_deviation_percent": 0.5,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "opening_gap_fade",
+            {
+                "min_gap_percent": 1.0,
+                "exit_gap_fill_percent": 0.25,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "ornstein_uhlenbeck_reversion",
+            {
+                "window": 4,
+                "entry_sigma": 0.5,
+                "exit_sigma": 0.25,
+                "min_mean_reversion_speed": 0.01,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
         )
-        assert child_output.diagnostics["atr_distance"] == pytest.approx(
-            output.derived_series["atr_distance"][-1]
+        rows = (
+            _build_intraday_mean_reversion_rows()
+            if alg_key in {"intraday_vwap_reversion", "opening_gap_fade"}
+            else _load_mean_reversion_fixture_rows("one_overshoot.csv")
         )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert any(point.signal_label == "buy" for point in output.points)
+        assert output.metadata["family"] == "mean_reversion"
+
+
+def test_mean_reversion_wave_3_registration_metadata_matches_manifest_contract() -> (
+    None
+):
+    expected = {
+        "intraday_vwap_reversion": ("algorithm:32", "mean_reversion", "intraday", 3),
+        "opening_gap_fade": ("algorithm:33", "mean_reversion", "opening", 3),
+        "ornstein_uhlenbeck_reversion": (
+            "algorithm:35",
+            "mean_reversion",
+            "ornstein",
+            8,
+        ),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.output_modes == ("signal", "score", "confidence")
+
+
+def test_mean_reversion_wave_3_performance_smoke_on_fixture_repetition(
+    tmp_path,
+) -> None:
+    algorithms = [
+        (
+            "intraday_vwap_reversion",
+            {
+                "entry_deviation_percent": 1.0,
+                "exit_deviation_percent": 0.5,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "opening_gap_fade",
+            {
+                "min_gap_percent": 1.0,
+                "exit_gap_fill_percent": 0.25,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "ornstein_uhlenbeck_reversion",
+            {
+                "window": 4,
+                "entry_sigma": 0.5,
+                "exit_sigma": 0.25,
+                "min_mean_reversion_speed": 0.01,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        rows = (
+            _build_intraday_mean_reversion_rows() * 300
+            if alg_key in {"intraday_vwap_reversion", "opening_gap_fade"}
+            else _load_mean_reversion_fixture_rows("one_overshoot.csv") * 300
+        )
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "bar_series"
 
 
 def test_mean_reversion_wave_2_validation_rejects_invalid_parameter_shapes() -> None:

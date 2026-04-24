@@ -5,8 +5,17 @@ from trading_algos.alertgen.algorithms.mean_reversion.bollinger_bands_reversion 
 from trading_algos.alertgen.algorithms.mean_reversion.cci_reversion import (
     CCIReversionAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.mean_reversion.intraday_vwap_reversion import (
+    IntradayVWAPReversionAlertAlgorithm,
+)
 from trading_algos.alertgen.algorithms.mean_reversion.long_horizon_reversal import (
     LongHorizonReversalAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.mean_reversion.opening_gap_fade import (
+    OpeningGapFadeAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.mean_reversion.ornstein_uhlenbeck_reversion import (
+    OrnsteinUhlenbeckReversionAlertAlgorithm,
 )
 from trading_algos.alertgen.algorithms.mean_reversion.range_reversion import (
     RangeReversionAlertAlgorithm,
@@ -29,7 +38,10 @@ from trading_algos.alertgen.algorithms.mean_reversion.z_score_mean_reversion imp
 from trading_algos.alertgen.core.validation import (
     require_bollinger_reversion_param,
     require_cci_reversion_param,
+    require_intraday_vwap_reversion_param,
     require_long_horizon_reversal_param,
+    require_opening_gap_fade_param,
+    require_ornstein_uhlenbeck_reversion_param,
     require_range_reversion_param,
     require_rsi_reversion_param,
     require_stochastic_reversion_param,
@@ -98,6 +110,40 @@ def _build_cci_reversion(symbol, report_base_path, alg_param, **_kwargs):
     )
 
 
+def _build_intraday_vwap_reversion(symbol, report_base_path, alg_param, **_kwargs):
+    return IntradayVWAPReversionAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        entry_deviation_percent=alg_param["entry_deviation_percent"],
+        exit_deviation_percent=alg_param["exit_deviation_percent"],
+        min_session_bars=alg_param["min_session_bars"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_opening_gap_fade(symbol, report_base_path, alg_param, **_kwargs):
+    return OpeningGapFadeAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        min_gap_percent=alg_param["min_gap_percent"],
+        exit_gap_fill_percent=alg_param["exit_gap_fill_percent"],
+        min_session_bars=alg_param["min_session_bars"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
+def _build_ornstein_uhlenbeck_reversion(symbol, report_base_path, alg_param, **_kwargs):
+    return OrnsteinUhlenbeckReversionAlertAlgorithm(
+        symbol,
+        report_base_path=report_base_path,
+        window=alg_param["window"],
+        entry_sigma=alg_param["entry_sigma"],
+        exit_sigma=alg_param["exit_sigma"],
+        min_mean_reversion_speed=alg_param["min_mean_reversion_speed"],
+        confirmation_bars=alg_param["confirmation_bars"],
+    )
+
+
 def _build_williams_percent_r_reversion(symbol, report_base_path, alg_param, **_kwargs):
     return WilliamsPercentRReversionAlertAlgorithm(
         symbol,
@@ -148,6 +194,115 @@ def _build_volatility_adjusted_reversion(
 
 def register_mean_reversion_alert_algorithms() -> None:
     specs = [
+        AlertAlgorithmSpec(
+            key="intraday_vwap_reversion",
+            name="Intraday VWAP Reversion",
+            catalog_ref="algorithm:32",
+            builder=_build_intraday_vwap_reversion,
+            default_param={
+                "entry_deviation_percent": 1.5,
+                "exit_deviation_percent": 0.4,
+                "min_session_bars": 3,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_intraday_vwap_reversion_param,
+            description="Fade intraday stretches away from session VWAP back toward the session average.",
+            param_schema=(
+                {
+                    "key": "entry_deviation_percent",
+                    "label": "Entry deviation percent",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Absolute percent deviation from session VWAP required to trigger a reversion setup.",
+                },
+                {
+                    "key": "exit_deviation_percent",
+                    "label": "Exit deviation percent",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Percent deviation from VWAP considered close enough to mean for exit diagnostics.",
+                },
+                {
+                    "key": "min_session_bars",
+                    "label": "Minimum session bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Minimum bars required inside the current session before evaluating VWAP deviations.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive extreme VWAP-deviation bars required before confirmation.",
+                },
+            ),
+            tags=("mean-reversion", "intraday", "vwap"),
+            category="mean_reversion",
+            family="mean_reversion",
+            subcategory="intraday",
+            warmup_period=3,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="opening_gap_fade",
+            name="Opening Gap Fade",
+            catalog_ref="algorithm:33",
+            builder=_build_opening_gap_fade,
+            default_param={
+                "min_gap_percent": 1.0,
+                "exit_gap_fill_percent": 0.25,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_opening_gap_fade_param,
+            description="Fade opening gaps back toward the prior session close once the gap is large enough.",
+            param_schema=(
+                {
+                    "key": "min_gap_percent",
+                    "label": "Minimum gap percent",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Absolute opening gap percent required to activate the fade setup.",
+                },
+                {
+                    "key": "exit_gap_fill_percent",
+                    "label": "Exit gap fill percent",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "maximum": 1.0,
+                    "description": "Fraction of the opening gap considered sufficiently filled for exit diagnostics.",
+                },
+                {
+                    "key": "min_session_bars",
+                    "label": "Minimum session bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Minimum bars required in the current session before evaluating the gap fade.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive qualifying gap-fade bars required before confirmation.",
+                },
+            ),
+            tags=("mean-reversion", "intraday", "gap"),
+            category="mean_reversion",
+            family="mean_reversion",
+            subcategory="opening",
+            warmup_period=3,
+            output_modes=("signal", "score", "confidence"),
+        ),
         AlertAlgorithmSpec(
             key="z_score_mean_reversion",
             name="Z-Score Mean Reversion",
@@ -578,6 +733,69 @@ def register_mean_reversion_alert_algorithms() -> None:
             family="mean_reversion",
             subcategory="range",
             warmup_period=20,
+            output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="ornstein_uhlenbeck_reversion",
+            name="Ornstein-Uhlenbeck Reversion",
+            catalog_ref="algorithm:35",
+            builder=_build_ornstein_uhlenbeck_reversion,
+            default_param={
+                "window": 8,
+                "entry_sigma": 1.0,
+                "exit_sigma": 0.35,
+                "min_mean_reversion_speed": 0.05,
+                "confirmation_bars": 1,
+            },
+            param_normalizer=require_ornstein_uhlenbeck_reversion_param,
+            description="Fade deviations from an estimated Ornstein-Uhlenbeck equilibrium when mean reversion speed is positive enough.",
+            param_schema=(
+                {
+                    "key": "window",
+                    "label": "Window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 2,
+                    "description": "Rolling lookback used to estimate the OU equilibrium and mean-reversion speed.",
+                },
+                {
+                    "key": "entry_sigma",
+                    "label": "Entry sigma",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Absolute OU residual z-score required to trigger a reversion setup.",
+                },
+                {
+                    "key": "exit_sigma",
+                    "label": "Exit sigma",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "OU residual z-score considered close enough to equilibrium for exit diagnostics.",
+                },
+                {
+                    "key": "min_mean_reversion_speed",
+                    "label": "Minimum mean-reversion speed",
+                    "type": "number",
+                    "required": True,
+                    "minimum": 0.0,
+                    "description": "Minimum estimated OU speed required before a residual can be traded as mean-reverting.",
+                },
+                {
+                    "key": "confirmation_bars",
+                    "label": "Confirmation bars",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Consecutive OU residual extremes required before confirmation.",
+                },
+            ),
+            tags=("mean-reversion", "ou", "ornstein-uhlenbeck"),
+            category="mean_reversion",
+            family="mean_reversion",
+            subcategory="ornstein",
+            warmup_period=8,
             output_modes=("signal", "score", "confidence"),
         ),
         AlertAlgorithmSpec(

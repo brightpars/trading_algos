@@ -1042,6 +1042,114 @@ def require_volatility_adjusted_reversion_param(raw_alg_param, label):
     }
 
 
+def require_intraday_vwap_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "entry_deviation_percent",
+            "exit_deviation_percent",
+            "min_session_bars",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    entry_deviation_percent = _require_non_negative_float_like(
+        normalized["entry_deviation_percent"], f"{label} entry_deviation_percent"
+    )
+    exit_deviation_percent = _require_non_negative_float_like(
+        normalized["exit_deviation_percent"], f"{label} exit_deviation_percent"
+    )
+    if entry_deviation_percent == 0.0:
+        raise ValueError(f"{label} entry_deviation_percent must be > 0")
+    if exit_deviation_percent > entry_deviation_percent:
+        raise ValueError(
+            f"{label} requires exit_deviation_percent <= entry_deviation_percent"
+        )
+    return {
+        "entry_deviation_percent": entry_deviation_percent,
+        "exit_deviation_percent": exit_deviation_percent,
+        "min_session_bars": _require_positive_int_like(
+            normalized["min_session_bars"], f"{label} min_session_bars"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_opening_gap_fade_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "min_gap_percent",
+            "exit_gap_fill_percent",
+            "min_session_bars",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    min_gap_percent = _require_non_negative_float_like(
+        normalized["min_gap_percent"], f"{label} min_gap_percent"
+    )
+    exit_gap_fill_percent = _require_non_negative_float_like(
+        normalized["exit_gap_fill_percent"], f"{label} exit_gap_fill_percent"
+    )
+    if min_gap_percent == 0.0:
+        raise ValueError(f"{label} min_gap_percent must be > 0")
+    if exit_gap_fill_percent > 1.0:
+        raise ValueError(f"{label} exit_gap_fill_percent must be <= 1")
+    return {
+        "min_gap_percent": min_gap_percent,
+        "exit_gap_fill_percent": exit_gap_fill_percent,
+        "min_session_bars": _require_positive_int_like(
+            normalized["min_session_bars"], f"{label} min_session_bars"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_ornstein_uhlenbeck_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "window",
+            "entry_sigma",
+            "exit_sigma",
+            "min_mean_reversion_speed",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    entry_sigma = _require_non_negative_float_like(
+        normalized["entry_sigma"], f"{label} entry_sigma"
+    )
+    exit_sigma = _require_non_negative_float_like(
+        normalized["exit_sigma"], f"{label} exit_sigma"
+    )
+    min_mean_reversion_speed = _require_non_negative_float_like(
+        normalized["min_mean_reversion_speed"],
+        f"{label} min_mean_reversion_speed",
+    )
+    if entry_sigma == 0.0:
+        raise ValueError(f"{label} entry_sigma must be > 0")
+    if exit_sigma > entry_sigma:
+        raise ValueError(f"{label} requires exit_sigma <= entry_sigma")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "entry_sigma": entry_sigma,
+        "exit_sigma": exit_sigma,
+        "min_mean_reversion_speed": min_mean_reversion_speed,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def require_volatility_breakout_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(
