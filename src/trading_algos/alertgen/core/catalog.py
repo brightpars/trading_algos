@@ -4,6 +4,9 @@ from trading_algos.alertgen.algorithms.composite.catalog import (
 from trading_algos.alertgen.algorithms.momentum.catalog import (
     register_momentum_alert_algorithms,
 )
+from trading_algos.alertgen.algorithms.mean_reversion.catalog import (
+    register_mean_reversion_alert_algorithms,
+)
 from trading_algos.alertgen.algorithms.trend.catalog import (
     register_trend_alert_algorithms,
 )
@@ -18,5 +21,6 @@ def register_builtin_alert_algorithms():
         return
     register_trend_alert_algorithms()
     register_momentum_alert_algorithms()
+    register_mean_reversion_alert_algorithms()
     register_composite_alert_algorithms()
     _REGISTERED = True

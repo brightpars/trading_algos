@@ -36,6 +36,9 @@ from trading_algos.alertgen.shared_utils.reporting import serialize_analysis_rep
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "trend"
 MOMENTUM_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "momentum"
+MEAN_REVERSION_FIXTURES_ROOT = (
+    Path(__file__).resolve().parent / "fixtures" / "mean_reversion"
+)
 COMPOSITE_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "composite"
 
 
@@ -59,6 +62,26 @@ def _load_fixture_rows(name: str) -> list[dict[str, object]]:
 
 def _load_momentum_fixture_rows(name: str) -> list[dict[str, object]]:
     with (MOMENTUM_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
+        rows = list(DictReader(handle))
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed_rows.append(
+            {
+                "ts": row["ts"],
+                "Open": float(row["Open"]),
+                "High": float(row["High"]),
+                "Low": float(row["Low"]),
+                "Close": float(row["Close"]),
+                "Volume": float(row["Volume"]),
+            }
+        )
+    return parsed_rows
+
+
+def _load_mean_reversion_fixture_rows(name: str) -> list[dict[str, object]]:
+    with (MEAN_REVERSION_FIXTURES_ROOT / name).open(
+        newline="", encoding="utf-8"
+    ) as handle:
         rows = list(DictReader(handle))
     parsed_rows: list[dict[str, object]] = []
     for row in rows:
@@ -149,6 +172,11 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "rsi_momentum_continuation",
         "stochastic_momentum",
         "cci_momentum",
+        "z_score_mean_reversion",
+        "bollinger_bands_reversion",
+        "rsi_reversion",
+        "stochastic_reversion",
+        "cci_reversion",
         "hard_boolean_gating_and_or_majority",
         "weighted_linear_score_blend",
         "aggregate_boundary_and_channel",
@@ -272,6 +300,55 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "window": 3,
                 "bullish_threshold": 50.0,
                 "bearish_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "z_score_mean_reversion",
+            {
+                "window": 5,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.5,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "bollinger_bands_reversion",
+            {
+                "window": 5,
+                "std_multiplier": 1.0,
+                "exit_band_fraction": 0.25,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "rsi_reversion",
+            {
+                "window": 3,
+                "oversold_threshold": 35.0,
+                "overbought_threshold": 65.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "stochastic_reversion",
+            {
+                "k_window": 3,
+                "d_window": 2,
+                "oversold_threshold": 25.0,
+                "overbought_threshold": 75.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "cci_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -50.0,
+                "overbought_threshold": 50.0,
+                "exit_threshold": 0.0,
                 "confirmation_bars": 1,
             },
         ),
@@ -1968,5 +2045,534 @@ def test_momentum_wave_1_normalized_output_metadata_exposes_dashboard_contract_f
     assert output.metadata["reporting_mode"] == "bar_series"
     assert output.metadata["catalog_ref"] == catalog_ref
     assert child_output.diagnostics["family"] == "momentum"
+    assert child_output.diagnostics["reporting_mode"] == "bar_series"
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "z_score_mean_reversion",
+            {
+                "window": 5,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.5,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "bollinger_bands_reversion",
+            {
+                "window": 5,
+                "std_multiplier": 1.0,
+                "exit_band_fraction": 0.25,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "rsi_reversion",
+            {
+                "window": 3,
+                "oversold_threshold": 35.0,
+                "overbought_threshold": 65.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+            4,
+        ),
+        (
+            "stochastic_reversion",
+            {
+                "k_window": 3,
+                "d_window": 2,
+                "oversold_threshold": 25.0,
+                "overbought_threshold": 75.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+            4,
+        ),
+        (
+            "cci_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -50.0,
+                "overbought_threshold": 50.0,
+                "exit_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+    ],
+)
+def test_mean_reversion_wave_1_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(
+        _load_mean_reversion_fixture_rows("one_overshoot.csv")[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_reason_code", "expected_annotation_keys"),
+    [
+        (
+            "z_score_mean_reversion",
+            {
+                "window": 5,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.5,
+                "confirmation_bars": 1,
+            },
+            "zscore_oversold",
+            {"window", "entry_zscore", "exit_zscore"},
+        ),
+        (
+            "bollinger_bands_reversion",
+            {
+                "window": 5,
+                "std_multiplier": 1.0,
+                "exit_band_fraction": 0.25,
+                "confirmation_bars": 1,
+            },
+            "bollinger_below_lower_band",
+            {"window", "std_multiplier", "exit_band_fraction"},
+        ),
+        (
+            "rsi_reversion",
+            {
+                "window": 3,
+                "oversold_threshold": 35.0,
+                "overbought_threshold": 65.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+            "rsi_oversold",
+            {"window", "oversold_threshold", "overbought_threshold", "exit_threshold"},
+        ),
+        (
+            "stochastic_reversion",
+            {
+                "k_window": 3,
+                "d_window": 2,
+                "oversold_threshold": 25.0,
+                "overbought_threshold": 75.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+            "stochastic_oversold",
+            {
+                "k_window",
+                "d_window",
+                "oversold_threshold",
+                "overbought_threshold",
+                "exit_threshold",
+            },
+        ),
+        (
+            "cci_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -50.0,
+                "overbought_threshold": 50.0,
+                "exit_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+            "cci_oversold",
+            {"window", "oversold_threshold", "overbought_threshold", "exit_threshold"},
+        ),
+    ],
+)
+def test_mean_reversion_wave_1_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, expected_reason_code, expected_annotation_keys
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_mean_reversion_fixture_rows("one_overshoot.csv"))
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    last_point = output.points[-1]
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert expected_reason_code in {
+        code for point in output.points for code in point.reason_codes
+    }
+    assert {"trend_score", "regime_label", "reason_codes", "primary_value"}.issubset(
+        output.derived_series
+    )
+    assert last_point.signal_label in {"buy", "neutral", "sell"}
+    assert child_output.regime_label == algorithm.latest_predicted_trend
+    assert child_output.diagnostics["reason_codes"]
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+    assert child_output.reason_codes == tuple(child_output.diagnostics.keys())
+
+
+def test_mean_reversion_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="exit_zscore <= entry_zscore"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "z_score_mean_reversion",
+                "alg_param": {
+                    "window": 5,
+                    "entry_zscore": 1.0,
+                    "exit_zscore": 1.5,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="exit_band_fraction must be <= 1"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "bollinger_bands_reversion",
+                "alg_param": {
+                    "window": 5,
+                    "std_multiplier": 1.0,
+                    "exit_band_fraction": 1.5,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="oversold_threshold < overbought_threshold"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "rsi_reversion",
+                "alg_param": {
+                    "window": 3,
+                    "oversold_threshold": 70.0,
+                    "overbought_threshold": 65.0,
+                    "exit_threshold": 50.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match=r"within \[0, 100\]"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "stochastic_reversion",
+                "alg_param": {
+                    "k_window": 3,
+                    "d_window": 2,
+                    "oversold_threshold": -1.0,
+                    "overbought_threshold": 75.0,
+                    "exit_threshold": 50.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(
+        ValueError, match="oversold_threshold <= exit_threshold <= overbought_threshold"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "cci_reversion",
+                "alg_param": {
+                    "window": 5,
+                    "oversold_threshold": -50.0,
+                    "overbought_threshold": 50.0,
+                    "exit_threshold": 100.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "z_score_mean_reversion",
+            {
+                "window": 5,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.5,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "bollinger_bands_reversion",
+            {
+                "window": 5,
+                "std_multiplier": 1.0,
+                "exit_band_fraction": 0.25,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "rsi_reversion",
+            {
+                "window": 3,
+                "oversold_threshold": 35.0,
+                "overbought_threshold": 65.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "stochastic_reversion",
+            {
+                "k_window": 3,
+                "d_window": 2,
+                "oversold_threshold": 25.0,
+                "overbought_threshold": 75.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "cci_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -50.0,
+                "overbought_threshold": 50.0,
+                "exit_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+    ],
+)
+def test_mean_reversion_wave_1_fixture_one_overshoot_produces_buy_signal(
+    tmp_path, alg_key, alg_param
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_mean_reversion_fixture_rows("one_overshoot.csv"))
+
+    buy_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("buy_SIGNAL")
+    ]
+
+    assert buy_indices
+
+
+def test_mean_reversion_wave_1_performance_smoke_on_fixture_repetition(
+    tmp_path,
+) -> None:
+    rows = _load_mean_reversion_fixture_rows("one_overshoot.csv") * 300
+    algorithms = [
+        (
+            "z_score_mean_reversion",
+            {
+                "window": 5,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.5,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "bollinger_bands_reversion",
+            {
+                "window": 5,
+                "std_multiplier": 1.0,
+                "exit_band_fraction": 0.25,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "rsi_reversion",
+            {
+                "window": 3,
+                "oversold_threshold": 35.0,
+                "overbought_threshold": 65.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "stochastic_reversion",
+            {
+                "k_window": 3,
+                "d_window": 2,
+                "oversold_threshold": 25.0,
+                "overbought_threshold": 75.0,
+                "exit_threshold": 50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "cci_reversion",
+            {
+                "window": 5,
+                "oversold_threshold": -50.0,
+                "overbought_threshold": 50.0,
+                "exit_threshold": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert "trend_score" in output.derived_series
+
+
+def test_mean_reversion_wave_1_registration_metadata_matches_manifest_contract() -> (
+    None
+):
+    expected = {
+        "z_score_mean_reversion": ("algorithm:26", "mean_reversion", "z", 20),
+        "bollinger_bands_reversion": (
+            "algorithm:27",
+            "mean_reversion",
+            "bollinger",
+            20,
+        ),
+        "rsi_reversion": ("algorithm:28", "mean_reversion", "rsi", 15),
+        "stochastic_reversion": ("algorithm:29", "mean_reversion", "stochastic", 16),
+        "cci_reversion": ("algorithm:30", "mean_reversion", "cci", 20),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.output_modes == ("signal", "score", "confidence")
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "catalog_ref"),
+    [
+        ("z_score_mean_reversion", "algorithm:26"),
+        ("bollinger_bands_reversion", "algorithm:27"),
+        ("rsi_reversion", "algorithm:28"),
+        ("stochastic_reversion", "algorithm:29"),
+        ("cci_reversion", "algorithm:30"),
+    ],
+)
+def test_mean_reversion_wave_1_normalized_output_metadata_exposes_dashboard_contract_fields(
+    tmp_path, alg_key, catalog_ref
+) -> None:
+    default_params = {
+        "z_score_mean_reversion": {
+            "window": 5,
+            "entry_zscore": 1.0,
+            "exit_zscore": 0.5,
+            "confirmation_bars": 1,
+        },
+        "bollinger_bands_reversion": {
+            "window": 5,
+            "std_multiplier": 1.0,
+            "exit_band_fraction": 0.25,
+            "confirmation_bars": 1,
+        },
+        "rsi_reversion": {
+            "window": 3,
+            "oversold_threshold": 35.0,
+            "overbought_threshold": 65.0,
+            "exit_threshold": 50.0,
+            "confirmation_bars": 1,
+        },
+        "stochastic_reversion": {
+            "k_window": 3,
+            "d_window": 2,
+            "oversold_threshold": 25.0,
+            "overbought_threshold": 75.0,
+            "exit_threshold": 50.0,
+            "confirmation_bars": 1,
+        },
+        "cci_reversion": {
+            "window": 5,
+            "oversold_threshold": -50.0,
+            "overbought_threshold": 50.0,
+            "exit_threshold": 0.0,
+            "confirmation_bars": 1,
+        },
+    }
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": default_params[alg_key],
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_mean_reversion_fixture_rows("one_overshoot.csv"))
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.metadata["family"] == "mean_reversion"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert child_output.diagnostics["family"] == "mean_reversion"
     assert child_output.diagnostics["reporting_mode"] == "bar_series"
     assert child_output.diagnostics["catalog_ref"] == catalog_ref

@@ -413,6 +413,190 @@ def require_cci_momentum_param(raw_alg_param, label):
     }
 
 
+def require_zscore_mean_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "entry_zscore", "exit_zscore", "confirmation_bars"],
+        label,
+    )
+    entry_zscore = _require_non_negative_float_like(
+        normalized["entry_zscore"], f"{label} entry_zscore"
+    )
+    exit_zscore = _require_non_negative_float_like(
+        normalized["exit_zscore"], f"{label} exit_zscore"
+    )
+    if exit_zscore > entry_zscore:
+        raise ValueError(f"{label} requires exit_zscore <= entry_zscore")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "entry_zscore": entry_zscore,
+        "exit_zscore": exit_zscore,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_bollinger_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "std_multiplier", "exit_band_fraction", "confirmation_bars"],
+        label,
+    )
+    exit_band_fraction = _require_non_negative_float_like(
+        normalized["exit_band_fraction"], f"{label} exit_band_fraction"
+    )
+    if exit_band_fraction > 1.0:
+        raise ValueError(f"{label} exit_band_fraction must be <= 1")
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "std_multiplier": _require_non_negative_float_like(
+            normalized["std_multiplier"], f"{label} std_multiplier"
+        ),
+        "exit_band_fraction": exit_band_fraction,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_rsi_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "window",
+            "oversold_threshold",
+            "overbought_threshold",
+            "exit_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    oversold_threshold = _require_float_like(
+        normalized["oversold_threshold"], f"{label} oversold_threshold"
+    )
+    overbought_threshold = _require_float_like(
+        normalized["overbought_threshold"], f"{label} overbought_threshold"
+    )
+    exit_threshold = _require_float_like(
+        normalized["exit_threshold"], f"{label} exit_threshold"
+    )
+    if not 0.0 <= oversold_threshold <= 100.0:
+        raise ValueError(f"{label} oversold_threshold must be within [0, 100]")
+    if not 0.0 <= overbought_threshold <= 100.0:
+        raise ValueError(f"{label} overbought_threshold must be within [0, 100]")
+    if not 0.0 <= exit_threshold <= 100.0:
+        raise ValueError(f"{label} exit_threshold must be within [0, 100]")
+    if oversold_threshold >= overbought_threshold:
+        raise ValueError(f"{label} requires oversold_threshold < overbought_threshold")
+    if not oversold_threshold <= exit_threshold <= overbought_threshold:
+        raise ValueError(
+            f"{label} requires oversold_threshold <= exit_threshold <= overbought_threshold"
+        )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "oversold_threshold": oversold_threshold,
+        "overbought_threshold": overbought_threshold,
+        "exit_threshold": exit_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_stochastic_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "k_window",
+            "d_window",
+            "oversold_threshold",
+            "overbought_threshold",
+            "exit_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    oversold_threshold = _require_float_like(
+        normalized["oversold_threshold"], f"{label} oversold_threshold"
+    )
+    overbought_threshold = _require_float_like(
+        normalized["overbought_threshold"], f"{label} overbought_threshold"
+    )
+    exit_threshold = _require_float_like(
+        normalized["exit_threshold"], f"{label} exit_threshold"
+    )
+    if not 0.0 <= oversold_threshold <= 100.0:
+        raise ValueError(f"{label} oversold_threshold must be within [0, 100]")
+    if not 0.0 <= overbought_threshold <= 100.0:
+        raise ValueError(f"{label} overbought_threshold must be within [0, 100]")
+    if not 0.0 <= exit_threshold <= 100.0:
+        raise ValueError(f"{label} exit_threshold must be within [0, 100]")
+    if oversold_threshold >= overbought_threshold:
+        raise ValueError(f"{label} requires oversold_threshold < overbought_threshold")
+    if not oversold_threshold <= exit_threshold <= overbought_threshold:
+        raise ValueError(
+            f"{label} requires oversold_threshold <= exit_threshold <= overbought_threshold"
+        )
+    return {
+        "k_window": _require_positive_int_like(
+            normalized["k_window"], f"{label} k_window"
+        ),
+        "d_window": _require_positive_int_like(
+            normalized["d_window"], f"{label} d_window"
+        ),
+        "oversold_threshold": oversold_threshold,
+        "overbought_threshold": overbought_threshold,
+        "exit_threshold": exit_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_cci_reversion_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "window",
+            "oversold_threshold",
+            "overbought_threshold",
+            "exit_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    oversold_threshold = _require_float_like(
+        normalized["oversold_threshold"], f"{label} oversold_threshold"
+    )
+    overbought_threshold = _require_float_like(
+        normalized["overbought_threshold"], f"{label} overbought_threshold"
+    )
+    exit_threshold = _require_float_like(
+        normalized["exit_threshold"], f"{label} exit_threshold"
+    )
+    if oversold_threshold >= overbought_threshold:
+        raise ValueError(f"{label} requires oversold_threshold < overbought_threshold")
+    if not oversold_threshold <= exit_threshold <= overbought_threshold:
+        raise ValueError(
+            f"{label} requires oversold_threshold <= exit_threshold <= overbought_threshold"
+        )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "oversold_threshold": oversold_threshold,
+        "overbought_threshold": overbought_threshold,
+        "exit_threshold": exit_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def _require_rows_param(raw_rows, label):
     if not isinstance(raw_rows, list):
         raise ValueError(f"{label} rows must be a list")
