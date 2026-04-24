@@ -186,7 +186,7 @@ class BaseOptionsSurfaceAlgorithm:
             )
             for row in self._rows
         )
-        derived_series = {
+        derived_series: dict[str, list[Any]] = {
             "signal_label": [row.signal_label for row in self._rows],
             "score": [row.score for row in self._rows],
             "confidence": [row.confidence for row in self._rows],

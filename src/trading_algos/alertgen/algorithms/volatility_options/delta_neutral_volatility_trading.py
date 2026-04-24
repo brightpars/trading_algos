@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from trading_algos.alertgen.algorithms.volatility_options.options_surface_algorithm import (
     BaseOptionsSurfaceAlgorithm,
 )
@@ -74,10 +76,11 @@ class DeltaNeutralVolatilityTradingAlgorithm(BaseOptionsSurfaceAlgorithm):
 def build_delta_neutral_volatility_trading_algorithm(
     *, symbol: str, alg_param: dict[str, object], **_: object
 ) -> DeltaNeutralVolatilityTradingAlgorithm:
+    rows = cast(list[dict[str, Any]], alg_param["rows"])
     return DeltaNeutralVolatilityTradingAlgorithm(
         symbol=symbol,
-        rows=list(alg_param["rows"]),
-        iv_rv_threshold=float(alg_param["iv_rv_threshold"]),
-        min_gamma=float(alg_param["min_gamma"]),
-        target_delta_band=float(alg_param["target_delta_band"]),
+        rows=rows,
+        iv_rv_threshold=float(cast(float, alg_param["iv_rv_threshold"])),
+        min_gamma=float(cast(float, alg_param["min_gamma"])),
+        target_delta_band=float(cast(float, alg_param["target_delta_band"])),
     )

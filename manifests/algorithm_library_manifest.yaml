@@ -3339,7 +3339,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 55; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:56
   source_doc_ref: requirements_v4:algorithm:56
   kind: algorithm
@@ -3399,7 +3399,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 56; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:57
   source_doc_ref: requirements_v4:algorithm:57
   kind: algorithm
@@ -3459,7 +3459,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 57; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:58
   source_doc_ref: requirements_v4:algorithm:58
   kind: algorithm
@@ -3519,7 +3519,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 58; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:59
   source_doc_ref: requirements_v4:algorithm:59
   kind: algorithm
@@ -3579,7 +3579,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 59; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:60
   source_doc_ref: requirements_v4:algorithm:60
   kind: algorithm
@@ -3639,7 +3639,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-TERM
-  notes: Seeded from requirements_v4 row 60; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:61
   source_doc_ref: requirements_v4:algorithm:61
   kind: algorithm
@@ -3699,7 +3699,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 61; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:62
   source_doc_ref: requirements_v4:algorithm:62
   kind: algorithm

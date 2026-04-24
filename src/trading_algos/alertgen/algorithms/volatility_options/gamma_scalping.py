@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from trading_algos.alertgen.algorithms.volatility_options.options_surface_algorithm import (
     BaseOptionsSurfaceAlgorithm,
 )
@@ -70,10 +72,11 @@ class GammaScalpingAlgorithm(BaseOptionsSurfaceAlgorithm):
 def build_gamma_scalping_algorithm(
     *, symbol: str, alg_param: dict[str, object], **_: object
 ) -> GammaScalpingAlgorithm:
+    rows = cast(list[dict[str, Any]], alg_param["rows"])
     return GammaScalpingAlgorithm(
         symbol=symbol,
-        rows=list(alg_param["rows"]),
-        rebalance_band=float(alg_param["rebalance_band"]),
-        min_gamma=float(alg_param["min_gamma"]),
-        scalp_threshold=float(alg_param["scalp_threshold"]),
+        rows=rows,
+        rebalance_band=float(cast(float, alg_param["rebalance_band"])),
+        min_gamma=float(cast(float, alg_param["min_gamma"])),
+        scalp_threshold=float(cast(float, alg_param["scalp_threshold"])),
     )

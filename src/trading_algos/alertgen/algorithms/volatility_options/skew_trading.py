@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from trading_algos.alertgen.algorithms.volatility_options.options_surface_algorithm import (
     BaseOptionsSurfaceAlgorithm,
 )
@@ -61,8 +63,9 @@ class SkewTradingAlgorithm(BaseOptionsSurfaceAlgorithm):
 def build_skew_trading_algorithm(
     *, symbol: str, alg_param: dict[str, object], **_: object
 ) -> SkewTradingAlgorithm:
+    rows = cast(list[dict[str, Any]], alg_param["rows"])
     return SkewTradingAlgorithm(
         symbol=symbol,
-        rows=list(alg_param["rows"]),
-        entry_threshold=float(alg_param["entry_threshold"]),
+        rows=rows,
+        entry_threshold=float(cast(float, alg_param["entry_threshold"])),
     )

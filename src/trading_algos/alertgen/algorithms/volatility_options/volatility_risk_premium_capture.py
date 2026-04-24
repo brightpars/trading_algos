@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from trading_algos.alertgen.algorithms.volatility_options.options_surface_algorithm import (
     BaseOptionsSurfaceAlgorithm,
 )
@@ -75,9 +77,10 @@ class VolatilityRiskPremiumCaptureAlgorithm(BaseOptionsSurfaceAlgorithm):
 def build_volatility_risk_premium_capture_algorithm(
     *, symbol: str, alg_param: dict[str, object], **_: object
 ) -> VolatilityRiskPremiumCaptureAlgorithm:
+    rows = cast(list[dict[str, Any]], alg_param["rows"])
     return VolatilityRiskPremiumCaptureAlgorithm(
         symbol=symbol,
-        rows=list(alg_param["rows"]),
-        premium_threshold=float(alg_param["premium_threshold"]),
+        rows=rows,
+        premium_threshold=float(cast(float, alg_param["premium_threshold"])),
         policy=str(alg_param["policy"]),
     )

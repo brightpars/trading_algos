@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 from trading_algos.alertgen.algorithms.volatility_options.options_surface_algorithm import (
     BaseOptionsSurfaceAlgorithm,
 )
@@ -54,8 +56,9 @@ class StraddleBreakoutTimingAlgorithm(BaseOptionsSurfaceAlgorithm):
 def build_straddle_breakout_timing_algorithm(
     *, symbol: str, alg_param: dict[str, object], **_: object
 ) -> StraddleBreakoutTimingAlgorithm:
+    rows = cast(list[dict[str, Any]], alg_param["rows"])
     return StraddleBreakoutTimingAlgorithm(
         symbol=symbol,
-        rows=list(alg_param["rows"]),
-        move_threshold=float(alg_param["move_threshold"]),
+        rows=rows,
+        move_threshold=float(cast(float, alg_param["move_threshold"])),
     )

@@ -175,10 +175,14 @@ fixtures:
   domain: options_surface
   purpose: Implied-versus-realized volatility gap for options strategies.
   inputs:
-    dataset_path: tests/fixtures/options/iv_rv_gap.parquet
+    dataset_path: tests/fixtures/options/iv_rv_gap.csv
   expected_behaviors:
   - Volatility-premium measure rises above configured threshold
   - Signal reflects the configured long-vol or short-vol policy
+  - Delta-neutral and gamma-scalping variants remain neutral during warmup and expose hedge, greek, and selection diagnostics for dashboard explanation
+  - Dispersion, skew, and term-structure variants emit directionally distinct signals when the fixture alternates between rich and cheap surface regimes
+  - Straddle-timing remains neutral when expected move does not clear priced move by threshold and explains the suppression with explicit reason codes
+  - Normalized outputs expose underlying symbol, selected contracts, contract count, warmup readiness, and decision reason fields for dashboard explanation
 - fixture_id: fixture.execution_twap_schedule_v1
   domain: execution_schedule
   purpose: Simple TWAP schedule with catch-up behavior.

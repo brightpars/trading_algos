@@ -1,0 +1,4 @@
+ts,symbol,Close,underlying_price,realized_vol,index_iv,constituent_iv_avg,short_term_iv,long_term_iv,put_25d_iv,call_25d_iv,expected_move,priced_move,call_delta,put_delta,call_gamma,put_gamma,call_vega,put_vega,put_25d_delta,call_25d_delta,put_25d_gamma,call_25d_gamma,put_25d_vega,call_25d_vega
+2025-01-02,SPY,100.0,100.0,0.18,0.30,0.36,0.34,0.26,0.33,0.25,0.06,0.02,0.48,-0.45,0.08,0.07,0.11,0.10,-0.25,0.25,0.05,0.04,0.08,0.07
+2025-01-03,SPY,101.0,101.0,0.32,0.20,0.16,0.18,0.28,0.18,0.24,0.01,0.03,0.62,-0.18,0.03,0.02,0.06,0.04,-0.22,0.22,0.02,0.02,0.03,0.03
+2025-01-06,SPY,102.0,102.0,0.27,0.25,0.24,0.24,0.24,0.24,0.24,0.02,0.02,0.50,-0.50,0.01,0.01,0.02,0.02,-0.25,0.25,0.01,0.01,0.02,0.02
