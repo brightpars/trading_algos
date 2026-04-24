@@ -5,7 +5,10 @@ from typing import Any
 from trading_algos.alertgen.algorithms.event_driven.base import (
     EventDrivenAlertAlgorithm,
 )
-from trading_algos.alertgen.algorithms.event_driven.helpers import evaluate_event_rows
+from trading_algos.alertgen.algorithms.event_driven.helpers import (
+    evaluate_event_rows,
+    extract_expected_buy_flow,
+)
 from trading_algos.data.panel_dataset import MultiAssetPanel
 from trading_algos.events import EventCalendar, EventWindowDefinition
 
@@ -37,7 +40,7 @@ def build_etf_rebalancing_anticipation_front_run_strategy_algorithm(
         ),
         event_value_label=event_value_field,
         bullish_phase=str(alg_param["bullish_phase"]),
-        event_value_function=lambda _row, event_metadata: _extract_expected_flow(
+        event_value_function=lambda _row, event_metadata: extract_expected_buy_flow(
             event_metadata,
             event_value_field=event_value_field,
             expected_direction_field=expected_direction_field,
@@ -52,23 +55,3 @@ def build_etf_rebalancing_anticipation_front_run_strategy_algorithm(
         subcategory="etf",
         rows=rows,
     )
-
-
-def _extract_expected_flow(
-    event_metadata: dict[str, Any],
-    *,
-    event_value_field: str,
-    expected_direction_field: str,
-    minimum_score_threshold: float,
-) -> float | None:
-    direction = str(event_metadata.get(expected_direction_field, "buy")).lower()
-    raw_value = event_metadata.get(event_value_field)
-    if raw_value is None:
-        return None
-    try:
-        value = float(raw_value)
-    except (TypeError, ValueError):
-        return None
-    if value < minimum_score_threshold:
-        return None
-    return value if direction == "buy" else None

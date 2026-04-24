@@ -5,7 +5,10 @@ from typing import Any
 from trading_algos.alertgen.algorithms.event_driven.base import (
     EventDrivenAlertAlgorithm,
 )
-from trading_algos.alertgen.algorithms.event_driven.helpers import evaluate_event_rows
+from trading_algos.alertgen.algorithms.event_driven.helpers import (
+    evaluate_event_rows,
+    extract_positive_event_value,
+)
 from trading_algos.data.panel_dataset import MultiAssetPanel
 from trading_algos.events import EventCalendar, EventWindowDefinition
 
@@ -34,10 +37,12 @@ def build_post_earnings_announcement_drift_algorithm(
         ),
         event_value_label=event_value_field,
         bullish_phase=str(alg_param["bullish_phase"]),
-        event_value_function=lambda _row, event_metadata: _extract_event_value(
-            event_metadata,
-            event_value_field=event_value_field,
-            minimum_score_threshold=minimum_score_threshold,
+        event_value_function=lambda _row, event_metadata: (
+            _extract_positive_post_event_value(
+                event_metadata,
+                event_value_field=event_value_field,
+                minimum_score_threshold=minimum_score_threshold,
+            )
         ),
     )
     return PostEarningsAnnouncementDriftAlertAlgorithm(
@@ -56,13 +61,24 @@ def _extract_event_value(
     event_value_field: str,
     minimum_score_threshold: float,
 ) -> float | None:
-    raw_value = event_metadata.get(event_value_field)
-    if raw_value is None:
-        return None
-    try:
-        value = float(raw_value)
-    except (TypeError, ValueError):
-        return None
-    if abs(value) < minimum_score_threshold:
+    return _extract_positive_post_event_value(
+        event_metadata,
+        event_value_field=event_value_field,
+        minimum_score_threshold=minimum_score_threshold,
+    )
+
+
+def _extract_positive_post_event_value(
+    event_metadata: dict[str, Any],
+    *,
+    event_value_field: str,
+    minimum_score_threshold: float,
+) -> float | None:
+    value = extract_positive_event_value(
+        event_metadata,
+        event_value_field=event_value_field,
+        minimum_score_threshold=minimum_score_threshold,
+    )
+    if value is None:
         return None
     return value if value > 0.0 else None

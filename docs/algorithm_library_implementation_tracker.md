@@ -16,11 +16,11 @@
 | algorithm rows | 121 |
 | combination-method rows | 12 |
 | ready_to_implement | 4 |
-| blocked_framework | 53 |
+| blocked_framework | 48 |
 | in_progress | 0 |
-| complete | 76 |
-| prototype_only | 57 |
-| research_ready | 76 |
+| complete | 81 |
+| prototype_only | 52 |
+| research_ready | 81 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -32,7 +32,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | adaptive_state_based | combination_method | 1 | 0 | 1 | 0 | 0 |
 | cross_asset_macro_carry | algorithm | 8 | 0 | 0 | 0 | 8 |
-| event_driven | algorithm | 5 | 0 | 5 | 0 | 0 |
+| event_driven | algorithm | 5 | 0 | 0 | 0 | 5 |
 | execution | algorithm | 6 | 0 | 6 | 0 | 0 |
 | factor_risk_premia | algorithm | 15 | 0 | 4 | 0 | 11 |
 | fixed_income_relative_value | algorithm | 2 | 0 | 2 | 0 | 0 |
@@ -57,9 +57,9 @@
 | blocker.multi_asset_panel_v1 | planned | 38 | cross_asset_macro_carry, factor_risk_premia, fundamental_ml_composite, momentum, optimization_based |
 | blocker.rebalance_engine_v1 | planned | 38 | cross_asset_macro_carry, factor_risk_premia, fundamental_ml_composite, momentum, optimization_based |
 | blocker.portfolio_weight_output_v1 | planned | 29 | factor_risk_premia, fundamental_ml_composite, momentum, optimization_based, risk_overlay |
-| blocker.event_calendar_v1 | planned | 6 | cross_asset_macro_carry, event_driven |
-| blocker.event_window_execution_v1 | planned | 6 | cross_asset_macro_carry, event_driven |
-| blocker.event_reporting_v1 | planned | 6 | cross_asset_macro_carry, event_driven |
+| blocker.event_calendar_v1 | complete | 6 | cross_asset_macro_carry, event_driven |
+| blocker.event_window_execution_v1 | complete | 6 | cross_asset_macro_carry, event_driven |
+| blocker.event_reporting_v1 | complete | 6 | cross_asset_macro_carry, event_driven |
 | blocker.spread_leg_output_v1 | planned | 19 | cross_asset_macro_carry, fixed_income_relative_value, stat_arb |
 | blocker.hedge_ratio_helpers_v1 | planned | 16 | fixed_income_relative_value, stat_arb |
 | blocker.multi_leg_reporting_v1 | planned | 19 | cross_asset_macro_carry, fixed_income_relative_value, stat_arb |

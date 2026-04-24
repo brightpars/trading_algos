@@ -168,7 +168,7 @@ blockers:
 - blocker_key: blocker.event_calendar_v1
   description: Point-in-time event calendar support with event timestamps and source metadata.
   category: data-model blocker
-  status: planned
+  status: complete
   owner: null
   target_modules:
   - src/trading_algos/events/calendar.py
@@ -189,7 +189,7 @@ blockers:
 - blocker_key: blocker.event_window_execution_v1
   description: Event-window strategy runner supporting pre-event, event-day, and post-event windows.
   category: execution-model blocker
-  status: planned
+  status: complete
   owner: null
   target_modules:
   - src/trading_algos/events/window_runner.py
@@ -210,7 +210,7 @@ blockers:
 - blocker_key: blocker.event_reporting_v1
   description: Reporting support for event metadata, surprise values, and event-specific diagnostics.
   category: reporting blocker
-  status: planned
+  status: complete
   owner: null
   target_modules:
   - src/trading_algos/reporting/event_report.py

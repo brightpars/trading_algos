@@ -7003,8 +7003,8 @@ rows:
   display_category: Event-Driven
   subcategory: post
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven / short- to medium-term after earnings
   home_suitability: 2
@@ -7057,7 +7057,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-PEAD
-  notes: Seeded from requirements_v4 row 117; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared event-value helpers, fixture-backed public-timestamp and rebalance-window checks, warmup coverage, normalized decision diagnostics, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: algorithm:118
   source_doc_ref: requirements_v4:algorithm:118
   kind: algorithm
@@ -7066,8 +7066,8 @@ rows:
   display_category: Event-Driven
   subcategory: pre
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven / very short-term before earnings
   home_suitability: 2
@@ -7121,7 +7121,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-PREAD
-  notes: Seeded from requirements_v4 row 118; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared event-value helpers, fixture-backed pre-event phase checks, warmup coverage, normalized decision diagnostics, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: algorithm:119
   source_doc_ref: requirements_v4:algorithm:119
   kind: algorithm
@@ -7130,8 +7130,8 @@ rows:
   display_category: Event-Driven
   subcategory: earnings
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven / around scheduled earnings windows
   home_suitability: 2
@@ -7184,7 +7184,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-EAP
-  notes: Seeded from requirements_v4 row 119; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared event-value helpers, earnings-window fixture coverage, warmup-aware normalized diagnostics, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: algorithm:120
   source_doc_ref: requirements_v4:algorithm:120
   kind: algorithm
@@ -7193,8 +7193,8 @@ rows:
   display_category: Event-Driven
   subcategory: index
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven / short-term around index rebalances
   home_suitability: 2
@@ -7247,7 +7247,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-REB
-  notes: Seeded from requirements_v4 row 120; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared expected-flow helpers, fixture-backed rebalance-window behavior checks, warmup coverage, phase-filtered decision diagnostics, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: algorithm:121
   source_doc_ref: requirements_v4:algorithm:121
   kind: algorithm
@@ -7256,8 +7256,8 @@ rows:
   display_category: Event-Driven
   subcategory: etf
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: true
   best_use_horizon: Event-driven / short-term around ETF rebalance dates
   home_suitability: 2
@@ -7310,7 +7310,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-ETFREB
-  notes: Seeded from requirements_v4 row 121; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared expected-flow helpers, fixture-backed ETF rebalance anticipation checks, warmup coverage, normalized decision diagnostics including no-event states, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: combination:1
   source_doc_ref: requirements_v4:combination:1
   kind: combination_method

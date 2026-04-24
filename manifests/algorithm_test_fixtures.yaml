@@ -136,6 +136,9 @@ fixtures:
   expected_behaviors:
   - Event window starts from the correct public availability point
   - No signal appears before the after-close announcement timestamp
+  - Short-history evaluation remains neutral with warmup_pending reason codes until the first post-warmup bar is available
+  - Diagnostics expose event_window_active, event_window_phase, event_anchor_timestamp, warmup_ready, and decision_reason for dashboard explanation
+  - Interactive report payloads preserve metadata, summary metrics, and latest child diagnostics for event-window reporting
 - fixture_id: fixture.event_index_rebalance_window_v1
   domain: event_calendar
   purpose: Index add/delete flow window around a rebalance event.
@@ -144,6 +147,9 @@ fixtures:
   expected_behaviors:
   - Expected flow direction is attached to the right symbols
   - Signal exists only inside the configured rebalance window
+  - Non-bullish event phases remain neutral with explicit phase-filtered or inactive reason codes
+  - Short-history evaluation remains neutral with warmup_pending reason codes until the first actionable window bar is available
+  - Diagnostics expose event_type, event_window_phase, expected flow context, warmup readiness, and decision_reason for dashboard explanation
 - fixture_id: fixture.statarb_pair_divergence_reversion_v1
   domain: pair_prices
   purpose: Stable pair with one temporary spread divergence and convergence.
