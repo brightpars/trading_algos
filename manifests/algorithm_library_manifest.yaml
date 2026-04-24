@@ -455,8 +455,8 @@ rows:
   display_category: Trend Following
   subcategory: breakout
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -502,7 +502,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 6; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed breakout coverage, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:7
   source_doc_ref: requirements_v4:algorithm:7
   kind: algorithm
@@ -511,8 +511,8 @@ rows:
   display_category: Trend Following
   subcategory: channel
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -558,7 +558,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 7; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed confirmation and whipsaw checks, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:8
   source_doc_ref: requirements_v4:algorithm:8
   kind: algorithm
@@ -567,8 +567,8 @@ rows:
   display_category: Trend Following
   subcategory: adx
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -614,7 +614,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 8; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed trend-filter behavior, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:9
   source_doc_ref: requirements_v4:algorithm:9
   kind: algorithm
@@ -623,8 +623,8 @@ rows:
   display_category: Trend Following
   subcategory: parabolic
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -670,7 +670,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 9; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed SAR behavior, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:10
   source_doc_ref: requirements_v4:algorithm:10
   kind: algorithm
@@ -679,8 +679,8 @@ rows:
   display_category: Trend Following
   subcategory: supertrend
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -726,7 +726,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 10; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed SuperTrend behavior, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:11
   source_doc_ref: requirements_v4:algorithm:11
   kind: algorithm

@@ -1670,6 +1670,18 @@ def test_trend_wave_2_whipsaw_controls_reduce_or_limit_events(tmp_path) -> None:
     )
 
     assert guarded_events <= loose_events
+    guarded_output = guarded_algorithm.normalized_output()
+
+    assert "confirmation_state_label" in guarded_output.derived_series
+    assert all(
+        state in {"idle", "pending", "confirmed"}
+        for state in guarded_output.derived_series["confirmation_state_label"]
+    )
+    assert any(
+        "confirmation_pending" in point.reason_codes
+        or "channel_waiting_confirmation" in point.reason_codes
+        for point in guarded_output.points
+    )
 
 
 @pytest.mark.parametrize(
@@ -1791,10 +1803,38 @@ def test_trend_wave_2_normalized_output_exposes_dashboard_diagnostics(
         "reason_codes",
         "primary_value",
         "signal_value",
+        "confirmation_state_label",
+        "warmup_ready",
     }.issubset(output.derived_series)
+    assert output.metadata["family"] == "trend"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == child_output.diagnostics["catalog_ref"]
     assert child_output.signal_label == "buy"
     assert expected_reason_code in child_output.diagnostics["reason_codes"]
     assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+    assert child_output.diagnostics["warmup_ready"] is True
+    assert child_output.diagnostics["confirmation_state_label"] == "confirmed"
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "expected_catalog_ref", "expected_warmup"),
+    [
+        ("breakout_donchian_channel", "algorithm:6", 20),
+        ("channel_breakout_with_confirmation", "algorithm:7", 20),
+        ("adx_trend_filter", "algorithm:8", 27),
+        ("parabolic_sar_trend_following", "algorithm:9", 2),
+        ("supertrend", "algorithm:10", 10),
+    ],
+)
+def test_trend_wave_2_registration_metadata_matches_catalog(
+    alg_key, expected_catalog_ref, expected_warmup
+) -> None:
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+
+    assert spec.catalog_ref == expected_catalog_ref
+    assert spec.family == "trend"
+    assert spec.category == "trend"
+    assert spec.warmup_period == expected_warmup
 
 
 def test_validation_rejects_invalid_trend_wave_2_parameter_shapes() -> None:

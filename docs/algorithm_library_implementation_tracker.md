@@ -15,12 +15,12 @@
 | --- | --- |
 | algorithm rows | 121 |
 | combination-method rows | 12 |
-| ready_to_implement | 33 |
+| ready_to_implement | 28 |
 | blocked_framework | 83 |
 | in_progress | 0 |
-| complete | 17 |
-| prototype_only | 116 |
-| research_ready | 17 |
+| complete | 22 |
+| prototype_only | 111 |
+| research_ready | 22 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -47,7 +47,7 @@
 | risk_overlay | combination_method | 2 | 1 | 1 | 0 | 0 |
 | rule_based_combination | combination_method | 3 | 0 | 1 | 0 | 2 |
 | stat_arb | algorithm | 14 | 0 | 14 | 0 | 0 |
-| trend | algorithm | 14 | 9 | 0 | 0 | 5 |
+| trend | algorithm | 14 | 4 | 0 | 0 | 10 |
 | volatility_options | algorithm | 10 | 3 | 7 | 0 | 0 |
 
 ## Framework blockers summary
@@ -76,7 +76,6 @@
 
 | batch | ready_rows |
 | --- | --- |
-| trend_wave_2 | 5 |
 | pattern_wave_1 | 5 |
 | trend_wave_3 | 4 |
 | mean_reversion_wave_2 | 4 |

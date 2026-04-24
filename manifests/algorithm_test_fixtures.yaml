@@ -10,7 +10,8 @@ fixtures:
   - Buy event occurs on the first positive crossover
   - No sell event appears later in the fixture horizon
   - Short-history evaluation remains neutral until warmup is satisfied
-  - Normalized outputs include trend score, regime label, spread, and reason codes for dashboard explanation
+  - Normalized outputs include trend score, regime label, spread, confirmation state, warmup readiness, and reason codes for dashboard explanation
+  - Registration metadata and catalog references remain aligned with the manifest row and dashboard payloads
 - fixture_id: fixture.trend_whipsaw_guard_v1
   domain: single_asset_ohlcv
   purpose: Sideways price action used to validate anti-whipsaw filters.
@@ -20,7 +21,7 @@ fixtures:
   - Trend algorithms produce fewer events when a minimum-spread or confirmation filter is enabled
   - No lookahead is required to suppress noisy crossover churn
   - Guarded variants can stay neutral when alignment is insufficient to justify a trade
-  - Diagnostics expose confirmation state and alignment context for churn explanation
+  - Diagnostics expose confirmation state, pending-versus-confirmed reason codes, and alignment context for churn explanation
 - fixture_id: fixture.momentum_sustained_up_v1
   domain: single_asset_ohlcv
   purpose: Sustained price continuation for single-asset momentum checks.

@@ -65,6 +65,15 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
         return tuple(reason_codes)
 
     def _decision_annotations(self) -> dict[str, object]:
+        bullish_setup = self.latest_data_modifiable.get("bullish_setup", False)
+        bearish_setup = self.latest_data_modifiable.get("bearish_setup", False)
+        bullish_confirmed = self.latest_data_modifiable.get("bullish_confirmed", False)
+        bearish_confirmed = self.latest_data_modifiable.get("bearish_confirmed", False)
+        confirmation_state_label = "idle"
+        if bullish_confirmed or bearish_confirmed:
+            confirmation_state_label = "confirmed"
+        elif bullish_setup or bearish_setup:
+            confirmation_state_label = "pending"
         annotations: dict[str, object] = {
             "alg_name": self.alg_name,
             "catalog_ref": getattr(self, "catalog_ref", None),
@@ -82,20 +91,17 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
             "aligned_count": self.latest_data_modifiable.get("aligned_count", 0),
             "minimum_spread": self.minimum_spread,
             "confirmation_bars": self.confirmation_bars,
-            "bullish_setup": self.latest_data_modifiable.get("bullish_setup", False),
-            "bearish_setup": self.latest_data_modifiable.get("bearish_setup", False),
-            "bullish_confirmed": self.latest_data_modifiable.get(
-                "bullish_confirmed", False
-            ),
-            "bearish_confirmed": self.latest_data_modifiable.get(
-                "bearish_confirmed", False
-            ),
+            "bullish_setup": bullish_setup,
+            "bearish_setup": bearish_setup,
+            "bullish_confirmed": bullish_confirmed,
+            "bearish_confirmed": bearish_confirmed,
             "bullish_confirmation_count": self.latest_data_modifiable.get(
                 "bullish_confirmation_count", 0
             ),
             "bearish_confirmation_count": self.latest_data_modifiable.get(
                 "bearish_confirmation_count", 0
             ),
+            "confirmation_state_label": confirmation_state_label,
             "warmup_period": self.minimum_history(),
             "warmup_ready": len(self.data_list) >= self.minimum_history(),
         }
@@ -107,10 +113,14 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
         self.latest_data_modifiable["aligned_count"] = state.aligned_count
         self.latest_data_modifiable["minimum_spread"] = self.minimum_spread
         self.latest_data_modifiable["confirmation_bars"] = self.confirmation_bars
+        self.latest_data_modifiable["warmup_ready"] = (
+            len(self.data_list) >= self.minimum_history()
+        )
         self.latest_data_modifiable["bullish_setup"] = state.bullish
         self.latest_data_modifiable["bearish_setup"] = state.bearish
         self.latest_data_modifiable["bullish_confirmed"] = False
         self.latest_data_modifiable["bearish_confirmed"] = False
+        self.latest_data_modifiable["confirmation_state_label"] = "idle"
         self.latest_data_modifiable["regime_label"] = state.regime
         self.latest_data_modifiable["reason_codes"] = self._reason_codes(state)
         self.latest_data_modifiable["primary_value"] = state.primary_value
@@ -144,6 +154,20 @@ class BaseMovingAverageTrendAlertAlgorithm(BaseAlertAlgorithm, ABC):
         )
         self.latest_data_modifiable["bullish_confirmed"] = bullish_confirmed
         self.latest_data_modifiable["bearish_confirmed"] = bearish_confirmed
+        confirmation_state_label = "idle"
+        if bullish_confirmed or bearish_confirmed:
+            confirmation_state_label = "confirmed"
+        elif state.bullish or state.bearish:
+            confirmation_state_label = "pending"
+        self.latest_data_modifiable["confirmation_state_label"] = (
+            confirmation_state_label
+        )
+        reason_codes = list(tuple(self.latest_data_modifiable.get("reason_codes", ())))
+        if bullish_confirmed or bearish_confirmed:
+            reason_codes.append("confirmation_confirmed")
+        elif state.bullish or state.bearish:
+            reason_codes.append("confirmation_pending")
+        self.latest_data_modifiable["reason_codes"] = tuple(reason_codes)
         if bullish_confirmed and not bearish_confirmed:
             self.latest_predicted_trend = TREND.UP
         elif bearish_confirmed and not bullish_confirmed:
