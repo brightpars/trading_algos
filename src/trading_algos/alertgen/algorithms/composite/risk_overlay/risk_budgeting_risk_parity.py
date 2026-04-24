@@ -129,6 +129,7 @@ def evaluate_risk_budget_rows(
             "rebalance_frequency": raw_row.get("rebalance_frequency", "monthly"),
             "warmup_ready": bool(ordered),
             "selection_reason": selection_reason,
+            "selected_symbols": list(selected_symbols),
             "selected_count": len(selected_symbols),
             "target_gross_exposure": target_gross_exposure,
             "risk_contributions": risk_contributions,

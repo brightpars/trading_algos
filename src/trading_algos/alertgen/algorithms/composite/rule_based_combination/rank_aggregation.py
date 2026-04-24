@@ -23,7 +23,7 @@ class RankAggregationAsset:
     symbol: str
     aggregate_score: float
     average_rank: float
-    child_rank_count: int
+    observed_input_count: int
 
 
 def _coerce_float(value: Any) -> float | None:
@@ -93,7 +93,7 @@ def _aggregate_asset_rank(
         symbol=symbol,
         aggregate_score=aggregate_score,
         average_rank=average_rank,
-        child_rank_count=max(len(observed_ranks), len(observed_scores)),
+        observed_input_count=len(observed_ranks) + len(observed_scores),
     )
 
 
@@ -122,7 +122,7 @@ def evaluate_rank_aggregation_rows(
             if aggregated is None:
                 missing_symbols.append(str(asset_row["symbol"]))
                 continue
-            if aggregated.child_rank_count < minimum_child_count:
+            if aggregated.observed_input_count < minimum_child_count:
                 missing_symbols.append(aggregated.symbol)
                 continue
             aggregated_assets.append(aggregated)
@@ -173,6 +173,7 @@ def evaluate_rank_aggregation_rows(
             "minimum_child_count": minimum_child_count,
             "warmup_ready": bool(ordered_assets),
             "selection_reason": selection_reason,
+            "selected_symbols": list(selected_symbols),
             "selected_count": len(selected_symbols),
             "selection_strength": selection_strength,
             "top_ranked_symbol": ranking[0].symbol if ranking else None,

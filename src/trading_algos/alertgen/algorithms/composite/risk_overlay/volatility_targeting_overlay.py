@@ -91,6 +91,7 @@ def evaluate_volatility_target_rows(
             "applied_leverage": leverage,
             "warmup_ready": warmup_ready,
             "selection_reason": selection_reason,
+            "selected_symbols": list(selected_symbols),
             "selected_count": len(selected_symbols),
             "top_ranked_symbol": "portfolio" if selected_symbols else None,
             "top_ranked_score": leverage if selected_symbols else None,

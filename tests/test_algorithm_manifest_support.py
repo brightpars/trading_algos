@@ -80,6 +80,40 @@ def test_performance_smoke_case_loads_combination_method_budget_mapping() -> Non
     assert smoke_case.fixture_ids == ("fixture.composite_boolean_truth_table_v1",)
 
 
+@pytest.mark.parametrize(
+    ("catalog_ref", "expected_name", "expected_fixture_ids"),
+    [
+        (
+            "combination:3",
+            "Rank Aggregation",
+            ("fixture.composite_rank_aggregation_v1",),
+        ),
+        (
+            "combination:5",
+            "Risk Budgeting / Risk Parity",
+            ("fixture.composite_risk_budget_v1",),
+        ),
+        (
+            "combination:6",
+            "Volatility Targeting Overlay",
+            ("fixture.composite_risk_budget_v1",),
+        ),
+    ],
+)
+def test_composite_wave_2_performance_smoke_cases_load_expected_budget_mapping(
+    catalog_ref: str,
+    expected_name: str,
+    expected_fixture_ids: tuple[str, ...],
+) -> None:
+    smoke_case = get_performance_smoke_case(catalog_ref)
+
+    assert smoke_case.catalog_ref == catalog_ref
+    assert smoke_case.kind == "combination_method"
+    assert smoke_case.name == expected_name
+    assert smoke_case.performance_budget_id == "perf.cross_sectional_rebalance_v1"
+    assert smoke_case.fixture_ids == expected_fixture_ids
+
+
 def test_missing_catalog_ref_fails_clearly_for_performance_smoke_case() -> None:
     with pytest.raises(RegistryLookupError, match=r"catalog_ref=combination:missing"):
         get_performance_smoke_case("combination:missing")

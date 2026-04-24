@@ -228,6 +228,9 @@ fixtures:
   expected_behaviors:
   - Aggregate rank is reproducible from the child ranks
   - Top-k selection matches expected result
+  - Assets missing enough child rank or score inputs remain excluded with warmup_pending diagnostics until minimum_child_count is satisfied
+  - Diagnostics expose selected symbols, top-ranked symbol, selection strength, missing symbols, and reason codes for dashboard explanation
+  - Interactive report payloads preserve catalog reference alignment between normalized output and portfolio-weight output
 - fixture_id: fixture.composite_risk_budget_v1
   domain: strategy_return_streams
   purpose: Risk-budget allocation across multiple sleeves.
@@ -236,6 +239,9 @@ fixtures:
   expected_behaviors:
   - Risk contribution targets are reflected in output weights
   - Weight changes are stable under the configured rebalance cadence
+  - Warmup remains neutral with explicit insufficient-history sleeve diagnostics until min_history is satisfied
+  - Diagnostics expose selected sleeves, realized sleeve volatility, mean return context, risk contributions, gross exposure, and reason codes for dashboard explanation
+  - Volatility-targeting overlays using the same return stream fixture expose realized volatility, applied leverage, selected symbols, and warmup readiness in allocation diagnostics
 - fixture_id: fixture.composite_regime_switch_v1
   domain: regime_features
   purpose: Regime-gated child activation with explicit state changes.
