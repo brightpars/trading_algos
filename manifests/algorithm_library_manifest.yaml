@@ -4194,10 +4194,10 @@ rows:
   name: Support and Resistance Bounce
   family: pattern_price_action
   display_category: Pattern / Price Action
-  subcategory: support
+  subcategory: support_resistance
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4209,7 +4209,7 @@ rows:
   code_dependencies:
   - pattern.levels
   - pattern.session
-  target_module: src/trading_algos/alertgen/algorithms/pattern_price_action/support_and_resistance_bounce.py
+  target_module: src/trading_algos/alertgen/algorithms/pattern_price_action/support_resistance_bounce.py
   target_catalog: src/trading_algos/alertgen/algorithms/pattern_price_action/catalog.py
   required_input_domains:
   - single_asset_ohlcv
@@ -4242,7 +4242,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 70; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with fixture-backed support rejection checks, warmup coverage, normalized dashboard diagnostics, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:71
   source_doc_ref: requirements_v4:algorithm:71
   kind: algorithm
@@ -4251,8 +4251,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: breakout
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4297,7 +4297,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 71; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with neutral breakout fixture checks, warmup coverage, normalized dashboard diagnostics, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:72
   source_doc_ref: requirements_v4:algorithm:72
   kind: algorithm
@@ -4306,8 +4306,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: pivot
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4352,7 +4352,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 72; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with pivot-level diagnostic checks, warmup coverage, normalized dashboard diagnostics, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:73
   source_doc_ref: requirements_v4:algorithm:73
   kind: algorithm
@@ -4361,8 +4361,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: opening
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Intraday / session trading
   home_suitability: 1
@@ -4407,7 +4407,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 73; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with opening-range fixture checks, session-aware diagnostics, warmup coverage, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:74
   source_doc_ref: requirements_v4:algorithm:74
   kind: algorithm
@@ -4416,8 +4416,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: inside
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4462,7 +4462,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 74; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with inside-bar neutral fixture checks, warmup coverage, normalized dashboard diagnostics, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:75
   source_doc_ref: requirements_v4:algorithm:75
   kind: algorithm

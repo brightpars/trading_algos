@@ -84,6 +84,11 @@ fixtures:
   expected_behaviors:
   - Support touch is detected inside configured buffer
   - Buy signal requires rejection confirmation, not just a touch
+  - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - Support-bounce diagnostics expose support level, touch distance, rejection strength, warmup readiness, and reason codes for dashboard explanation
+  - Breakout-retest stays neutral with awaiting-breakout diagnostics when the fixture does not contain a qualifying breakout-retest sequence
+  - Pivot and inside-bar variants can remain neutral while still exposing nearest-level or mother-bar diagnostics needed to explain why no trade was taken
+  - Normalized output metadata identifies pattern_price_action family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.pattern_opening_range_breakout_v1
   domain: intraday_ohlcv
   purpose: Opening range with one clean breakout direction.
@@ -92,6 +97,9 @@ fixtures:
   expected_behaviors:
   - Opening range is frozen after configured window
   - Breakout signal occurs only after range is fully defined
+  - Short-history evaluation remains neutral until the opening-range warmup is satisfied
+  - Diagnostics expose opening-range high and low, session label, session minute, range-complete state, breakout distance, warmup readiness, and reason codes for dashboard explanation
+  - Normalized output metadata identifies pattern_price_action family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.cross_asset_carry_ranking_v1
   domain: multi_asset_panel
   purpose: Small carry universe with deterministic ranking.

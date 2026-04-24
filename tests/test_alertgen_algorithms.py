@@ -3439,12 +3439,15 @@ def test_pattern_wave_1_short_history_stays_neutral_until_warmup(
     assert algorithm.minimum_history() == expected_warmup
     assert output.points
     assert all(point.signal_label == "neutral" for point in output.points)
+    assert all(point.score == 0.0 for point in output.points)
     expected_pending_code = (
         "opening_range_pending"
         if alg_key == "opening_range_breakout"
         else "warmup_pending"
     )
     assert any(expected_pending_code in point.reason_codes for point in output.points)
+    assert output.metadata["warmup_period"] == expected_warmup
+    assert output.derived_series["warmup_ready"][-1] is False
 
 
 @pytest.mark.parametrize(
@@ -3551,11 +3554,21 @@ def test_pattern_wave_1_normalized_output_exposes_dashboard_diagnostics(
         "primary_value",
         "signal_value",
         "threshold_value",
+        "exit_value",
+        "bullish_confirmation_count",
+        "bearish_confirmation_count",
+        "bullish_confirmed",
+        "bearish_confirmed",
         "confirmation_state_label",
         "warmup_ready",
     }.issubset(output.derived_series)
+    assert output.metadata["family"] == "pattern_price_action"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == child_output.diagnostics["catalog_ref"]
     assert child_output.diagnostics["family"] == "pattern_price_action"
     assert child_output.diagnostics["reporting_mode"] == "bar_series"
+    assert child_output.diagnostics["warmup_ready"] is True
+    assert child_output.diagnostics["warmup_period"] == algorithm.minimum_history()
     assert expected_keys.issubset(child_output.diagnostics.keys())
     assert child_output.signal_label in {"buy", "neutral"}
     assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
@@ -3595,6 +3608,66 @@ def test_pattern_wave_1_fixture_behavior_matches_manifest_expectations(
     assert touch_indices
     assert buy_indices
     assert min(touch_indices) <= min(buy_indices)
+    assert any(point.signal_label == "buy" for point in support_output.points)
+    assert any(support_output.derived_series["support_touched"])
+    assert any(support_output.derived_series["rejection_confirmed"])
+
+    breakout_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "breakout_retest",
+            "alg_param": {
+                "breakout_window": 5,
+                "breakout_buffer": 0.2,
+                "retest_tolerance": 0.3,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "breakout"),
+    )
+    breakout_algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    breakout_output = breakout_algorithm.normalized_output()
+    assert all(point.signal_label == "neutral" for point in breakout_output.points)
+    assert breakout_output.points[-1].reason_codes[0] == "awaiting_breakout"
+
+    pivot_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "pivot_point_strategy",
+            "alg_param": {
+                "pivot_lookback": 3,
+                "level_tolerance": 0.4,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "pivot"),
+    )
+    pivot_algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    pivot_output = pivot_algorithm.normalized_output()
+    assert pivot_output.points[-1].signal_label == "neutral"
+    assert pivot_output.derived_series["pivot_level_name"][-1] is not None
+
+    inside_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "inside_bar_breakout",
+            "alg_param": {
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "inside"),
+    )
+    inside_algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    inside_output = inside_algorithm.normalized_output()
+    assert inside_output.points[-1].signal_label == "neutral"
+    assert inside_output.derived_series["inside_bar_detected"][-1] is False
 
     orb_algorithm, _ = create_alertgen_algorithm(
         sensor_config={
@@ -3627,6 +3700,9 @@ def test_pattern_wave_1_fixture_behavior_matches_manifest_expectations(
     assert complete_indices
     assert orb_buy_indices
     assert min(orb_buy_indices) >= min(complete_indices)
+    assert orb_output.points[-1].signal_label == "buy"
+    assert orb_output.derived_series["session_label"][-1] == "2025-01-02"
+    assert orb_output.derived_series["session_minute"][-1] == 20
 
 
 def test_pattern_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
@@ -3677,6 +3753,35 @@ def test_pattern_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
             }
         )
 
+    with pytest.raises(ValueError, match="level_tolerance must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "pivot_point_strategy",
+                "alg_param": {
+                    "pivot_lookback": 3,
+                    "level_tolerance": -0.1,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="breakout_buffer must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "inside_bar_breakout",
+                "alg_param": {
+                    "breakout_buffer": -0.1,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
 
 def test_pattern_wave_1_registration_metadata_matches_manifest_contract() -> None:
     expected = {
@@ -3705,6 +3810,7 @@ def test_pattern_wave_1_registration_metadata_matches_manifest_contract() -> Non
         assert spec.subcategory == subcategory
         assert spec.warmup_period == warmup_period
         assert spec.output_modes == ("signal", "score", "confidence")
+        assert spec.category == "pattern_price_action"
 
 
 def test_pattern_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
