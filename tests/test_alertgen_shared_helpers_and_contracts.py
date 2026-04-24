@@ -51,6 +51,17 @@ from trading_algos.regime.state import (
     normalize_probability_map,
     smooth_regime_probabilities,
 )
+from trading_algos.options import (
+    build_delta_hedge_plan,
+    compute_greek_exposure,
+    nearest_expiry,
+    option_chain_from_row,
+    query_contracts,
+    select_atm_straddle,
+    select_skew_contracts,
+    select_term_structure_contracts,
+    surface_metrics_object_from_snapshot,
+)
 
 
 def test_simple_and_exponential_moving_averages_return_expected_shapes() -> None:
@@ -239,6 +250,52 @@ def test_ichimoku_helper_produces_expected_shapes() -> None:
     assert span_a[-1] == pytest.approx(13.75)
     assert span_b[-1] == pytest.approx(13.0)
     assert lagging[-1] == pytest.approx(12.5)
+
+
+def test_options_shared_helpers_compute_selection_surface_and_hedge_plan() -> None:
+    snapshot = option_chain_from_row(
+        {
+            "ts": "2025-01-02",
+            "symbol": "SPY",
+            "Close": 100.0,
+            "underlying_price": 100.0,
+            "realized_vol": 0.18,
+            "index_iv": 0.30,
+            "constituent_iv_avg": 0.36,
+            "short_term_iv": 0.34,
+            "long_term_iv": 0.26,
+            "put_25d_iv": 0.33,
+            "call_25d_iv": 0.25,
+            "expected_move": 0.06,
+            "priced_move": 0.02,
+            "call_delta": 0.48,
+            "put_delta": -0.45,
+            "call_gamma": 0.08,
+            "put_gamma": 0.07,
+            "call_vega": 0.11,
+            "put_vega": 0.10,
+        }
+    )
+
+    all_calls = query_contracts(snapshot, option_type="call")
+    atm_straddle = select_atm_straddle(snapshot)
+    skew_contracts = select_skew_contracts(snapshot)
+    term_contracts = select_term_structure_contracts(snapshot)
+    exposure = compute_greek_exposure(atm_straddle)
+    hedge_plan = build_delta_hedge_plan(net_delta=exposure.net_delta, band=0.01)
+    surface = surface_metrics_object_from_snapshot(snapshot)
+
+    assert nearest_expiry(snapshot, option_type="call") == 15
+    assert all(contract.option_type == "call" for contract in all_calls)
+    assert len(atm_straddle) == 2
+    assert len(skew_contracts) == 2
+    assert len(term_contracts) == 2
+    assert exposure.contract_count == 2
+    assert hedge_plan.rebalance_required is True
+    assert hedge_plan.hedge_units == pytest.approx(-exposure.net_delta)
+    assert surface.dispersion_gap == pytest.approx(0.06)
+    assert surface.put_call_skew == pytest.approx(0.08)
+    assert surface.term_structure_slope == pytest.approx(-0.08)
 
 
 def test_normalized_child_output_contract_validates_and_serializes() -> None:

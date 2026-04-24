@@ -1279,6 +1279,148 @@ def require_volatility_mean_reversion_param(raw_alg_param, label):
     }
 
 
+def _require_options_surface_rows(value, label):
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{label} rows must be a non-empty list")
+    normalized_rows = []
+    for index, row in enumerate(value):
+        if not isinstance(row, dict):
+            raise ValueError(f"{label} rows[{index}] must be a dict")
+        normalized_row = dict(row)
+        symbol = normalized_row.get("symbol")
+        timestamp = normalized_row.get("ts")
+        if not isinstance(symbol, str) or symbol.strip() == "":
+            raise ValueError(f"{label} rows[{index}] symbol is required")
+        if not isinstance(timestamp, str) or timestamp.strip() == "":
+            raise ValueError(f"{label} rows[{index}] ts is required")
+        normalized_rows.append(normalized_row)
+    return normalized_rows
+
+
+def require_delta_neutral_volatility_trading_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "iv_rv_threshold", "min_gamma", "target_delta_band"],
+        label,
+    )
+    iv_rv_threshold = _require_non_negative_float_like(
+        normalized["iv_rv_threshold"], f"{label} iv_rv_threshold"
+    )
+    if iv_rv_threshold == 0.0:
+        raise ValueError(f"{label} iv_rv_threshold must be > 0")
+    return {
+        "rows": _require_options_surface_rows(normalized["rows"], label),
+        "iv_rv_threshold": iv_rv_threshold,
+        "min_gamma": _require_non_negative_float_like(
+            normalized["min_gamma"], f"{label} min_gamma"
+        ),
+        "target_delta_band": _require_non_negative_float_like(
+            normalized["target_delta_band"], f"{label} target_delta_band"
+        ),
+    }
+
+
+def require_gamma_scalping_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "rebalance_band", "min_gamma", "scalp_threshold"],
+        label,
+    )
+    rebalance_band = _require_non_negative_float_like(
+        normalized["rebalance_band"], f"{label} rebalance_band"
+    )
+    scalp_threshold = _require_non_negative_float_like(
+        normalized["scalp_threshold"], f"{label} scalp_threshold"
+    )
+    if scalp_threshold == 0.0:
+        raise ValueError(f"{label} scalp_threshold must be > 0")
+    return {
+        "rows": _require_options_surface_rows(normalized["rows"], label),
+        "rebalance_band": rebalance_band,
+        "min_gamma": _require_non_negative_float_like(
+            normalized["min_gamma"], f"{label} min_gamma"
+        ),
+        "scalp_threshold": scalp_threshold,
+    }
+
+
+def require_volatility_risk_premium_capture_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(normalized, ["rows", "premium_threshold", "policy"], label)
+    premium_threshold = _require_non_negative_float_like(
+        normalized["premium_threshold"], f"{label} premium_threshold"
+    )
+    if premium_threshold == 0.0:
+        raise ValueError(f"{label} premium_threshold must be > 0")
+    return {
+        "rows": _require_options_surface_rows(normalized["rows"], label),
+        "premium_threshold": premium_threshold,
+        "policy": _require_choice(
+            normalized["policy"],
+            f"{label} policy",
+            allowed={"short_vol", "long_vol", "balanced"},
+        ),
+    }
+
+
+def require_dispersion_trading_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(normalized, ["rows", "entry_threshold"], label)
+    entry_threshold = _require_non_negative_float_like(
+        normalized["entry_threshold"], f"{label} entry_threshold"
+    )
+    if entry_threshold == 0.0:
+        raise ValueError(f"{label} entry_threshold must be > 0")
+    return {
+        "rows": _require_options_surface_rows(normalized["rows"], label),
+        "entry_threshold": entry_threshold,
+    }
+
+
+def require_skew_trading_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(normalized, ["rows", "entry_threshold"], label)
+    entry_threshold = _require_non_negative_float_like(
+        normalized["entry_threshold"], f"{label} entry_threshold"
+    )
+    if entry_threshold == 0.0:
+        raise ValueError(f"{label} entry_threshold must be > 0")
+    return {
+        "rows": _require_options_surface_rows(normalized["rows"], label),
+        "entry_threshold": entry_threshold,
+    }
+
+
+def require_term_structure_trading_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(normalized, ["rows", "entry_threshold"], label)
+    entry_threshold = _require_non_negative_float_like(
+        normalized["entry_threshold"], f"{label} entry_threshold"
+    )
+    if entry_threshold == 0.0:
+        raise ValueError(f"{label} entry_threshold must be > 0")
+    return {
+        "rows": _require_options_surface_rows(normalized["rows"], label),
+        "entry_threshold": entry_threshold,
+    }
+
+
+def require_straddle_breakout_timing_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(normalized, ["rows", "move_threshold"], label)
+    move_threshold = _require_non_negative_float_like(
+        normalized["move_threshold"], f"{label} move_threshold"
+    )
+    if move_threshold == 0.0:
+        raise ValueError(f"{label} move_threshold must be > 0")
+    return {
+        "rows": _require_options_surface_rows(normalized["rows"], label),
+        "move_threshold": move_threshold,
+    }
+
+
 def require_support_resistance_bounce_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(

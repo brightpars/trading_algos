@@ -689,6 +689,92 @@ def _load_volatility_fixture_rows(name: str) -> list[dict[str, object]]:
     return parsed_rows
 
 
+def _build_options_surface_fixture_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "ts": "2025-01-02",
+            "symbol": "SPY",
+            "Close": 100.0,
+            "underlying_price": 100.0,
+            "realized_vol": 0.18,
+            "index_iv": 0.30,
+            "constituent_iv_avg": 0.36,
+            "short_term_iv": 0.34,
+            "long_term_iv": 0.26,
+            "put_25d_iv": 0.33,
+            "call_25d_iv": 0.25,
+            "expected_move": 0.06,
+            "priced_move": 0.02,
+            "call_delta": 0.48,
+            "put_delta": -0.45,
+            "call_gamma": 0.08,
+            "put_gamma": 0.07,
+            "call_vega": 0.11,
+            "put_vega": 0.10,
+            "put_25d_delta": -0.25,
+            "call_25d_delta": 0.25,
+            "put_25d_gamma": 0.05,
+            "call_25d_gamma": 0.04,
+            "put_25d_vega": 0.08,
+            "call_25d_vega": 0.07,
+        },
+        {
+            "ts": "2025-01-03",
+            "symbol": "SPY",
+            "Close": 101.0,
+            "underlying_price": 101.0,
+            "realized_vol": 0.32,
+            "index_iv": 0.20,
+            "constituent_iv_avg": 0.16,
+            "short_term_iv": 0.18,
+            "long_term_iv": 0.28,
+            "put_25d_iv": 0.18,
+            "call_25d_iv": 0.24,
+            "expected_move": 0.01,
+            "priced_move": 0.03,
+            "call_delta": 0.62,
+            "put_delta": -0.18,
+            "call_gamma": 0.03,
+            "put_gamma": 0.02,
+            "call_vega": 0.06,
+            "put_vega": 0.04,
+            "put_25d_delta": -0.22,
+            "call_25d_delta": 0.22,
+            "put_25d_gamma": 0.02,
+            "call_25d_gamma": 0.02,
+            "put_25d_vega": 0.03,
+            "call_25d_vega": 0.03,
+        },
+        {
+            "ts": "2025-01-06",
+            "symbol": "SPY",
+            "Close": 102.0,
+            "underlying_price": 102.0,
+            "realized_vol": 0.27,
+            "index_iv": 0.25,
+            "constituent_iv_avg": 0.24,
+            "short_term_iv": 0.24,
+            "long_term_iv": 0.24,
+            "put_25d_iv": 0.24,
+            "call_25d_iv": 0.24,
+            "expected_move": 0.02,
+            "priced_move": 0.02,
+            "call_delta": 0.50,
+            "put_delta": -0.50,
+            "call_gamma": 0.01,
+            "put_gamma": 0.01,
+            "call_vega": 0.02,
+            "put_vega": 0.02,
+            "put_25d_delta": -0.25,
+            "call_25d_delta": 0.25,
+            "put_25d_gamma": 0.01,
+            "call_25d_gamma": 0.01,
+            "put_25d_vega": 0.02,
+            "call_25d_vega": 0.02,
+        },
+    ]
+
+
 def _load_pattern_fixture_rows(name: str) -> list[dict[str, object]]:
     with (PATTERN_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
         rows = list(DictReader(handle))
@@ -12025,6 +12111,342 @@ def test_volatility_wave_1_registration_metadata_matches_manifest_contract() -> 
         assert spec.subcategory == subcategory
         assert spec.warmup_period == warmup_period
         assert spec.output_modes == ("signal", "score", "confidence")
+
+
+@pytest.mark.parametrize(
+    (
+        "alg_key",
+        "catalog_ref",
+        "alg_param",
+        "expected_reason_code",
+        "expected_latest_reason_code",
+    ),
+    [
+        (
+            "delta_neutral_volatility_trading",
+            "algorithm:55",
+            {
+                "rows": _build_options_surface_fixture_rows(),
+                "iv_rv_threshold": 0.05,
+                "min_gamma": 0.10,
+                "target_delta_band": 0.1,
+            },
+            "delta_rehedge_required",
+            "insufficient_gamma",
+        ),
+        (
+            "gamma_scalping",
+            "algorithm:56",
+            {
+                "rows": _build_options_surface_fixture_rows(),
+                "rebalance_band": 0.1,
+                "min_gamma": 0.04,
+                "scalp_threshold": 0.01,
+            },
+            "gamma_scalping_rehedge",
+            "gamma_too_low",
+        ),
+        (
+            "volatility_risk_premium_capture",
+            "algorithm:57",
+            {
+                "rows": _build_options_surface_fixture_rows(),
+                "premium_threshold": 0.05,
+                "policy": "short_vol",
+            },
+            "premium_long_vol_filtered",
+            "premium_inside_band",
+        ),
+        (
+            "dispersion_trading",
+            "algorithm:58",
+            {"rows": _build_options_surface_fixture_rows(), "entry_threshold": 0.02},
+            "dispersion_long_index_vol",
+            "dispersion_neutral",
+        ),
+        (
+            "skew_trading",
+            "algorithm:59",
+            {"rows": _build_options_surface_fixture_rows(), "entry_threshold": 0.02},
+            "skew_long_put_richness",
+            "skew_neutral",
+        ),
+        (
+            "term_structure_trading",
+            "algorithm:60",
+            {"rows": _build_options_surface_fixture_rows(), "entry_threshold": 0.02},
+            "term_structure_short_front",
+            "term_structure_neutral",
+        ),
+        (
+            "straddle_breakout_timing",
+            "algorithm:61",
+            {"rows": _build_options_surface_fixture_rows(), "move_threshold": 0.01},
+            "straddle_timing_wait",
+            "straddle_timing_wait",
+        ),
+    ],
+)
+def test_volatility_wave_2_normalized_output_metadata_exposes_dashboard_contract_fields(
+    tmp_path,
+    alg_key,
+    catalog_ref,
+    alg_param,
+    expected_reason_code,
+    expected_latest_reason_code,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "SPY",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.metadata["family"] == "volatility_options"
+    assert output.metadata["reporting_mode"] == "options_trace"
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert output.metadata["warmup_period"] == algorithm.minimum_history()
+    assert child_output.diagnostics["family"] == "volatility_options"
+    assert child_output.diagnostics["reporting_mode"] == "options_trace"
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert child_output.diagnostics["warmup_ready"] is True
+    assert any(expected_reason_code in point.reason_codes for point in output.points)
+    assert expected_latest_reason_code in child_output.diagnostics["reason_codes"]
+    assert {
+        "net_delta",
+        "hedge_units",
+        "net_gamma",
+        "net_vega",
+        "average_implied_vol",
+        "iv_rv_gap",
+        "dispersion_gap",
+        "put_call_skew",
+        "term_structure_slope",
+        "expected_move_gap",
+        "reason_codes",
+    }.issubset(output.derived_series)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "delta_neutral_volatility_trading",
+            {
+                "rows": _build_options_surface_fixture_rows()[:1],
+                "iv_rv_threshold": 0.05,
+                "min_gamma": 0.0,
+                "target_delta_band": 0.1,
+            },
+        ),
+        (
+            "gamma_scalping",
+            {
+                "rows": _build_options_surface_fixture_rows()[:1],
+                "rebalance_band": 0.1,
+                "min_gamma": 0.0,
+                "scalp_threshold": 0.01,
+            },
+        ),
+        (
+            "volatility_risk_premium_capture",
+            {
+                "rows": _build_options_surface_fixture_rows()[:1],
+                "premium_threshold": 0.05,
+                "policy": "short_vol",
+            },
+        ),
+        (
+            "dispersion_trading",
+            {
+                "rows": _build_options_surface_fixture_rows()[:1],
+                "entry_threshold": 0.02,
+            },
+        ),
+        (
+            "skew_trading",
+            {
+                "rows": _build_options_surface_fixture_rows()[:1],
+                "entry_threshold": 0.02,
+            },
+        ),
+        (
+            "term_structure_trading",
+            {
+                "rows": _build_options_surface_fixture_rows()[:1],
+                "entry_threshold": 0.02,
+            },
+        ),
+        (
+            "straddle_breakout_timing",
+            {"rows": _build_options_surface_fixture_rows()[:1], "move_threshold": 0.01},
+        ),
+    ],
+)
+def test_volatility_wave_2_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "SPY",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == 2
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert all("warmup_pending" in point.reason_codes for point in output.points)
+
+
+def test_volatility_wave_2_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="iv_rv_threshold must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "SPY",
+                "alg_key": "delta_neutral_volatility_trading",
+                "alg_param": {
+                    "rows": _build_options_surface_fixture_rows(),
+                    "iv_rv_threshold": 0.0,
+                    "min_gamma": 0.0,
+                    "target_delta_band": 0.1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="policy must be one of"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "SPY",
+                "alg_key": "volatility_risk_premium_capture",
+                "alg_param": {
+                    "rows": _build_options_surface_fixture_rows(),
+                    "premium_threshold": 0.05,
+                    "policy": "bad_policy",
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match=r"rows\[0\] symbol is required"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "SPY",
+                "alg_key": "straddle_breakout_timing",
+                "alg_param": {
+                    "rows": [{"ts": "2025-01-02"}],
+                    "move_threshold": 0.01,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_volatility_wave_2_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = _build_options_surface_fixture_rows() * 300
+    algorithms = [
+        (
+            "delta_neutral_volatility_trading",
+            {
+                "rows": rows,
+                "iv_rv_threshold": 0.05,
+                "min_gamma": 0.0,
+                "target_delta_band": 0.1,
+            },
+        ),
+        (
+            "gamma_scalping",
+            {
+                "rows": rows,
+                "rebalance_band": 0.1,
+                "min_gamma": 0.0,
+                "scalp_threshold": 0.01,
+            },
+        ),
+        (
+            "volatility_risk_premium_capture",
+            {"rows": rows, "premium_threshold": 0.05, "policy": "short_vol"},
+        ),
+        ("dispersion_trading", {"rows": rows, "entry_threshold": 0.02}),
+        ("skew_trading", {"rows": rows, "entry_threshold": 0.02}),
+        ("term_structure_trading", {"rows": rows, "entry_threshold": 0.02}),
+        ("straddle_breakout_timing", {"rows": rows, "move_threshold": 0.01}),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "SPY",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / f"wave2_{index}"),
+        )
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "options_trace"
+
+
+def test_volatility_wave_2_registration_metadata_matches_manifest_contract() -> None:
+    expected = {
+        "delta_neutral_volatility_trading": (
+            "algorithm:55",
+            "volatility_options",
+            "delta",
+            2,
+        ),
+        "gamma_scalping": ("algorithm:56", "volatility_options", "gamma", 2),
+        "volatility_risk_premium_capture": (
+            "algorithm:57",
+            "volatility_options",
+            "volatility",
+            2,
+        ),
+        "dispersion_trading": ("algorithm:58", "volatility_options", "dispersion", 2),
+        "skew_trading": ("algorithm:59", "volatility_options", "skew", 2),
+        "term_structure_trading": ("algorithm:60", "volatility_options", "term", 2),
+        "straddle_breakout_timing": (
+            "algorithm:61",
+            "volatility_options",
+            "straddle",
+            2,
+        ),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.output_modes == (
+            "volatility_position",
+            "greek_diagnostics",
+            "diagnostics",
+        )
 
 
 @pytest.mark.parametrize(

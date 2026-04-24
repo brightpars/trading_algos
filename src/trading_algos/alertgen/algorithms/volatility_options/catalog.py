@@ -2,16 +2,44 @@ from trading_algos.algorithmspec import AlertAlgorithmSpec, register_algorithm
 from trading_algos.alertgen.algorithms.volatility_options.atr_channel_breakout import (
     ATRChannelBreakoutAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.volatility_options.delta_neutral_volatility_trading import (
+    build_delta_neutral_volatility_trading_algorithm,
+)
+from trading_algos.alertgen.algorithms.volatility_options.dispersion_trading import (
+    build_dispersion_trading_algorithm,
+)
+from trading_algos.alertgen.algorithms.volatility_options.gamma_scalping import (
+    build_gamma_scalping_algorithm,
+)
+from trading_algos.alertgen.algorithms.volatility_options.skew_trading import (
+    build_skew_trading_algorithm,
+)
+from trading_algos.alertgen.algorithms.volatility_options.straddle_breakout_timing import (
+    build_straddle_breakout_timing_algorithm,
+)
+from trading_algos.alertgen.algorithms.volatility_options.term_structure_trading import (
+    build_term_structure_trading_algorithm,
+)
 from trading_algos.alertgen.algorithms.volatility_options.volatility_breakout import (
     VolatilityBreakoutAlertAlgorithm,
 )
 from trading_algos.alertgen.algorithms.volatility_options.volatility_mean_reversion import (
     VolatilityMeanReversionAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.volatility_options.volatility_risk_premium_capture import (
+    build_volatility_risk_premium_capture_algorithm,
+)
 from trading_algos.alertgen.core.validation import (
+    require_delta_neutral_volatility_trading_param,
+    require_dispersion_trading_param,
+    require_gamma_scalping_param,
+    require_skew_trading_param,
+    require_straddle_breakout_timing_param,
+    require_term_structure_trading_param,
     require_atr_channel_breakout_param,
     require_volatility_breakout_param,
     require_volatility_mean_reversion_param,
+    require_volatility_risk_premium_capture_param,
 )
 
 
@@ -241,6 +269,161 @@ def register_volatility_options_alert_algorithms() -> None:
             subcategory="volatility",
             warmup_period=13,
             output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="delta_neutral_volatility_trading",
+            name="Delta-Neutral Volatility Trading",
+            catalog_ref="algorithm:55",
+            builder=build_delta_neutral_volatility_trading_algorithm,
+            default_param={
+                "rows": [],
+                "iv_rv_threshold": 0.05,
+                "min_gamma": 0.0,
+                "target_delta_band": 0.1,
+            },
+            param_normalizer=require_delta_neutral_volatility_trading_param,
+            description="Trade IV-RV dislocations while targeting delta neutrality and tracking hedge demand.",
+            param_schema=(
+                {"key": "rows", "label": "Options rows", "type": "array", "required": True, "description": "Options-surface input rows with symbol and ts fields."},
+                {"key": "iv_rv_threshold", "label": "IV-RV threshold", "type": "number", "required": True, "minimum": 0.0, "description": "Absolute IV minus realized-volatility gap required to activate a trade."},
+                {"key": "min_gamma", "label": "Minimum gamma", "type": "number", "required": True, "minimum": 0.0, "description": "Minimum net gamma required for the selected option structure."},
+                {"key": "target_delta_band", "label": "Target delta band", "type": "number", "required": True, "minimum": 0.0, "description": "Maximum absolute net delta allowed before re-hedging is required."},
+            ),
+            tags=("options", "volatility", "delta-neutral"),
+            category="volatility_options",
+            family="volatility_options",
+            subcategory="delta",
+            warmup_period=2,
+            input_domains=("options_chain", "underlying_price_series"),
+            output_modes=("volatility_position", "greek_diagnostics", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="gamma_scalping",
+            name="Gamma Scalping",
+            catalog_ref="algorithm:56",
+            builder=build_gamma_scalping_algorithm,
+            default_param={
+                "rows": [],
+                "rebalance_band": 0.1,
+                "min_gamma": 0.0,
+                "scalp_threshold": 0.01,
+            },
+            param_normalizer=require_gamma_scalping_param,
+            description="Trigger hedge actions when a gamma-rich position drifts outside its delta band on large expected moves.",
+            param_schema=(
+                {"key": "rows", "label": "Options rows", "type": "array", "required": True, "description": "Options-surface input rows with symbol and ts fields."},
+                {"key": "rebalance_band", "label": "Rebalance band", "type": "number", "required": True, "minimum": 0.0, "description": "Absolute delta band tolerated before a hedge rebalance is flagged."},
+                {"key": "min_gamma", "label": "Minimum gamma", "type": "number", "required": True, "minimum": 0.0, "description": "Minimum gamma required before scalping signals are considered valid."},
+                {"key": "scalp_threshold", "label": "Scalp threshold", "type": "number", "required": True, "minimum": 0.0, "description": "Minimum expected-versus-priced move gap required before re-hedging is worthwhile."},
+            ),
+            tags=("options", "gamma", "scalping"),
+            category="volatility_options",
+            family="volatility_options",
+            subcategory="gamma",
+            warmup_period=2,
+            input_domains=("options_chain", "underlying_price_series"),
+            output_modes=("volatility_position", "greek_diagnostics", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="volatility_risk_premium_capture",
+            name="Volatility Risk Premium Capture",
+            catalog_ref="algorithm:57",
+            builder=build_volatility_risk_premium_capture_algorithm,
+            default_param={"rows": [], "premium_threshold": 0.05, "policy": "short_vol"},
+            param_normalizer=require_volatility_risk_premium_capture_param,
+            description="Express long- or short-volatility positions from the implied-versus-realized volatility gap.",
+            param_schema=(
+                {"key": "rows", "label": "Options rows", "type": "array", "required": True, "description": "Options-surface input rows with symbol and ts fields."},
+                {"key": "premium_threshold", "label": "Premium threshold", "type": "number", "required": True, "minimum": 0.0, "description": "Absolute IV-RV premium required before taking a volatility stance."},
+                {"key": "policy", "label": "Policy", "type": "string", "required": True, "description": "Preferred policy for mapping the premium into long-vol or short-vol actions."},
+            ),
+            tags=("options", "volatility", "premium"),
+            category="volatility_options",
+            family="volatility_options",
+            subcategory="volatility",
+            warmup_period=2,
+            input_domains=("options_chain", "underlying_price_series"),
+            output_modes=("volatility_position", "greek_diagnostics", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="dispersion_trading",
+            name="Dispersion Trading",
+            catalog_ref="algorithm:58",
+            builder=build_dispersion_trading_algorithm,
+            default_param={"rows": [], "entry_threshold": 0.02},
+            param_normalizer=require_dispersion_trading_param,
+            description="Compare index implied volatility with constituent-implied volatility to express a dispersion view.",
+            param_schema=(
+                {"key": "rows", "label": "Options rows", "type": "array", "required": True, "description": "Options-surface input rows with symbol and ts fields."},
+                {"key": "entry_threshold", "label": "Entry threshold", "type": "number", "required": True, "minimum": 0.0, "description": "Minimum dispersion gap magnitude required before a trade is signaled."},
+            ),
+            tags=("options", "dispersion", "correlation"),
+            category="volatility_options",
+            family="volatility_options",
+            subcategory="dispersion",
+            warmup_period=2,
+            input_domains=("options_chain", "underlying_price_series"),
+            output_modes=("volatility_position", "greek_diagnostics", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="skew_trading",
+            name="Skew Trading",
+            catalog_ref="algorithm:59",
+            builder=build_skew_trading_algorithm,
+            default_param={"rows": [], "entry_threshold": 0.02},
+            param_normalizer=require_skew_trading_param,
+            description="Trade relative richness in downside versus upside implied volatility.",
+            param_schema=(
+                {"key": "rows", "label": "Options rows", "type": "array", "required": True, "description": "Options-surface input rows with symbol and ts fields."},
+                {"key": "entry_threshold", "label": "Entry threshold", "type": "number", "required": True, "minimum": 0.0, "description": "Minimum skew magnitude required before a skew trade is signaled."},
+            ),
+            tags=("options", "skew", "surface"),
+            category="volatility_options",
+            family="volatility_options",
+            subcategory="skew",
+            warmup_period=2,
+            input_domains=("options_chain", "underlying_price_series"),
+            output_modes=("volatility_position", "greek_diagnostics", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="term_structure_trading",
+            name="Term Structure Trading",
+            catalog_ref="algorithm:60",
+            builder=build_term_structure_trading_algorithm,
+            default_param={"rows": [], "entry_threshold": 0.02},
+            param_normalizer=require_term_structure_trading_param,
+            description="Trade unusually steep, flat, or inverted implied-volatility term structures.",
+            param_schema=(
+                {"key": "rows", "label": "Options rows", "type": "array", "required": True, "description": "Options-surface input rows with symbol and ts fields."},
+                {"key": "entry_threshold", "label": "Entry threshold", "type": "number", "required": True, "minimum": 0.0, "description": "Minimum term-structure slope magnitude required before a trade is signaled."},
+            ),
+            tags=("options", "term-structure", "surface"),
+            category="volatility_options",
+            family="volatility_options",
+            subcategory="term",
+            warmup_period=2,
+            input_domains=("options_chain", "underlying_price_series"),
+            output_modes=("volatility_position", "greek_diagnostics", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="straddle_breakout_timing",
+            name="Straddle Breakout Timing",
+            catalog_ref="algorithm:61",
+            builder=build_straddle_breakout_timing_algorithm,
+            default_param={"rows": [], "move_threshold": 0.01},
+            param_normalizer=require_straddle_breakout_timing_param,
+            description="Time long-volatility straddle entries when expected movement exceeds priced movement.",
+            param_schema=(
+                {"key": "rows", "label": "Options rows", "type": "array", "required": True, "description": "Options-surface input rows with symbol and ts fields."},
+                {"key": "move_threshold", "label": "Move threshold", "type": "number", "required": True, "minimum": 0.0, "description": "Minimum expected-versus-priced move gap required before buying volatility."},
+            ),
+            tags=("options", "straddle", "breakout"),
+            category="volatility_options",
+            family="volatility_options",
+            subcategory="straddle",
+            warmup_period=2,
+            input_domains=("options_chain", "underlying_price_series"),
+            output_modes=("volatility_position", "greek_diagnostics", "diagnostics"),
         ),
     ]
     for spec in specs:
