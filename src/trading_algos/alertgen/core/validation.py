@@ -1145,6 +1145,120 @@ def require_volatility_mean_reversion_param(raw_alg_param, label):
     }
 
 
+def require_support_resistance_bounce_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "level_window",
+            "touch_tolerance",
+            "rejection_min_close_delta",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    return {
+        "level_window": _require_positive_int_like(
+            normalized["level_window"], f"{label} level_window"
+        ),
+        "touch_tolerance": _require_non_negative_float_like(
+            normalized["touch_tolerance"], f"{label} touch_tolerance"
+        ),
+        "rejection_min_close_delta": _require_non_negative_float_like(
+            normalized["rejection_min_close_delta"],
+            f"{label} rejection_min_close_delta",
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_breakout_retest_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "breakout_window",
+            "breakout_buffer",
+            "retest_tolerance",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    return {
+        "breakout_window": _require_positive_int_like(
+            normalized["breakout_window"], f"{label} breakout_window"
+        ),
+        "breakout_buffer": _require_non_negative_float_like(
+            normalized["breakout_buffer"], f"{label} breakout_buffer"
+        ),
+        "retest_tolerance": _require_non_negative_float_like(
+            normalized["retest_tolerance"], f"{label} retest_tolerance"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_pivot_point_strategy_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["pivot_lookback", "level_tolerance", "confirmation_bars"],
+        label,
+    )
+    return {
+        "pivot_lookback": _require_positive_int_like(
+            normalized["pivot_lookback"], f"{label} pivot_lookback"
+        ),
+        "level_tolerance": _require_non_negative_float_like(
+            normalized["level_tolerance"], f"{label} level_tolerance"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_opening_range_breakout_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["opening_range_minutes", "breakout_buffer", "confirmation_bars"],
+        label,
+    )
+    return {
+        "opening_range_minutes": _require_positive_int_like(
+            normalized["opening_range_minutes"], f"{label} opening_range_minutes"
+        ),
+        "breakout_buffer": _require_non_negative_float_like(
+            normalized["breakout_buffer"], f"{label} breakout_buffer"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_inside_bar_breakout_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["breakout_buffer", "confirmation_bars"],
+        label,
+    )
+    return {
+        "breakout_buffer": _require_non_negative_float_like(
+            normalized["breakout_buffer"], f"{label} breakout_buffer"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def _require_rows_param(raw_rows, label):
     if not isinstance(raw_rows, list):
         raise ValueError(f"{label} rows must be a list")

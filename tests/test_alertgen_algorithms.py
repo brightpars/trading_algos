@@ -40,6 +40,7 @@ MEAN_REVERSION_FIXTURES_ROOT = (
     Path(__file__).resolve().parent / "fixtures" / "mean_reversion"
 )
 VOLATILITY_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "volatility"
+PATTERN_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "patterns"
 COMPOSITE_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "composite"
 
 
@@ -101,6 +102,24 @@ def _load_mean_reversion_fixture_rows(name: str) -> list[dict[str, object]]:
 
 def _load_volatility_fixture_rows(name: str) -> list[dict[str, object]]:
     with (VOLATILITY_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
+        rows = list(DictReader(handle))
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed_rows.append(
+            {
+                "ts": row["ts"],
+                "Open": float(row["Open"]),
+                "High": float(row["High"]),
+                "Low": float(row["Low"]),
+                "Close": float(row["Close"]),
+                "Volume": float(row["Volume"]),
+            }
+        )
+    return parsed_rows
+
+
+def _load_pattern_fixture_rows(name: str) -> list[dict[str, object]]:
+    with (PATTERN_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
         rows = list(DictReader(handle))
     parsed_rows: list[dict[str, object]] = []
     for row in rows:
@@ -202,6 +221,11 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "cci_momentum",
         "kst_know_sure_thing",
         "volume_confirmed_momentum",
+        "support_resistance_bounce",
+        "breakout_retest",
+        "pivot_point_strategy",
+        "opening_range_breakout",
+        "inside_bar_breakout",
         "z_score_mean_reversion",
         "bollinger_bands_reversion",
         "rsi_reversion",
@@ -3335,6 +3359,423 @@ def test_momentum_wave_2_performance_smoke_on_fixture_repetition(tmp_path) -> No
         assert len(output.points) == len(rows)
         assert output.metadata["warmup_period"] == algorithm.minimum_history()
         assert "trend_score" in output.derived_series
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "support_resistance_bounce",
+            {
+                "level_window": 5,
+                "touch_tolerance": 0.3,
+                "rejection_min_close_delta": 0.2,
+                "confirmation_bars": 1,
+            },
+            6,
+        ),
+        (
+            "breakout_retest",
+            {
+                "breakout_window": 5,
+                "breakout_buffer": 0.2,
+                "retest_tolerance": 0.3,
+                "confirmation_bars": 1,
+            },
+            7,
+        ),
+        (
+            "pivot_point_strategy",
+            {
+                "pivot_lookback": 3,
+                "level_tolerance": 0.4,
+                "confirmation_bars": 1,
+            },
+            4,
+        ),
+        (
+            "opening_range_breakout",
+            {
+                "opening_range_minutes": 15,
+                "breakout_buffer": 0.2,
+                "confirmation_bars": 1,
+            },
+            2,
+        ),
+        (
+            "inside_bar_breakout",
+            {
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+            3,
+        ),
+    ],
+)
+def test_pattern_wave_1_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    fixture_name = (
+        "opening_range_breakout.csv"
+        if alg_key == "opening_range_breakout"
+        else "support_rejection.csv"
+    )
+    algorithm.process_list(
+        _load_pattern_fixture_rows(fixture_name)[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    expected_pending_code = (
+        "opening_range_pending"
+        if alg_key == "opening_range_breakout"
+        else "warmup_pending"
+    )
+    assert any(expected_pending_code in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "fixture_name", "expected_reason_code", "expected_keys"),
+    [
+        (
+            "support_resistance_bounce",
+            {
+                "level_window": 5,
+                "touch_tolerance": 0.3,
+                "rejection_min_close_delta": 0.2,
+                "confirmation_bars": 1,
+            },
+            "support_rejection.csv",
+            "support_rejection_bullish",
+            {
+                "level_window",
+                "touch_tolerance",
+                "rejection_min_close_delta",
+                "support_level",
+            },
+        ),
+        (
+            "breakout_retest",
+            {
+                "breakout_window": 5,
+                "breakout_buffer": 0.2,
+                "retest_tolerance": 0.3,
+                "confirmation_bars": 1,
+            },
+            "support_rejection.csv",
+            "awaiting_breakout",
+            {
+                "breakout_window",
+                "breakout_buffer",
+                "retest_tolerance",
+                "breakout_level",
+            },
+        ),
+        (
+            "pivot_point_strategy",
+            {
+                "pivot_lookback": 3,
+                "level_tolerance": 0.4,
+                "confirmation_bars": 1,
+            },
+            "support_rejection.csv",
+            "pivot_not_supportive",
+            {"pivot_lookback", "level_tolerance", "pivot_level", "pivot_level_name"},
+        ),
+        (
+            "opening_range_breakout",
+            {
+                "opening_range_minutes": 15,
+                "breakout_buffer": 0.2,
+                "confirmation_bars": 1,
+            },
+            "opening_range_breakout.csv",
+            "opening_range_breakout_bullish",
+            {
+                "opening_range_minutes",
+                "breakout_buffer",
+                "opening_range_high",
+                "opening_range_complete",
+            },
+        ),
+        (
+            "inside_bar_breakout",
+            {
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+            "support_rejection.csv",
+            "inside_bar_not_detected",
+            {"breakout_buffer", "mother_high", "mother_low", "inside_bar_detected"},
+        ),
+    ],
+)
+def test_pattern_wave_1_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, fixture_name, expected_reason_code, expected_keys
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_pattern_fixture_rows(fixture_name))
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert any(expected_reason_code in point.reason_codes for point in output.points)
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+        "threshold_value",
+        "confirmation_state_label",
+        "warmup_ready",
+    }.issubset(output.derived_series)
+    assert child_output.diagnostics["family"] == "pattern_price_action"
+    assert child_output.diagnostics["reporting_mode"] == "bar_series"
+    assert expected_keys.issubset(child_output.diagnostics.keys())
+    assert child_output.signal_label in {"buy", "neutral"}
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+
+
+def test_pattern_wave_1_fixture_behavior_matches_manifest_expectations(
+    tmp_path,
+) -> None:
+    support_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "support_resistance_bounce",
+            "alg_param": {
+                "level_window": 5,
+                "touch_tolerance": 0.3,
+                "rejection_min_close_delta": 0.2,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "support"),
+    )
+    support_algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    support_output = support_algorithm.normalized_output()
+
+    touch_indices = [
+        index
+        for index, value in enumerate(support_output.derived_series["support_touched"])
+        if value
+    ]
+    buy_indices = [
+        index
+        for index, point in enumerate(support_output.points)
+        if point.signal_label == "buy"
+    ]
+    assert touch_indices
+    assert buy_indices
+    assert min(touch_indices) <= min(buy_indices)
+
+    orb_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "opening_range_breakout",
+            "alg_param": {
+                "opening_range_minutes": 15,
+                "breakout_buffer": 0.2,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "orb"),
+    )
+    orb_algorithm.process_list(_load_pattern_fixture_rows("opening_range_breakout.csv"))
+    orb_output = orb_algorithm.normalized_output()
+    orb_buy_indices = [
+        index
+        for index, point in enumerate(orb_output.points)
+        if point.signal_label == "buy"
+    ]
+    complete_indices = [
+        index
+        for index, value in enumerate(
+            orb_output.derived_series["opening_range_complete"]
+        )
+        if value
+    ]
+    assert complete_indices
+    assert orb_buy_indices
+    assert min(orb_buy_indices) >= min(complete_indices)
+
+
+def test_pattern_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="level_window must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "support_resistance_bounce",
+                "alg_param": {
+                    "level_window": 0,
+                    "touch_tolerance": 0.3,
+                    "rejection_min_close_delta": 0.2,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="breakout_buffer must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "breakout_retest",
+                "alg_param": {
+                    "breakout_window": 5,
+                    "breakout_buffer": -0.1,
+                    "retest_tolerance": 0.3,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="opening_range_minutes must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "opening_range_breakout",
+                "alg_param": {
+                    "opening_range_minutes": 0,
+                    "breakout_buffer": 0.2,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_pattern_wave_1_registration_metadata_matches_manifest_contract() -> None:
+    expected = {
+        "support_resistance_bounce": (
+            "algorithm:70",
+            "pattern_price_action",
+            "support_resistance",
+            6,
+        ),
+        "breakout_retest": ("algorithm:71", "pattern_price_action", "breakout", 7),
+        "pivot_point_strategy": ("algorithm:72", "pattern_price_action", "pivot", 4),
+        "opening_range_breakout": (
+            "algorithm:73",
+            "pattern_price_action",
+            "opening",
+            2,
+        ),
+        "inside_bar_breakout": ("algorithm:74", "pattern_price_action", "inside", 3),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.output_modes == ("signal", "score", "confidence")
+
+
+def test_pattern_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    support_rows = _load_pattern_fixture_rows("support_rejection.csv") * 300
+    opening_rows = _load_pattern_fixture_rows("opening_range_breakout.csv") * 300
+    algorithms = [
+        (
+            "support_resistance_bounce",
+            {
+                "level_window": 5,
+                "touch_tolerance": 0.3,
+                "rejection_min_close_delta": 0.2,
+                "confirmation_bars": 1,
+            },
+            support_rows,
+        ),
+        (
+            "breakout_retest",
+            {
+                "breakout_window": 5,
+                "breakout_buffer": 0.2,
+                "retest_tolerance": 0.3,
+                "confirmation_bars": 1,
+            },
+            support_rows,
+        ),
+        (
+            "pivot_point_strategy",
+            {
+                "pivot_lookback": 3,
+                "level_tolerance": 0.4,
+                "confirmation_bars": 1,
+            },
+            support_rows,
+        ),
+        (
+            "opening_range_breakout",
+            {
+                "opening_range_minutes": 15,
+                "breakout_buffer": 0.2,
+                "confirmation_bars": 1,
+            },
+            opening_rows,
+        ),
+        (
+            "inside_bar_breakout",
+            {
+                "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+            support_rows,
+        ),
+    ]
+
+    for index, (alg_key, alg_param, rows) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "bar_series"
 
 
 def test_momentum_wave_2_volume_confirmation_missing_stays_neutral_with_explanatory_reason(
