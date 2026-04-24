@@ -120,10 +120,14 @@ fixtures:
   domain: fundamentals_pti
   purpose: Monthly factor rebalance with point-in-time accounting inputs.
   inputs:
-    dataset_path: tests/fixtures/factors/monthly_rebalance.parquet
+    dataset_path: tests/fixtures/factors/monthly_rebalance.csv
   expected_behaviors:
   - Factor scores are reproducible under point-in-time data
   - Rebalance output is generated only on scheduled dates
+  - Low-volatility and low-beta variants prefer AAA on the first monthly rebalance and BBB on the second monthly rebalance
+  - Dividend yield prefers CCC across both monthly rebalances while growth and liquidity rotate from AAA to BBB
+  - Normalized outputs expose selected symbols, weights, ranking details, selection strength, exposure counts, and top-ranked diagnostics for dashboard explanation
+  - Short-history evaluations remain neutral with warmup_pending reason codes until minimum universe size is met
 - fixture_id: fixture.event_earnings_after_close_v1
   domain: event_calendar
   purpose: Earnings event arriving after close and traded next valid window.

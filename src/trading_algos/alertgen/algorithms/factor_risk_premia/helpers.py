@@ -87,6 +87,10 @@ def _rank_factor_scores(
     return tuple(ranking), selected_symbols, weights
 
 
+def _clamp_unit_interval(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
 def evaluate_factor_strategy(
     panel: MultiAssetPanel,
     *,
@@ -128,6 +132,13 @@ def evaluate_factor_strategy(
         weights: dict[str, float] = {}
         selection_reason = "selection_ready"
         normalized_scores: dict[str, float] = {}
+        selection_strength = 0.0
+        top_ranked_symbol: str | None = None
+        top_ranked_score: float | None = None
+        gross_exposure = 0.0
+        net_exposure = 0.0
+        long_count = 0
+        short_count = 0
         if scored_universe_size < minimum_universe_size:
             selection_reason = "warmup_pending"
         else:
@@ -141,6 +152,22 @@ def evaluate_factor_strategy(
                 bottom_n=bottom_n,
                 long_only=long_only,
             )
+            if ranking:
+                top_ranked_symbol = ranking[0].symbol
+                top_ranked_score = ranking[0].score
+                score_values = [asset.score for asset in ranking]
+                min_score = min(score_values)
+                max_score = max(score_values)
+                if max_score > min_score and top_ranked_score is not None:
+                    selection_strength = _clamp_unit_interval(
+                        (top_ranked_score - min_score) / (max_score - min_score)
+                    )
+                elif selected_symbols:
+                    selection_strength = 1.0
+            gross_exposure = sum(abs(weight) for weight in weights.values())
+            net_exposure = sum(weights.values())
+            long_count = sum(1 for weight in weights.values() if weight > 0.0)
+            short_count = sum(1 for weight in weights.values() if weight < 0.0)
             if not selected_symbols:
                 selection_reason = "no_selection"
 
@@ -155,7 +182,14 @@ def evaluate_factor_strategy(
             "warmup_pending_symbols": tuple(sorted(missing_metric_symbols)),
             "warmup_ready": scored_universe_size >= minimum_universe_size,
             "selection_reason": selection_reason,
+            "selection_strength": selection_strength,
             "selected_count": len(selected_symbols),
+            "long_count": long_count,
+            "short_count": short_count,
+            "gross_exposure": gross_exposure,
+            "net_exposure": net_exposure,
+            "top_ranked_symbol": top_ranked_symbol,
+            "top_ranked_score": top_ranked_score,
             "raw_scores": raw_scores,
             "normalized_scores": normalized_scores,
         }

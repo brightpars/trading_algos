@@ -42,6 +42,7 @@ MEAN_REVERSION_FIXTURES_ROOT = (
 VOLATILITY_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "volatility"
 PATTERN_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "patterns"
 COMPOSITE_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "composite"
+FACTOR_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "factors"
 
 
 def _build_factor_fixture_rows() -> list[dict[str, object]]:
@@ -107,6 +108,98 @@ def _build_factor_fixture_rows() -> list[dict[str, object]]:
             "turnover_ratio": 0.40,
         },
     ]
+
+
+def _build_factor_fixture_rows_with_multiple_rebalances() -> list[dict[str, object]]:
+    january_rows = _build_factor_fixture_rows()
+    february_rows = [
+        {
+            "ts": "2025-02-03",
+            "symbol": "AAA",
+            "Close": 102.0,
+            "volatility_20d": 0.18,
+            "realized_volatility": 0.17,
+            "beta_252d": 1.10,
+            "market_beta": 1.08,
+            "dividend_yield": 0.022,
+            "forward_dividend_yield": 0.023,
+            "earnings_growth": 0.10,
+            "sales_growth": 0.09,
+            "liquidity_score": 0.68,
+            "turnover_ratio": 0.60,
+        },
+        {
+            "ts": "2025-02-03",
+            "symbol": "BBB",
+            "Close": 101.0,
+            "volatility_20d": 0.12,
+            "realized_volatility": 0.11,
+            "beta_252d": 0.86,
+            "market_beta": 0.88,
+            "dividend_yield": 0.035,
+            "forward_dividend_yield": 0.036,
+            "earnings_growth": 0.20,
+            "sales_growth": 0.18,
+            "liquidity_score": 0.88,
+            "turnover_ratio": 0.79,
+        },
+        {
+            "ts": "2025-02-03",
+            "symbol": "CCC",
+            "Close": 103.0,
+            "volatility_20d": 0.15,
+            "realized_volatility": 0.16,
+            "beta_252d": 0.98,
+            "market_beta": 1.00,
+            "dividend_yield": 0.060,
+            "forward_dividend_yield": 0.059,
+            "earnings_growth": 0.16,
+            "sales_growth": 0.15,
+            "liquidity_score": 0.82,
+            "turnover_ratio": 0.74,
+        },
+        {
+            "ts": "2025-02-03",
+            "symbol": "DDD",
+            "Close": 98.0,
+            "volatility_20d": 0.26,
+            "realized_volatility": 0.25,
+            "beta_252d": 1.42,
+            "market_beta": 1.40,
+            "dividend_yield": 0.018,
+            "forward_dividend_yield": 0.019,
+            "earnings_growth": 0.06,
+            "sales_growth": 0.06,
+            "liquidity_score": 0.50,
+            "turnover_ratio": 0.43,
+        },
+    ]
+    return [*january_rows, *february_rows]
+
+
+def _load_factor_fixture_rows(name: str) -> list[dict[str, object]]:
+    with (FACTOR_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
+        rows = list(DictReader(handle))
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed_rows.append(
+            {
+                "ts": row["ts"],
+                "symbol": row["symbol"],
+                "Close": float(row["Close"]),
+                "volatility_20d": float(row["volatility_20d"]),
+                "realized_volatility": float(row["realized_volatility"]),
+                "beta_252d": float(row["beta_252d"]),
+                "market_beta": float(row["market_beta"]),
+                "dividend_yield": float(row["dividend_yield"]),
+                "forward_dividend_yield": float(row["forward_dividend_yield"]),
+                "earnings_growth": float(row["earnings_growth"]),
+                "sales_growth": float(row["sales_growth"]),
+                "liquidity_score": float(row["liquidity_score"]),
+                "turnover_ratio": float(row["turnover_ratio"]),
+            }
+        )
+    return parsed_rows
 
 
 def _load_fixture_rows(name: str) -> list[dict[str, object]]:
@@ -4969,11 +5062,34 @@ def test_factor_wave_1_registration_and_fixture_behavior(
     assert output.derived_series["top_symbol"][-1] == expected_top_symbol
     assert output.metadata["reporting_mode"] == "rebalance_report"
     assert output.metadata["family"] == "factor_risk_premia"
+    assert output.metadata["catalog_ref"] == expected_catalog_ref
     assert portfolio_output.metadata["catalog_ref"] == expected_catalog_ref
     assert portfolio_output.rebalances[-1].ranking[0].symbol == expected_top_symbol
+    assert (
+        portfolio_output.rebalances[-1].diagnostics["top_ranked_symbol"]
+        == expected_top_symbol
+    )
     assert child_output.diagnostics["catalog_ref"] == expected_catalog_ref
     assert child_output.diagnostics["family"] == "factor_risk_premia"
+    assert child_output.diagnostics["reporting_mode"] == "rebalance_report"
     assert child_output.diagnostics["selected_symbols"]
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert {
+        "selection_strength",
+        "gross_exposure",
+        "net_exposure",
+        "long_count",
+        "short_count",
+    }.issubset(output.derived_series)
+    assert output.derived_series["selection_strength"][-1] == pytest.approx(
+        child_output.diagnostics["selection_strength"]
+    )
+    assert output.derived_series["gross_exposure"][-1] == pytest.approx(1.0)
+    assert output.derived_series["net_exposure"][-1] == pytest.approx(1.0)
+    assert output.derived_series["long_count"][-1] == 2
+    assert output.derived_series["short_count"][-1] == 0
+    assert 0.0 <= output.points[-1].score <= 1.0
+    assert output.points[-1].confidence == output.points[-1].score
 
 
 def test_factor_wave_1_short_history_stays_neutral_until_minimum_universe_ready(
@@ -5005,7 +5121,13 @@ def test_factor_wave_1_short_history_stays_neutral_until_minimum_universe_ready(
     assert all(point.signal_label == "neutral" for point in output.points)
     assert output.points[-1].reason_codes == ("warmup_pending",)
     assert output.derived_series["warmup_ready"][-1] is False
+    assert output.derived_series["selection_strength"][-1] == pytest.approx(0.0)
     assert portfolio_output.rebalances[-1].selected_symbols == ()
+    assert (
+        portfolio_output.rebalances[-1].diagnostics["selection_reason"]
+        == "warmup_pending"
+    )
+    assert portfolio_output.rebalances[-1].diagnostics["missing_metric_symbols"] == ()
 
 
 def test_factor_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
@@ -5019,6 +5141,46 @@ def test_factor_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
                     "field_names": [],
                     "rebalance_frequency": "monthly",
                     "top_n": 2,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+    with pytest.raises(ValueError, match="minimum_universe_size must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "low_beta_betting_against_beta",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": ["beta_252d"],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 0,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+    with pytest.raises(
+        ValueError, match="rebalance_frequency must be one of: all, monthly, weekly"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "dividend_yield_strategy",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": ["dividend_yield"],
+                    "rebalance_frequency": "quarterly",
+                    "top_n": 2,
+                    "bottom_n": 0,
                     "long_only": True,
                     "minimum_universe_size": 2,
                 },
@@ -5045,6 +5207,231 @@ def test_factor_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
                 "sell": False,
             }
         )
+
+
+def test_factor_wave_1_fixture_behavior_matches_manifest_expectations(tmp_path) -> None:
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    algorithms = [
+        (
+            "low_volatility_strategy",
+            ["volatility_20d", "realized_volatility"],
+            "AAA",
+            "BBB",
+        ),
+        ("low_beta_betting_against_beta", ["beta_252d", "market_beta"], "AAA", "BBB"),
+        (
+            "dividend_yield_strategy",
+            ["dividend_yield", "forward_dividend_yield"],
+            "CCC",
+            "CCC",
+        ),
+        ("growth_factor_strategy", ["earnings_growth", "sales_growth"], "AAA", "BBB"),
+        (
+            "liquidity_factor_strategy",
+            ["liquidity_score", "turnover_ratio"],
+            "AAA",
+            "BBB",
+        ),
+    ]
+
+    for index, (
+        alg_key,
+        field_names,
+        expected_first_top,
+        expected_second_top,
+    ) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": rows,
+                    "field_names": field_names,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / f"fixture_{index}"),
+        )
+
+        output = algorithm.normalized_output()
+        portfolio_output = algorithm.portfolio_output()
+        payloads = algorithm.interactive_report_payloads()
+
+        assert [point.timestamp for point in output.points] == [
+            "2025-01-02",
+            "2025-02-03",
+        ]
+        assert [rebalance.timestamp for rebalance in portfolio_output.rebalances] == [
+            "2025-01-02",
+            "2025-02-03",
+        ]
+        assert [point.signal_label for point in output.points] == ["buy", "buy"]
+        assert output.derived_series["top_symbol"] == [
+            expected_first_top,
+            expected_second_top,
+        ]
+        assert output.derived_series["warmup_ready"] == [True, True]
+        assert all(
+            reason == "selection_ready"
+            for reason in output.derived_series["selection_reason"]
+        )
+        assert all(
+            count == 4 for count in output.derived_series["eligible_universe_size"]
+        )
+        assert all(
+            count == 4 for count in output.derived_series["scored_universe_size"]
+        )
+        assert all(
+            value == pytest.approx(1.0)
+            for value in output.derived_series["gross_exposure"]
+        )
+        assert all(
+            value == pytest.approx(1.0)
+            for value in output.derived_series["net_exposure"]
+        )
+        assert all(value == 2 for value in output.derived_series["long_count"])
+        assert all(value == 0 for value in output.derived_series["short_count"])
+        assert all(
+            0.0 <= value <= 1.0 for value in output.derived_series["selection_strength"]
+        )
+        assert (
+            payloads[0][0]["portfolio"]["rebalances"][-1]["diagnostics"][
+                "top_ranked_symbol"
+            ]
+            == expected_second_top
+        )
+        assert (
+            payloads[0][0]["data"]["metadata"]["reporting_mode"] == "rebalance_report"
+        )
+        assert (
+            payloads[0][0]["portfolio"]["metadata"]["reporting_mode"]
+            == "rebalance_report"
+        )
+        assert payloads[0][0]["data"]["derived_series"]["top_symbol"] == [
+            expected_first_top,
+            expected_second_top,
+        ]
+
+
+def test_factor_wave_1_fixture_behavior_exposes_dashboard_diagnostics_and_weight_contract(
+    tmp_path,
+) -> None:
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "low_volatility_strategy",
+            "alg_param": {
+                "rows": rows,
+                "field_names": ["volatility_20d", "realized_volatility"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+    latest_rebalance = portfolio_output.rebalances[-1]
+
+    assert output.summary_metrics == {"rebalance_count": 2, "selection_count": 2}
+    assert output.derived_series["selected_symbols"][-1] == ["BBB", "CCC"]
+    assert output.derived_series["selected_count"][-1] == 2
+    assert output.derived_series["weights"][-1] == {
+        "BBB": pytest.approx(0.5),
+        "CCC": pytest.approx(0.5),
+    }
+    assert latest_rebalance.weights == {
+        "BBB": pytest.approx(0.5),
+        "CCC": pytest.approx(0.5),
+    }
+    assert latest_rebalance.diagnostics["factor_name"] == "low_volatility"
+    assert latest_rebalance.diagnostics["field_names"] == (
+        "volatility_20d",
+        "realized_volatility",
+    )
+    assert latest_rebalance.diagnostics["top_ranked_symbol"] == "BBB"
+    assert latest_rebalance.diagnostics["top_ranked_score"] == pytest.approx(-0.115)
+    assert latest_rebalance.diagnostics["raw_scores"]["BBB"] == pytest.approx(0.115)
+    assert latest_rebalance.diagnostics["normalized_scores"]["BBB"] == pytest.approx(
+        -0.115
+    )
+    assert child_output.diagnostics["weights"] == {
+        "BBB": pytest.approx(0.5),
+        "CCC": pytest.approx(0.5),
+    }
+    assert child_output.diagnostics["selected_symbols"] == ["BBB", "CCC"]
+    assert child_output.diagnostics["selection_reason"] == "selection_ready"
+    assert child_output.diagnostics["warmup_ready"] is True
+
+
+def test_factor_wave_1_weekly_rebalance_uses_calendar_weeks(tmp_path) -> None:
+    rows = [
+        {
+            "ts": "2025-01-31",
+            "symbol": "AAA",
+            "Close": 100.0,
+            "volatility_20d": 0.10,
+            "realized_volatility": 0.10,
+        },
+        {
+            "ts": "2025-01-31",
+            "symbol": "BBB",
+            "Close": 100.0,
+            "volatility_20d": 0.20,
+            "realized_volatility": 0.20,
+        },
+        {
+            "ts": "2025-02-03",
+            "symbol": "AAA",
+            "Close": 101.0,
+            "volatility_20d": 0.12,
+            "realized_volatility": 0.12,
+        },
+        {
+            "ts": "2025-02-03",
+            "symbol": "BBB",
+            "Close": 99.0,
+            "volatility_20d": 0.18,
+            "realized_volatility": 0.18,
+        },
+    ]
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "low_volatility_strategy",
+            "alg_param": {
+                "rows": rows,
+                "field_names": ["volatility_20d", "realized_volatility"],
+                "rebalance_frequency": "weekly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+
+    assert [point.timestamp for point in output.points] == ["2025-01-31", "2025-02-03"]
+    assert output.derived_series["top_symbol"] == ["AAA", "AAA"]
 
 
 def test_factor_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
