@@ -1,4 +1,6 @@
 import json
+from csv import DictReader
+from pathlib import Path
 
 import pytest
 
@@ -12,7 +14,6 @@ from trading_algos.alertgen.algorithms.trend.boundary_breakout import (
 )
 from trading_algos.alertgen.algorithms.trend.channel_breakout import (
     CloseHighChannelBreakoutAlertAlgorithm,
-    RollingChannelBreakoutAlertAlgorithm,
 )
 from trading_algos.alertgen.core.algorithm_registry import (
     get_alert_algorithm_spec_by_key,
@@ -21,6 +22,27 @@ from trading_algos.alertgen.core.factory import create_alertgen_algorithm
 from trading_algos.alertgen.core.validation import normalize_alertgen_sensor_config
 from trading_algos.alertgen.shared_utils.models import Candle
 from trading_algos.alertgen.shared_utils.reporting import serialize_analysis_report
+
+
+FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "trend"
+
+
+def _load_fixture_rows(name: str) -> list[dict[str, object]]:
+    with (FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
+        rows = list(DictReader(handle))
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed_rows.append(
+            {
+                "ts": row["ts"],
+                "Open": float(row["Open"]),
+                "High": float(row["High"]),
+                "Low": float(row["Low"]),
+                "Close": float(row["Close"]),
+                "Volume": float(row["Volume"]),
+            }
+        )
+    return parsed_rows
 
 
 def _sample_rows(count=5, *, flat=False):
@@ -78,6 +100,11 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
     keys = [spec.key for spec in specs]
 
     assert keys == [
+        "simple_moving_average_crossover",
+        "exponential_moving_average_crossover",
+        "triple_moving_average_crossover",
+        "price_vs_moving_average",
+        "moving_average_ribbon_trend",
         "boundary_breakout",
         "double_red_confirmation",
         "low_anchored_boundary_breakout",
@@ -115,6 +142,51 @@ def test_factory_creates_registered_algorithm(tmp_path):
         ("boundary_breakout", {"period": 5}),
         ("double_red_confirmation", {"period": 5}),
         ("low_anchored_boundary_breakout", {"period": 5}),
+        (
+            "simple_moving_average_crossover",
+            {
+                "short_window": 2,
+                "long_window": 4,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "exponential_moving_average_crossover",
+            {
+                "short_window": 2,
+                "long_window": 4,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "triple_moving_average_crossover",
+            {
+                "fast_window": 2,
+                "medium_window": 3,
+                "slow_window": 4,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "price_vs_moving_average",
+            {
+                "window": 3,
+                "average_type": "sma",
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "moving_average_ribbon_trend",
+            {
+                "windows": [2, 3, 4],
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
         ("rolling_channel_breakout", {"window": 3}),
         ("close_high_channel_breakout", {"window": 3}),
         ("aggregate_boundary_and_channel", {"window": 3}),
@@ -150,6 +222,15 @@ def test_registered_algorithms_follow_basic_contract(tmp_path, alg_key, alg_para
 @pytest.mark.parametrize(
     "alg_key, alg_param",
     [
+        (
+            "simple_moving_average_crossover",
+            {
+                "short_window": 2,
+                "long_window": 3,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
         ("boundary_breakout", {"period": 5}),
         ("rolling_channel_breakout", {"window": 2}),
         ("close_high_channel_breakout", {"window": 2}),
@@ -334,19 +415,31 @@ def test_algorithm_evaluate_populates_metrics_via_evaluation_module(tmp_path):
 
 
 def test_algorithm_spec_warmup_metadata_matches_runtime_behavior():
-    spec = get_alert_algorithm_spec_by_key("rolling_channel_breakout")
-    algorithm = RollingChannelBreakoutAlertAlgorithm(
-        "AAPL", report_base_path="/tmp", wlen=spec.warmup_period
+    spec = get_alert_algorithm_spec_by_key("simple_moving_average_crossover")
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "simple_moving_average_crossover",
+            "alg_param": {
+                "short_window": 5,
+                "long_window": spec.warmup_period,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path="/tmp",
     )
 
     assert spec.warmup_period == algorithm.minimum_history()
 
 
 def test_algorithm_spec_can_be_resolved_by_key():
-    spec = get_alert_algorithm_spec_by_key("rolling_channel_breakout")
+    spec = get_alert_algorithm_spec_by_key("simple_moving_average_crossover")
 
-    assert spec.key == "rolling_channel_breakout"
-    assert spec.name == "Rolling Channel Breakout"
+    assert spec.key == "simple_moving_average_crossover"
+    assert spec.name == "Simple Moving Average Crossover"
 
 
 def test_validation_accepts_alg_key_without_alg_code():
@@ -373,3 +466,161 @@ def test_default_alertgen_sensor_config_prefers_alg_key_only():
     assert sensor_config["alg_key"] == "aggregate_boundary_and_channel"
     assert "alg_code" not in sensor_config
     assert sensor_config["symbol"] == "SYMBOL"
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "simple_moving_average_crossover",
+            {
+                "short_window": 3,
+                "long_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "exponential_moving_average_crossover",
+            {
+                "short_window": 3,
+                "long_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "triple_moving_average_crossover",
+            {
+                "fast_window": 2,
+                "medium_window": 3,
+                "slow_window": 5,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "price_vs_moving_average",
+            {
+                "window": 4,
+                "average_type": "sma",
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "moving_average_ribbon_trend",
+            {
+                "windows": [2, 3, 4, 5],
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+    ],
+)
+def test_trend_wave_1_fixture_monotonic_cross_produces_buy_without_late_sell(
+    tmp_path, alg_key, alg_param
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_fixture_rows("monotonic_cross.csv"))
+
+    buy_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("buy_SIGNAL")
+    ]
+    sell_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("sell_SIGNAL")
+    ]
+
+    assert buy_indices
+    assert sell_indices == [] or max(sell_indices) < min(buy_indices)
+
+
+def test_trend_wave_1_minimum_spread_reduces_whipsaw_events(tmp_path):
+    base_sensor_config = {
+        "symbol": "AAPL",
+        "alg_key": "simple_moving_average_crossover",
+        "buy": True,
+        "sell": True,
+    }
+    loose_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            **base_sensor_config,
+            "alg_param": {
+                "short_window": 2,
+                "long_window": 3,
+                "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        },
+        report_base_path=str(tmp_path / "loose"),
+    )
+    guarded_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            **base_sensor_config,
+            "alg_param": {
+                "short_window": 2,
+                "long_window": 3,
+                "minimum_spread": 0.2,
+                "confirmation_bars": 2,
+            },
+        },
+        report_base_path=str(tmp_path / "guarded"),
+    )
+
+    rows = _load_fixture_rows("whipsaw_guard.csv")
+    loose_algorithm.process_list(rows)
+    guarded_algorithm.process_list(rows)
+
+    loose_events = len(loose_algorithm.buy_signals) + len(loose_algorithm.sell_signals)
+    guarded_events = len(guarded_algorithm.buy_signals) + len(
+        guarded_algorithm.sell_signals
+    )
+
+    assert guarded_events <= loose_events
+
+
+def test_validation_rejects_invalid_trend_wave_1_parameter_shapes():
+    with pytest.raises(ValueError, match="short_window < long_window"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "simple_moving_average_crossover",
+                "alg_param": {
+                    "short_window": 5,
+                    "long_window": 5,
+                    "minimum_spread": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="windows must be sorted ascending"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "moving_average_ribbon_trend",
+                "alg_param": {
+                    "windows": [5, 3, 4],
+                    "minimum_spread": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )

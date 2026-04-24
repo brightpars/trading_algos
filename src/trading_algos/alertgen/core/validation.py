@@ -109,6 +109,149 @@ def require_buy_sell_window_param(raw_alg_param, label):
     }
 
 
+def _require_non_negative_float_like(value, label):
+    try:
+        parsed = float(value)
+    except Exception as exc:
+        raise ValueError(f"{label} must be a number: {exc}")
+    if parsed < 0.0:
+        raise ValueError(f"{label} must be >= 0")
+    return parsed
+
+
+def _require_choice(value, label, *, allowed):
+    normalized = _require_non_empty_string(value, label).lower()
+    if normalized not in allowed:
+        allowed_csv = ", ".join(sorted(allowed))
+        raise ValueError(f"{label} must be one of: {allowed_csv}")
+    return normalized
+
+
+def _require_positive_int_list(value, label, *, minimum_length=1):
+    if not isinstance(value, list):
+        raise ValueError(f"{label} must be a list")
+    normalized = [
+        _require_positive_int_like(item, f"{label}[{index}]")
+        for index, item in enumerate(value)
+    ]
+    if len(normalized) < minimum_length:
+        raise ValueError(f"{label} must contain at least {minimum_length} items")
+    return normalized
+
+
+def require_short_long_window_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["short_window", "long_window", "minimum_spread", "confirmation_bars"],
+        label,
+    )
+    short_window = _require_positive_int_like(
+        normalized["short_window"], f"{label} short_window"
+    )
+    long_window = _require_positive_int_like(
+        normalized["long_window"], f"{label} long_window"
+    )
+    if short_window >= long_window:
+        raise ValueError(f"{label} requires short_window < long_window")
+    return {
+        "short_window": short_window,
+        "long_window": long_window,
+        "minimum_spread": _require_non_negative_float_like(
+            normalized["minimum_spread"], f"{label} minimum_spread"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_fast_medium_slow_window_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "fast_window",
+            "medium_window",
+            "slow_window",
+            "minimum_spread",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    fast_window = _require_positive_int_like(
+        normalized["fast_window"], f"{label} fast_window"
+    )
+    medium_window = _require_positive_int_like(
+        normalized["medium_window"], f"{label} medium_window"
+    )
+    slow_window = _require_positive_int_like(
+        normalized["slow_window"], f"{label} slow_window"
+    )
+    if not (fast_window < medium_window < slow_window):
+        raise ValueError(f"{label} requires fast_window < medium_window < slow_window")
+    return {
+        "fast_window": fast_window,
+        "medium_window": medium_window,
+        "slow_window": slow_window,
+        "minimum_spread": _require_non_negative_float_like(
+            normalized["minimum_spread"], f"{label} minimum_spread"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_price_vs_ma_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["window", "average_type", "minimum_spread", "confirmation_bars"],
+        label,
+    )
+    return {
+        "window": _require_positive_int_like(normalized["window"], f"{label} window"),
+        "average_type": _require_choice(
+            normalized["average_type"],
+            f"{label} average_type",
+            allowed={"sma", "ema"},
+        ),
+        "minimum_spread": _require_non_negative_float_like(
+            normalized["minimum_spread"], f"{label} minimum_spread"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_ribbon_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["windows", "minimum_spread", "confirmation_bars"],
+        label,
+    )
+    windows = _require_positive_int_list(
+        normalized["windows"], f"{label} windows", minimum_length=3
+    )
+    if len(set(windows)) != len(windows):
+        raise ValueError(f"{label} windows must not contain duplicates")
+    sorted_windows = sorted(windows)
+    if windows != sorted_windows:
+        raise ValueError(f"{label} windows must be sorted ascending")
+    return {
+        "windows": windows,
+        "minimum_spread": _require_non_negative_float_like(
+            normalized["minimum_spread"], f"{label} minimum_spread"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def normalize_alertgen_sensor_config(
     sensor_config, label="Alert generator sensor_config"
 ):
