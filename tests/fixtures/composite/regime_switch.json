@@ -1,0 +1,44 @@
+[
+  {
+    "timestamp": "2025-01-01",
+    "regime_probabilities": {
+      "risk_on": 0.8,
+      "risk_off": 0.2
+    },
+    "child_outputs": [
+      {
+        "child_key": "trend_child",
+        "signal_label": "buy",
+        "score": 0.8,
+        "confidence": 0.9
+      },
+      {
+        "child_key": "defense_child",
+        "signal_label": "sell",
+        "score": -0.4,
+        "confidence": 0.6
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-01-02",
+    "regime_probabilities": {
+      "risk_on": 0.2,
+      "risk_off": 0.8
+    },
+    "child_outputs": [
+      {
+        "child_key": "trend_child",
+        "signal_label": "buy",
+        "score": 0.7,
+        "confidence": 0.8
+      },
+      {
+        "child_key": "defense_child",
+        "signal_label": "sell",
+        "score": -0.9,
+        "confidence": 0.9
+      }
+    ]
+  }
+]

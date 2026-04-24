@@ -109,9 +109,11 @@ class RegimeSwitchingHmmGatingAlertAlgorithm:
         derived_series: dict[str, list[Any]] = {
             "regime_label": [],
             "regime_confidence": [],
+            "regime_probabilities": [],
             "active_child_keys": [],
             "gated_child_keys": [],
             "warmup_ready": [],
+            "warmup_diagnostics": [],
             "child_contributions": [],
             "reason_codes": [],
         }
@@ -191,6 +193,15 @@ class RegimeSwitchingHmmGatingAlertAlgorithm:
                 reason_codes = ("regime_gate_active", f"regime={regime_label}")
 
             child_contributions = build_child_contribution_rows(active_children)
+            diagnostics = {
+                "active_regime": regime_label,
+                "regime_confidence": regime_confidence,
+                "regime_probabilities": dict(smoothed_probabilities),
+                "active_child_keys": list(active_child_keys),
+                "gated_child_keys": list(gated_child_keys),
+                "warmup_ready": warmup.is_ready,
+                **warmup.diagnostics,
+            }
             points.append(
                 AlertSeriesPoint(
                     timestamp=aligned_row.timestamp,
@@ -198,13 +209,16 @@ class RegimeSwitchingHmmGatingAlertAlgorithm:
                     score=score,
                     confidence=confidence,
                     reason_codes=reason_codes,
+                    diagnostics=diagnostics,
                 )
             )
             derived_series["regime_label"].append(regime_label)
             derived_series["regime_confidence"].append(regime_confidence)
+            derived_series["regime_probabilities"].append(dict(smoothed_probabilities))
             derived_series["active_child_keys"].append(list(active_child_keys))
             derived_series["gated_child_keys"].append(list(gated_child_keys))
             derived_series["warmup_ready"].append(warmup.is_ready)
+            derived_series["warmup_diagnostics"].append(dict(warmup.diagnostics))
             derived_series["child_contributions"].append(child_contributions)
             derived_series["reason_codes"].append(list(reason_codes))
 
@@ -220,12 +234,18 @@ class RegimeSwitchingHmmGatingAlertAlgorithm:
                     diagnostics={
                         **child.diagnostics,
                         "active_regime": regime_label,
+                        "regime_confidence": regime_confidence,
+                        "regime_probabilities": dict(smoothed_probabilities),
+                        "active_child_keys": list(active_child_keys),
+                        "gated_child_keys": list(gated_child_keys),
+                        "warmup_ready": warmup.is_ready,
+                        **warmup.diagnostics,
                         "gated": child.child_key in gated_child_keys,
                     },
                     reason_codes=child.reason_codes,
                     event_markers=child.event_markers,
                 )
-                for child in active_children
+                for child in aligned_row.child_outputs
             )
             previous_probability_map = smoothed_probabilities
             previous_label = regime_label

@@ -80,49 +80,20 @@ def test_constrained_multi_factor_optimization_fixture_behavior_and_contract(
         latest.diagnostics["optimization_score_by_sleeve"]["trend"]
         > latest.diagnostics["optimization_score_by_sleeve"]["value"]
     )
+    assert output.derived_series["gross_exposure"][-1] == pytest.approx(1.0)
+    assert output.derived_series["net_exposure"][-1] == pytest.approx(1.0)
+    assert output.child_outputs[0].diagnostics["selected_symbols"] == [
+        "trend",
+        "carry",
+        "value",
+    ]
+    assert output.child_outputs[0].reason_codes == ("selection_ready",)
 
 
 def test_regime_switching_hmm_gating_fixture_behavior_and_contract(
     tmp_path: Path,
 ) -> None:
-    rows = [
-        {
-            "timestamp": "2025-01-01",
-            "regime_probabilities": {"risk_on": 0.8, "risk_off": 0.2},
-            "child_outputs": [
-                {
-                    "child_key": "trend_child",
-                    "signal_label": "buy",
-                    "score": 0.8,
-                    "confidence": 0.9,
-                },
-                {
-                    "child_key": "defense_child",
-                    "signal_label": "sell",
-                    "score": -0.4,
-                    "confidence": 0.6,
-                },
-            ],
-        },
-        {
-            "timestamp": "2025-01-02",
-            "regime_probabilities": {"risk_on": 0.2, "risk_off": 0.8},
-            "child_outputs": [
-                {
-                    "child_key": "trend_child",
-                    "signal_label": "buy",
-                    "score": 0.7,
-                    "confidence": 0.8,
-                },
-                {
-                    "child_key": "defense_child",
-                    "signal_label": "sell",
-                    "score": -0.9,
-                    "confidence": 0.9,
-                },
-            ],
-        },
-    ]
+    rows = _load_composite_fixture_rows("regime_switch.json")
     algorithm, _ = create_alertgen_algorithm(
         sensor_config={
             "symbol": "BTCUSD",
@@ -151,7 +122,21 @@ def test_regime_switching_hmm_gating_fixture_behavior_and_contract(
     assert output.points[0].signal_label == "buy"
     assert output.points[1].signal_label == "sell"
     assert output.derived_series["active_child_keys"][1] == ["defense_child"]
-    assert output.child_outputs[0].diagnostics["active_regime"] == "risk_off"
+    assert output.derived_series["regime_probabilities"][1] == {
+        "risk_off": pytest.approx(0.8),
+        "risk_on": pytest.approx(0.2),
+    }
+    assert output.points[1].diagnostics["active_regime"] == "risk_off"
+    assert output.points[1].diagnostics["gated_child_keys"] == ["trend_child"]
+    assert output.points[1].diagnostics["warmup_ready"] is True
+    assert {child.child_key for child in output.child_outputs} == {
+        "trend_child",
+        "defense_child",
+    }
+    child_by_key = {child.child_key: child for child in output.child_outputs}
+    assert child_by_key["trend_child"].diagnostics["gated"] is True
+    assert child_by_key["defense_child"].diagnostics["gated"] is False
+    assert child_by_key["defense_child"].diagnostics["active_regime"] == "risk_off"
 
 
 def test_composite_wave_3_warmup_and_validation_behaviors(tmp_path: Path) -> None:
@@ -207,6 +192,11 @@ def test_composite_wave_3_warmup_and_validation_behaviors(tmp_path: Path) -> Non
     regime_output = regime_algorithm.normalized_output()
     assert regime_output.points[-1].signal_label == "neutral"
     assert regime_output.points[-1].reason_codes[0] == "warmup_pending"
+    assert regime_output.points[-1].diagnostics["warmup_ready"] is False
+    assert (
+        regime_output.derived_series["warmup_diagnostics"][-1]["actual_child_count"]
+        == 0
+    )
 
     with pytest.raises(ValueError, match="max_weight must be > 0"):
         normalize_alertgen_sensor_config(
@@ -241,6 +231,105 @@ def test_composite_wave_3_warmup_and_validation_behaviors(tmp_path: Path) -> Non
                 "sell": True,
             }
         )
+
+    with pytest.raises(ValueError, match="switch_threshold must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "BTCUSD",
+                "alg_key": "regime_switching_hmm_gating",
+                "alg_param": {
+                    "rows": [],
+                    "regime_field": "regime_probabilities",
+                    "regime_map": {"risk_on": ["trend_child"]},
+                    "smoothing": 0.1,
+                    "switch_threshold": -0.1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_composite_wave_3_behavior_edges_cover_hysteresis_and_exposure_cap(
+    tmp_path: Path,
+) -> None:
+    regime_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "BTCUSD",
+            "alg_key": "regime_switching_hmm_gating",
+            "alg_param": {
+                "rows": [
+                    {
+                        "timestamp": "2025-01-01",
+                        "regime_probabilities": {"risk_on": 0.4, "risk_off": 0.6},
+                        "child_outputs": [
+                            {
+                                "child_key": "trend_child",
+                                "signal_label": "buy",
+                                "score": 0.7,
+                                "confidence": 0.8,
+                            }
+                        ],
+                    },
+                    {
+                        "timestamp": "2025-01-02",
+                        "regime_probabilities": {"risk_on": 0.54, "risk_off": 0.46},
+                        "child_outputs": [
+                            {
+                                "child_key": "trend_child",
+                                "signal_label": "buy",
+                                "score": 0.6,
+                                "confidence": 0.7,
+                            }
+                        ],
+                    },
+                ],
+                "regime_field": "regime_probabilities",
+                "regime_map": {
+                    "risk_on": ["trend_child"],
+                    "risk_off": ["defense_child"],
+                },
+                "default_signal": "neutral",
+                "smoothing": 0.0,
+                "switch_threshold": 0.55,
+                "expected_child_count": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+    regime_output = regime_algorithm.normalized_output()
+    assert regime_output.derived_series["regime_label"] == ["risk_off", "risk_off"]
+    assert regime_output.points[-1].signal_label == "neutral"
+    assert regime_output.points[-1].reason_codes == ("no_active_children",)
+
+    optimization_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "PORTFOLIO",
+            "alg_key": "constrained_multi_factor_optimization",
+            "alg_param": {
+                "rows": _load_composite_fixture_rows("risk_budget.json"),
+                "rebalance_frequency": "monthly",
+                "target_gross_exposure": 0.4,
+                "min_history": 3,
+                "max_weight": 0.55,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+    optimization_output = optimization_algorithm.normalized_output()
+    optimization_portfolio = optimization_algorithm.portfolio_output()
+    assert optimization_output.points[-1].score == pytest.approx(0.4)
+    assert optimization_output.points[-1].confidence == pytest.approx(0.4)
+    assert optimization_output.derived_series["gross_exposure"][-1] == pytest.approx(
+        0.4
+    )
+    assert sum(
+        abs(weight) for weight in optimization_portfolio.rebalances[-1].weights.values()
+    ) == pytest.approx(0.4)
 
 
 def test_composite_wave_3_interactive_payloads_and_performance_smoke_mapping(
@@ -308,6 +397,13 @@ def test_composite_wave_3_interactive_payloads_and_performance_smoke_mapping(
     )
     assert regime_payload_name == "composite_report_regime_switching_hmm_gating_BTCUSD"
     assert regime_payload["data"]["metadata"]["catalog_ref"] == "combination:7"
+    assert regime_payload["data"]["derived_series"]["regime_probabilities"][0] == {
+        "risk_off": pytest.approx(0.1),
+        "risk_on": pytest.approx(0.9),
+    }
+    assert regime_payload["data"]["points"][0]["diagnostics"]["active_child_keys"] == [
+        "trend_child"
+    ]
 
     assert (
         get_performance_smoke_case("combination:4").performance_budget_id

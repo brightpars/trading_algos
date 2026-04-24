@@ -246,10 +246,12 @@ fixtures:
   domain: regime_features
   purpose: Regime-gated child activation with explicit state changes.
   inputs:
-    dataset_path: tests/fixtures/composite/regime_switch.parquet
+    dataset_path: tests/fixtures/composite/regime_switch.json
   expected_behaviors:
   - Regime label flips on the known transition
   - Active child set changes according to regime map
+  - Diagnostics expose regime probabilities, active and gated child keys, warmup readiness, and child contribution rows for dashboard explanation
+  - Regime child payloads retain both active and gated children so the dashboard can explain why a sleeve was suppressed
 - fixture_id: fixture.composite_ml_ensemble_v1
   domain: model_prediction_streams
   purpose: Aggregation of child model predictions into one final prediction.

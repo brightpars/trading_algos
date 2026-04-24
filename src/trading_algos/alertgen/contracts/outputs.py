@@ -14,6 +14,7 @@ class AlertSeriesPoint:
     signal_label: str
     score: float | None = None
     confidence: float | None = None
+    diagnostics: dict[str, Any] = field(default_factory=dict)
     reason_codes: tuple[str, ...] = ()
     event_markers: tuple[str, ...] = ()
 
