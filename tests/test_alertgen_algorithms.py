@@ -181,6 +181,8 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "rsi_momentum_continuation",
         "stochastic_momentum",
         "cci_momentum",
+        "kst_know_sure_thing",
+        "volume_confirmed_momentum",
         "z_score_mean_reversion",
         "bollinger_bands_reversion",
         "rsi_reversion",
@@ -387,6 +389,26 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "window": 3,
                 "bullish_threshold": 50.0,
                 "bearish_threshold": -50.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "kst_know_sure_thing",
+            {
+                "roc_windows": [3, 4, 5, 6],
+                "smoothing_windows": [3, 3, 3, 3],
+                "signal_window": 4,
+                "entry_mode": "signal_cross",
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volume_confirmed_momentum",
+            {
+                "momentum_window": 3,
+                "volume_window": 5,
+                "relative_volume_threshold": 1.0,
+                "signal_threshold": 1.0,
                 "confirmation_bars": 1,
             },
         ),
@@ -2863,6 +2885,286 @@ def test_momentum_wave_1_registration_metadata_matches_manifest_contract() -> No
         assert spec.subcategory == subcategory
         assert spec.warmup_period == warmup_period
         assert spec.output_modes == ("signal", "score", "confidence")
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "kst_know_sure_thing",
+            {
+                "roc_windows": [3, 4, 5, 6],
+                "smoothing_windows": [3, 3, 3, 3],
+                "signal_window": 4,
+                "entry_mode": "signal_cross",
+                "confirmation_bars": 1,
+            },
+            13,
+        ),
+        (
+            "volume_confirmed_momentum",
+            {
+                "momentum_window": 3,
+                "volume_window": 5,
+                "relative_volume_threshold": 1.0,
+                "signal_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+    ],
+)
+def test_momentum_wave_2_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(
+        _load_momentum_fixture_rows("sustained_up.csv")[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_reason_code", "expected_annotation_keys"),
+    [
+        (
+            "kst_know_sure_thing",
+            {
+                "roc_windows": [3, 4, 5, 6],
+                "smoothing_windows": [3, 3, 3, 3],
+                "signal_window": 4,
+                "entry_mode": "signal_cross",
+                "confirmation_bars": 1,
+            },
+            "kst_bullish_signal_cross",
+            {
+                "roc_windows",
+                "smoothing_windows",
+                "signal_window",
+                "entry_mode",
+                "indicator",
+            },
+        ),
+        (
+            "volume_confirmed_momentum",
+            {
+                "momentum_window": 3,
+                "volume_window": 5,
+                "relative_volume_threshold": 1.0,
+                "signal_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            "volume_confirmed_bullish",
+            {
+                "momentum_window",
+                "volume_window",
+                "relative_volume_threshold",
+                "signal_threshold",
+                "indicator",
+            },
+        ),
+    ],
+)
+def test_momentum_wave_2_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, expected_reason_code, expected_annotation_keys
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_momentum_fixture_rows("sustained_up.csv"))
+
+    output = algorithm.normalized_output()
+    last_point = output.points[-1]
+    child_output = output.child_outputs[0]
+
+    assert expected_reason_code in last_point.reason_codes
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+        "confirmation_state_label",
+        "warmup_ready",
+    }.issubset(output.derived_series)
+    assert child_output.signal_label == "buy"
+    assert expected_reason_code in child_output.diagnostics["reason_codes"]
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param"),
+    [
+        (
+            "kst_know_sure_thing",
+            {
+                "roc_windows": [3, 4, 5, 6],
+                "smoothing_windows": [3, 3, 3, 3],
+                "signal_window": 4,
+                "entry_mode": "signal_cross",
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volume_confirmed_momentum",
+            {
+                "momentum_window": 3,
+                "volume_window": 5,
+                "relative_volume_threshold": 1.0,
+                "signal_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+        ),
+    ],
+)
+def test_momentum_wave_2_fixture_sustained_up_produces_buy_without_bearish_reversal(
+    tmp_path, alg_key, alg_param
+):
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_momentum_fixture_rows("sustained_up.csv"))
+
+    buy_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("buy_SIGNAL")
+    ]
+    sell_indices = [
+        index
+        for index, item in enumerate(algorithm.data_list)
+        if item.get("sell_SIGNAL")
+    ]
+
+    assert buy_indices
+    assert sell_indices == []
+
+
+def test_momentum_wave_2_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="equal length"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "kst_know_sure_thing",
+                "alg_param": {
+                    "roc_windows": [3, 4, 5],
+                    "smoothing_windows": [3, 3],
+                    "signal_window": 4,
+                    "entry_mode": "signal_cross",
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="relative_volume_threshold must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "volume_confirmed_momentum",
+                "alg_param": {
+                    "momentum_window": 3,
+                    "volume_window": 5,
+                    "relative_volume_threshold": 0.0,
+                    "signal_threshold": 1.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_momentum_wave_2_registration_metadata_matches_manifest_contract() -> None:
+    expected = {
+        "kst_know_sure_thing": ("algorithm:24", "momentum", "kst", 13),
+        "volume_confirmed_momentum": ("algorithm:25", "momentum", "volume", 5),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.output_modes == ("signal", "score", "confidence")
+
+
+def test_momentum_wave_2_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = _load_momentum_fixture_rows("sustained_up.csv") * 300
+    algorithms = [
+        (
+            "kst_know_sure_thing",
+            {
+                "roc_windows": [3, 4, 5, 6],
+                "smoothing_windows": [3, 3, 3, 3],
+                "signal_window": 4,
+                "entry_mode": "signal_cross",
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volume_confirmed_momentum",
+            {
+                "momentum_window": 3,
+                "volume_window": 5,
+                "relative_volume_threshold": 1.0,
+                "signal_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert "trend_score" in output.derived_series
 
 
 def test_momentum_wave_1_acceleration_exposes_fast_and_acceleration_diagnostics(

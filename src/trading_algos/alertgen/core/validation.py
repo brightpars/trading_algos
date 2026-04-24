@@ -635,6 +635,85 @@ def require_cci_momentum_param(raw_alg_param, label):
     }
 
 
+def require_kst_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "roc_windows",
+            "smoothing_windows",
+            "signal_window",
+            "entry_mode",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    roc_windows = _require_positive_int_list(
+        normalized["roc_windows"], f"{label} roc_windows", minimum_length=2
+    )
+    smoothing_windows = _require_positive_int_list(
+        normalized["smoothing_windows"],
+        f"{label} smoothing_windows",
+        minimum_length=2,
+    )
+    if len(roc_windows) != len(smoothing_windows):
+        raise ValueError(
+            f"{label} requires roc_windows and smoothing_windows to have equal length"
+        )
+    return {
+        "roc_windows": roc_windows,
+        "smoothing_windows": smoothing_windows,
+        "signal_window": _require_positive_int_like(
+            normalized["signal_window"], f"{label} signal_window"
+        ),
+        "entry_mode": _require_choice(
+            normalized["entry_mode"],
+            f"{label} entry_mode",
+            allowed={"signal_cross", "zero_cross"},
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_volume_confirmed_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "momentum_window",
+            "volume_window",
+            "relative_volume_threshold",
+            "signal_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    relative_volume_threshold = _require_non_negative_float_like(
+        normalized["relative_volume_threshold"],
+        f"{label} relative_volume_threshold",
+    )
+    if relative_volume_threshold == 0.0:
+        raise ValueError(f"{label} relative_volume_threshold must be > 0")
+    signal_threshold = _require_non_negative_float_like(
+        normalized["signal_threshold"], f"{label} signal_threshold"
+    )
+    return {
+        "momentum_window": _require_positive_int_like(
+            normalized["momentum_window"], f"{label} momentum_window"
+        ),
+        "volume_window": _require_positive_int_like(
+            normalized["volume_window"], f"{label} volume_window"
+        ),
+        "relative_volume_threshold": relative_volume_threshold,
+        "signal_threshold": signal_threshold,
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def require_zscore_mean_reversion_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(

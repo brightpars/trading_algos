@@ -73,6 +73,10 @@ class BaseMomentumAlertAlgorithm(BaseAlertAlgorithm, ABC):
             "bearish_confirmed": self.latest_data_modifiable.get(
                 "bearish_confirmed", False
             ),
+            "confirmation_state_label": self.latest_data_modifiable.get(
+                "confirmation_state_label", "idle"
+            ),
+            "warmup_ready": self.latest_data_modifiable.get("warmup_ready", False),
         }
         annotations.update(self._parameter_annotations())
         return annotations
@@ -85,11 +89,15 @@ class BaseMomentumAlertAlgorithm(BaseAlertAlgorithm, ABC):
         self.latest_data_modifiable["bearish_setup"] = state.bearish
         self.latest_data_modifiable["bullish_confirmed"] = False
         self.latest_data_modifiable["bearish_confirmed"] = False
+        self.latest_data_modifiable["confirmation_state_label"] = "idle"
         self.latest_data_modifiable["regime_label"] = state.regime
         self.latest_data_modifiable["reason_codes"] = self._reason_codes(state)
         self.latest_data_modifiable["primary_value"] = state.primary_value
         self.latest_data_modifiable["signal_value"] = state.signal_value
         self.latest_data_modifiable["threshold_value"] = state.threshold_value
+        self.latest_data_modifiable["warmup_ready"] = (
+            len(self.data_list) >= self.minimum_history()
+        )
 
     def trend_prediction_logic(self) -> None:
         state = self._calculate_state()
@@ -112,6 +120,14 @@ class BaseMomentumAlertAlgorithm(BaseAlertAlgorithm, ABC):
         )
         self.latest_data_modifiable["bullish_confirmed"] = bullish_confirmed
         self.latest_data_modifiable["bearish_confirmed"] = bearish_confirmed
+        confirmation_state_label = "idle"
+        if bullish_confirmed or bearish_confirmed:
+            confirmation_state_label = "confirmed"
+        elif state.bullish or state.bearish:
+            confirmation_state_label = "pending"
+        self.latest_data_modifiable["confirmation_state_label"] = (
+            confirmation_state_label
+        )
         if bullish_confirmed and not bearish_confirmed:
             self.latest_predicted_trend = TREND.UP
         elif bearish_confirmed and not bullish_confirmed:
