@@ -1502,6 +1502,17 @@ def _require_rows_param(raw_rows, label):
     return normalized_rows
 
 
+def _require_dict_rows(raw_rows, label):
+    if not isinstance(raw_rows, list):
+        raise ValueError(f"{label} rows must be a list")
+    normalized_rows = []
+    for index, row in enumerate(raw_rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"{label} rows[{index}] must be a dict")
+        normalized_rows.append(dict(row))
+    return normalized_rows
+
+
 def _require_string_float_dict(value, label):
     if value is None:
         return {}
@@ -1814,7 +1825,7 @@ def require_hard_boolean_gating_param(raw_alg_param, label):
             allowed={"neutral", "buy", "sell"},
         ),
         "veto_sell_count": veto_sell_count,
-        "rows": _require_rows_param(normalized["rows"], label),
+        "rows": _require_dict_rows(normalized["rows"], label),
     }
     if normalized.get("expected_child_count") is not None:
         result["expected_child_count"] = _require_positive_int_like(
@@ -1853,13 +1864,121 @@ def require_weighted_linear_score_blend_param(raw_alg_param, label):
         "weights": weights,
         "buy_threshold": buy_threshold,
         "sell_threshold": sell_threshold,
-        "rows": _require_rows_param(normalized["rows"], label),
+        "rows": _require_dict_rows(normalized["rows"], label),
     }
     if normalized.get("expected_child_count") is not None:
         result["expected_child_count"] = _require_positive_int_like(
             normalized["expected_child_count"], f"{label} expected_child_count"
         )
     return result
+
+
+def require_rank_aggregation_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "aggregation_method",
+            "rank_field_names",
+            "top_k",
+            "minimum_child_count",
+        ],
+        label,
+    )
+    rank_field_names = _require_non_empty_string_list(
+        normalized["rank_field_names"], f"{label} rank_field_names"
+    )
+    score_field_names = normalized.get("score_field_names", [])
+    if not isinstance(score_field_names, list):
+        raise ValueError(f"{label} score_field_names must be a list")
+    return {
+        "rows": _require_dict_rows(normalized["rows"], label),
+        "aggregation_method": _require_choice(
+            normalized["aggregation_method"],
+            f"{label} aggregation_method",
+            allowed={"average_rank", "median_rank"},
+        ),
+        "rank_field_names": rank_field_names,
+        "score_field_names": [
+            _require_non_empty_string(item, f"{label} score_field_names[{index}]")
+            for index, item in enumerate(score_field_names)
+        ],
+        "top_k": _require_positive_int_like(normalized["top_k"], f"{label} top_k"),
+        "minimum_child_count": _require_positive_int_like(
+            normalized["minimum_child_count"], f"{label} minimum_child_count"
+        ),
+    }
+
+
+def require_risk_budgeting_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "rebalance_frequency", "target_gross_exposure", "min_history"],
+        label,
+    )
+    target_gross_exposure = _require_non_negative_float_like(
+        normalized["target_gross_exposure"], f"{label} target_gross_exposure"
+    )
+    if target_gross_exposure == 0.0:
+        raise ValueError(f"{label} target_gross_exposure must be > 0")
+    return {
+        "rows": _require_rows_param(normalized["rows"], label),
+        "rebalance_frequency": _require_choice(
+            normalized["rebalance_frequency"],
+            f"{label} rebalance_frequency",
+            allowed={"monthly", "weekly", "all"},
+        ),
+        "target_gross_exposure": target_gross_exposure,
+        "min_history": _require_positive_int_like(
+            normalized["min_history"], f"{label} min_history"
+        ),
+    }
+
+
+def require_volatility_targeting_overlay_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "target_volatility",
+            "base_weight",
+            "min_history",
+            "max_leverage",
+            "min_leverage",
+        ],
+        label,
+    )
+    target_volatility = _require_non_negative_float_like(
+        normalized["target_volatility"], f"{label} target_volatility"
+    )
+    base_weight = _require_non_negative_float_like(
+        normalized["base_weight"], f"{label} base_weight"
+    )
+    max_leverage = _require_non_negative_float_like(
+        normalized["max_leverage"], f"{label} max_leverage"
+    )
+    min_leverage = _require_non_negative_float_like(
+        normalized["min_leverage"], f"{label} min_leverage"
+    )
+    if target_volatility == 0.0:
+        raise ValueError(f"{label} target_volatility must be > 0")
+    if base_weight == 0.0:
+        raise ValueError(f"{label} base_weight must be > 0")
+    if max_leverage < min_leverage:
+        raise ValueError(f"{label} requires max_leverage >= min_leverage")
+    return {
+        "rows": _require_rows_param(normalized["rows"], label),
+        "target_volatility": target_volatility,
+        "base_weight": base_weight,
+        "min_history": _require_positive_int_like(
+            normalized["min_history"], f"{label} min_history"
+        ),
+        "max_leverage": max_leverage,
+        "min_leverage": min_leverage,
+    }
 
 
 def normalize_alertgen_sensor_config(

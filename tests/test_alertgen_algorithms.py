@@ -549,6 +549,10 @@ def _load_json_fixture_rows(path: Path) -> list[dict[str, object]]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _load_composite_fixture_rows(name: str) -> list[dict[str, object]]:
+    return _load_json_fixture_rows(COMPOSITE_FIXTURES_ROOT / name)
+
+
 def _sample_rows(count=5, *, flat=False):
     if flat:
         return [
@@ -686,7 +690,10 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "seasonality_calendar_effects",
         "earnings_drift_post_event_momentum",
         "hard_boolean_gating_and_or_majority",
+        "rank_aggregation",
         "weighted_linear_score_blend",
+        "risk_budgeting_risk_parity",
+        "volatility_targeting_overlay",
         "aggregate_boundary_and_channel",
         "aggregate_channel_dual_window",
     ]

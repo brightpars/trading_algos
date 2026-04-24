@@ -224,7 +224,7 @@ fixtures:
   domain: cross_sectional_child_outputs
   purpose: Cross-sectional rank aggregation on a small universe.
   inputs:
-    dataset_path: tests/fixtures/composite/rank_aggregation.parquet
+    dataset_path: tests/fixtures/composite/rank_aggregation.json
   expected_behaviors:
   - Aggregate rank is reproducible from the child ranks
   - Top-k selection matches expected result
@@ -232,7 +232,7 @@ fixtures:
   domain: strategy_return_streams
   purpose: Risk-budget allocation across multiple sleeves.
   inputs:
-    dataset_path: tests/fixtures/composite/risk_budget.parquet
+    dataset_path: tests/fixtures/composite/risk_budget.json
   expected_behaviors:
   - Risk contribution targets are reflected in output weights
   - Weight changes are stable under the configured rebalance cadence

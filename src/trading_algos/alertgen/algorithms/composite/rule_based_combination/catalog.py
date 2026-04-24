@@ -4,11 +4,15 @@ from trading_algos.algorithmspec import AlertAlgorithmSpec, register_algorithm
 from trading_algos.alertgen.algorithms.composite.rule_based_combination.hard_boolean_gating_and_or_majority import (
     build_hard_boolean_gating_algorithm,
 )
+from trading_algos.alertgen.algorithms.composite.rule_based_combination.rank_aggregation import (
+    build_rank_aggregation_algorithm,
+)
 from trading_algos.alertgen.algorithms.composite.rule_based_combination.weighted_linear_score_blend import (
     build_weighted_linear_score_blend_algorithm,
 )
 from trading_algos.alertgen.core.validation import (
     require_hard_boolean_gating_param,
+    require_rank_aggregation_param,
     require_weighted_linear_score_blend_param,
 )
 
@@ -70,6 +74,80 @@ def register_rule_based_combination_alert_algorithms() -> None:
             warmup_period=1,
             input_domains=("ohlcv",),
             output_modes=("signal", "score"),
+            composition_roles=("ensemble_member",),
+        ),
+        AlertAlgorithmSpec(
+            key="rank_aggregation",
+            name="Rank Aggregation",
+            catalog_ref="combination:3",
+            builder=lambda **kwargs: build_rank_aggregation_algorithm(
+                algorithm_key="rank_aggregation", **kwargs
+            ),
+            default_param={
+                "rows": [],
+                "aggregation_method": "average_rank",
+                "rank_field_names": [],
+                "score_field_names": [],
+                "top_k": 2,
+                "minimum_child_count": 1,
+            },
+            param_normalizer=require_rank_aggregation_param,
+            description="Aggregate cross-sectional child ranks or scores into one final ranking and top-k selection.",
+            param_schema=(
+                {
+                    "key": "rows",
+                    "label": "Cross-sectional rows",
+                    "type": "array",
+                    "required": True,
+                    "description": "Timestamped rows containing per-asset child ranks or scores.",
+                },
+                {
+                    "key": "aggregation_method",
+                    "label": "Aggregation method",
+                    "type": "string",
+                    "required": True,
+                    "enum": ["average_rank", "median_rank"],
+                    "description": "How multiple child rank columns are collapsed into one aggregate rank.",
+                },
+                {
+                    "key": "rank_field_names",
+                    "label": "Rank fields",
+                    "type": "array",
+                    "required": True,
+                    "description": "Per-asset field names containing child rank values.",
+                },
+                {
+                    "key": "score_field_names",
+                    "label": "Score fields",
+                    "type": "array",
+                    "required": False,
+                    "description": "Optional per-asset score fields blended with inverse rank strength.",
+                },
+                {
+                    "key": "top_k",
+                    "label": "Top k",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of highest-ranked assets selected at each rebalance.",
+                },
+                {
+                    "key": "minimum_child_count",
+                    "label": "Minimum child count",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Minimum number of child rank/score inputs required per asset.",
+                },
+            ),
+            tags=("composite", "rule_based_combination", "ranking"),
+            category="composite",
+            family="rule_based_combination",
+            subcategory="rank",
+            warmup_period=1,
+            input_domains=("multi_asset_panel",),
+            asset_scope="portfolio",
+            output_modes=("ranking", "selection", "diagnostics"),
             composition_roles=("ensemble_member",),
         ),
         AlertAlgorithmSpec(
