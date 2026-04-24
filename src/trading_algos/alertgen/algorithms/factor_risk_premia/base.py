@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 
 from trading_algos.alertgen.contracts.outputs import (
     AlertAlgorithmOutput,
@@ -39,6 +39,18 @@ def _diagnostic_float(value: object, default: float = 0.0) -> float:
     if isinstance(value, str):
         return float(value)
     return default
+
+
+def _diagnostic_mapping(value: object) -> dict[str, object]:
+    if isinstance(value, Mapping):
+        return {str(key): item for key, item in value.items()}
+    return {}
+
+
+def _diagnostic_sequence(value: object) -> list[object]:
+    if isinstance(value, tuple | list):
+        return list(value)
+    return []
 
 
 class FactorPortfolioAlertAlgorithm:
@@ -179,6 +191,9 @@ class FactorPortfolioAlertAlgorithm:
             "selection_strength": [],
             "ranking": [],
             "weights": [],
+            "raw_scores": [],
+            "normalized_scores": [],
+            "missing_metric_symbols": [],
             "warmup_ready": [],
             "selection_reason": [],
             "eligible_universe_size": [],
@@ -212,6 +227,15 @@ class FactorPortfolioAlertAlgorithm:
             derived_series["selection_strength"].append(selection_strength)
             derived_series["ranking"].append([asset.to_dict() for asset in row.ranking])
             derived_series["weights"].append(dict(row.weights))
+            derived_series["raw_scores"].append(
+                _diagnostic_mapping(row.diagnostics.get("raw_scores", {}))
+            )
+            derived_series["normalized_scores"].append(
+                _diagnostic_mapping(row.diagnostics.get("normalized_scores", {}))
+            )
+            derived_series["missing_metric_symbols"].append(
+                _diagnostic_sequence(row.diagnostics.get("missing_metric_symbols", ()))
+            )
             derived_series["warmup_ready"].append(
                 bool(row.diagnostics.get("warmup_ready", False))
             )

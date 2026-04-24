@@ -1564,7 +1564,7 @@ def test_composite_weighted_blend_normalized_output_exposes_dashboard_diagnostic
 
 
 def test_composite_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
-    algorithms: list[tuple[str, list[str], dict[str, Any]]] = [
+    algorithms: list[tuple[str, dict[str, Any]]] = [
         (
             "hard_boolean_gating_and_or_majority",
             {
@@ -5902,11 +5902,144 @@ def test_factor_wave_2_fixture_behavior_exposes_normalized_diagnostics_and_compo
     assert child_output.diagnostics["family"] == "fundamental_ml_composite"
     assert child_output.diagnostics["selection_reason"] == "selection_ready"
     assert child_output.diagnostics["warmup_ready"] is True
+    assert output.derived_series["raw_scores"][-1]["BBB"] == pytest.approx(0.38)
+    assert output.derived_series["normalized_scores"][-1]["BBB"] == pytest.approx(0.38)
+    assert output.derived_series["missing_metric_symbols"][-1] == []
+
+
+def test_factor_wave_2_fixture_behavior_matches_manifest_expectations(tmp_path) -> None:
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    expected_top_symbols = {
+        "value_strategy": ["AAA", "BBB"],
+        "quality_strategy": ["AAA", "BBB"],
+        "minimum_variance_strategy": ["AAA", "BBB"],
+        "size_small_cap_strategy": ["DDD", "DDD"],
+        "mid_cap_tilt_strategy": ["CCC", "CCC"],
+        "profitability_factor_strategy": ["AAA", "BBB"],
+        "earnings_quality_strategy": ["AAA", "BBB"],
+        "low_leverage_balance_sheet_strength": ["AAA", "BBB"],
+    }
+
+    for alg_key, expected in expected_top_symbols.items():
+        field_names = {
+            "value_strategy": ["price_to_book", "price_to_earnings"],
+            "quality_strategy": ["return_on_equity", "gross_margin"],
+            "minimum_variance_strategy": ["volatility_20d", "realized_volatility"],
+            "size_small_cap_strategy": ["market_cap_billions"],
+            "mid_cap_tilt_strategy": ["market_cap_billions"],
+            "profitability_factor_strategy": [
+                "return_on_assets",
+                "gross_profitability",
+            ],
+            "earnings_quality_strategy": ["cash_earnings_ratio", "earnings_stability"],
+            "low_leverage_balance_sheet_strength": [
+                "debt_to_equity",
+                "net_debt_to_ebitda",
+            ],
+        }[alg_key]
+        extra_params: dict[str, Any] = {}
+        if alg_key == "minimum_variance_strategy":
+            extra_params["weighting_mode"] = "inverse_metric"
+        if alg_key == "mid_cap_tilt_strategy":
+            extra_params["target_value"] = 10.0
+
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": rows,
+                    "field_names": field_names,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    **extra_params,
+                },
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / alg_key),
+        )
+
+        output = algorithm.normalized_output()
+        assert output.derived_series["top_symbol"] == expected
+
+    low_vol_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "minimum_variance_strategy",
+            "alg_param": {
+                "rows": rows,
+                "field_names": ["volatility_20d", "realized_volatility"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "weighting_mode": "inverse_metric",
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path / "minimum-variance-explicit"),
+    )
+    min_var_output = low_vol_algorithm.normalized_output()
+    assert min_var_output.derived_series["top_symbol"] == ["AAA", "BBB"]
+
+
+def test_factor_wave_2_short_history_reports_warmup_reason_and_missing_symbols(
+    tmp_path,
+) -> None:
+    rows = [
+        {
+            "ts": "2025-01-02",
+            "symbol": "AAA",
+            "Close": 100.0,
+            "return_on_equity": 0.24,
+            "gross_margin": 0.48,
+        },
+        {
+            "ts": "2025-01-02",
+            "symbol": "BBB",
+            "Close": 100.0,
+        },
+    ]
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "quality_strategy",
+            "alg_param": {
+                "rows": rows,
+                "field_names": ["return_on_equity", "gross_margin"],
+                "rebalance_frequency": "monthly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.points[-1].signal_label == "neutral"
+    assert output.points[-1].reason_codes == ("warmup_pending",)
+    assert output.derived_series["warmup_ready"][-1] is False
+    assert output.derived_series["scored_universe_size"][-1] == 1
+    assert output.derived_series["missing_metric_symbols"][-1] == ["BBB"]
+    assert child_output.diagnostics["selection_reason"] == "warmup_pending"
+    assert child_output.diagnostics["missing_metric_symbols"] == ("BBB",)
 
 
 def test_factor_wave_2_performance_smoke_on_fixture_repetition(tmp_path) -> None:
     rows = _build_factor_fixture_rows() * 50
-    algorithms = [
+    algorithms: list[tuple[str, list[str], dict[str, Any]]] = [
         (
             "value_strategy",
             ["price_to_book", "price_to_earnings"],
