@@ -7427,8 +7427,8 @@ rows:
   display_category: Rule-Based Combination
   subcategory: hard
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: All horizons if child signals are aligned
   home_suitability: 1
@@ -7475,7 +7475,7 @@ rows:
   - performance_smoke
   batch: composite_contract_wave_1
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 1; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_contract_wave_1 with aligned-child warmup handling, normalized composite-trace diagnostics, fixture-backed behavior checks, registration/validation coverage, and performance-smoke coverage.
 - catalog_ref: combination:2
   source_doc_ref: requirements_v4:combination:2
   kind: combination_method
@@ -7484,8 +7484,8 @@ rows:
   display_category: Rule-Based Combination
   subcategory: weighted
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: All horizons; especially good for swing / daily systems
   home_suitability: 1
@@ -7532,7 +7532,7 @@ rows:
   - performance_smoke
   batch: composite_contract_wave_1
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 2; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_contract_wave_1 with score/confidence normalization, aligned-child warmup handling, normalized composite-trace diagnostics, fixture-backed behavior checks, registration/validation coverage, and performance-smoke coverage.
 - catalog_ref: combination:3
   source_doc_ref: requirements_v4:combination:3
   kind: combination_method

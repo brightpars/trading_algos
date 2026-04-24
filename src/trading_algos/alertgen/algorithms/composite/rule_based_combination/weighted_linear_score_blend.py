@@ -10,6 +10,7 @@ from trading_algos.alertgen.algorithms.composite.rule_based_combination.helpers 
     clamp_confidence,
     clamp_score,
     direction_to_signal_label,
+    evaluate_child_row_warmup,
 )
 from trading_algos.alertgen.contracts.outputs import (
     AlertAlgorithmOutput,
@@ -114,6 +115,14 @@ class WeightedLinearScoreBlendAlertAlgorithm:
         self.latest_predicted_trend = "neutral"
         self.latest_predicted_trend_confidence = 0.0
 
+    def _required_child_count(self) -> int:
+        configured = self.params.get("expected_child_count")
+        if configured is not None:
+            return int(configured)
+        if not self.rows:
+            return 0
+        return max(len(row.child_outputs) for row in self.rows)
+
     def process_list(self, _data_list: list[dict[str, Any]]) -> None:
         output = self.normalized_output()
         if not output.points:
@@ -146,7 +155,13 @@ class WeightedLinearScoreBlendAlertAlgorithm:
         )
 
     def interactive_report_payloads(self) -> list[tuple[dict[str, Any], str]]:
-        return []
+        output = self.normalized_output()
+        payload = {
+            "algorithm_key": self.algorithm_key,
+            "data": output.to_dict(),
+            "summary": output.summary_metrics,
+        }
+        return [(payload, f"composite_trace_{self.algorithm_key}_{self.symbol}")]
 
     def normalized_output(self) -> AlertAlgorithmOutput:
         points: list[AlertSeriesPoint] = []
@@ -154,42 +169,108 @@ class WeightedLinearScoreBlendAlertAlgorithm:
             "buy_signal": [],
             "sell_signal": [],
             "composite_score": [],
+            "raw_weighted_score": [],
+            "child_count": [],
+            "expected_child_count": [],
+            "warmup_ready": [],
+            "decision_reason": [],
         }
         child_outputs: list[NormalizedChildOutput] = []
         weights = {
             str(key): float(value) for key, value in self.params["weights"].items()
         }
+        decision_reasons: dict[str, int] = {}
+        required_child_count = self._required_child_count()
         for row in self.rows:
-            decision = evaluate_weighted_blend_row(
+            warmup_state = evaluate_child_row_warmup(
                 row,
-                weights=weights,
-                buy_threshold=float(self.params["buy_threshold"]),
-                sell_threshold=float(self.params["sell_threshold"]),
+                required_child_count=required_child_count,
             )
-            signal_label = direction_to_signal_label(decision.direction)
+            if warmup_state.is_ready:
+                decision = evaluate_weighted_blend_row(
+                    row,
+                    weights=weights,
+                    buy_threshold=float(self.params["buy_threshold"]),
+                    sell_threshold=float(self.params["sell_threshold"]),
+                )
+                signal_label = direction_to_signal_label(decision.direction)
+                diagnostics = {
+                    **decision.diagnostics,
+                    **warmup_state.diagnostics,
+                    "warmup_ready": True,
+                    "timestamp": row.timestamp,
+                }
+                score = decision.score
+                confidence = decision.confidence
+                reason_codes = (str(decision.diagnostics["decision_reason"]),)
+            else:
+                signal_label = "neutral"
+                diagnostics = {
+                    "weighted_score": 0.0,
+                    "raw_weighted_score": 0.0,
+                    "buy_threshold": float(self.params["buy_threshold"]),
+                    "sell_threshold": float(self.params["sell_threshold"]),
+                    "decision_reason": warmup_state.reason_code,
+                    "weighted_terms": [],
+                    "child_contributions": build_child_contribution_rows(
+                        row.child_outputs
+                    ),
+                    **warmup_state.diagnostics,
+                    "warmup_ready": False,
+                    "timestamp": row.timestamp,
+                }
+                score = 0.0
+                confidence = 0.0
+                reason_codes = (warmup_state.reason_code,)
+            decision_reason = str(diagnostics["decision_reason"])
+            decision_reasons[decision_reason] = (
+                decision_reasons.get(decision_reason, 0) + 1
+            )
             points.append(
                 AlertSeriesPoint(
                     timestamp=row.timestamp,
                     signal_label=signal_label,
-                    score=decision.score,
-                    confidence=decision.confidence,
-                    reason_codes=(str(decision.diagnostics["decision_reason"]),),
+                    score=score,
+                    confidence=confidence,
+                    reason_codes=reason_codes,
                 )
             )
-            derived_series["buy_signal"].append(decision.direction > 0)
-            derived_series["sell_signal"].append(decision.direction < 0)
-            derived_series["composite_score"].append(decision.score)
+            derived_series["buy_signal"].append(signal_label == "buy")
+            derived_series["sell_signal"].append(signal_label == "sell")
+            derived_series["composite_score"].append(score)
+            derived_series["raw_weighted_score"].append(
+                diagnostics["raw_weighted_score"]
+            )
+            derived_series["child_count"].append(diagnostics["actual_child_count"])
+            derived_series["expected_child_count"].append(
+                diagnostics["expected_child_count"]
+            )
+            derived_series["warmup_ready"].append(diagnostics["warmup_ready"])
+            derived_series["decision_reason"].append(decision_reason)
             child_outputs.extend(row.child_outputs)
         return AlertAlgorithmOutput(
             algorithm_key=self.algorithm_key,
             points=tuple(points),
             derived_series=derived_series,
+            summary_metrics={
+                "point_count": len(points),
+                "buy_points": sum(1 for point in points if point.signal_label == "buy"),
+                "sell_points": sum(
+                    1 for point in points if point.signal_label == "sell"
+                ),
+                "neutral_points": sum(
+                    1 for point in points if point.signal_label == "neutral"
+                ),
+                "decision_reason_counts": decision_reasons,
+            },
             metadata={
                 "family": "rule_based_combination",
                 "subcategory": "weighted",
                 "catalog_ref": "combination:2",
                 "supports_composition": True,
                 "output_contract_version": "1.0",
+                "warmup_period": self.minimum_history(),
+                "reporting_mode": "composite_trace",
                 "params": dict(self.params),
             },
             child_outputs=tuple(child_outputs),

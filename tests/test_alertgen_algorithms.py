@@ -1,6 +1,7 @@
 import json
 from csv import DictReader
 from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -353,9 +354,9 @@ def test_boolean_gating_fixture_behaviors_match_truth_table() -> None:
         veto_sell_count=1,
     ).direction
 
-    assert and_directions == [0, 0, -1]
-    assert or_directions == [1, 0, -1]
-    assert majority_directions == [1, 0, -1]
+    assert and_directions == [0, 0, -1, 1, 0]
+    assert or_directions == [1, 0, -1, 1, 0]
+    assert majority_directions == [1, 0, -1, 1, 0]
     assert veto_direction == -1
 
 
@@ -380,6 +381,297 @@ def test_weighted_blend_fixture_behaviors_match_expected_thresholds() -> None:
     assert decisions[1].score == pytest.approx(-0.45)
     assert decisions[1].direction == -1
     assert decisions[2].direction == 0
+    assert decisions[3].score == pytest.approx(0.87)
+    assert decisions[3].confidence == pytest.approx(0.91)
+    assert decisions[3].direction == 1
+
+
+def test_composite_boolean_gating_registration_and_contract_metadata(tmp_path) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "hard_boolean_gating_and_or_majority",
+            "alg_param": {
+                "mode": "majority",
+                "tie_policy": "neutral",
+                "veto_sell_count": 0,
+                "expected_child_count": 3,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "boolean_truth_table.json"
+                ),
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    spec = get_alert_algorithm_spec_by_key("hard_boolean_gating_and_or_majority")
+
+    assert spec.catalog_ref == "combination:1"
+    assert output.metadata["catalog_ref"] == "combination:1"
+    assert output.metadata["reporting_mode"] == "composite_trace"
+    assert output.metadata["warmup_period"] == algorithm.minimum_history()
+    assert payloads
+    assert payloads[0][0]["data"]["summary_metrics"]["point_count"] == len(
+        output.points
+    )
+
+
+def test_composite_weighted_blend_registration_and_contract_metadata(tmp_path) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "weighted_linear_score_blend",
+            "alg_param": {
+                "weights": {"trend": 0.6, "momentum": 0.3, "filter": 0.1},
+                "buy_threshold": 0.4,
+                "sell_threshold": -0.4,
+                "expected_child_count": 3,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "weighted_blend.json"
+                ),
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    spec = get_alert_algorithm_spec_by_key("weighted_linear_score_blend")
+
+    assert spec.catalog_ref == "combination:2"
+    assert output.metadata["catalog_ref"] == "combination:2"
+    assert output.metadata["reporting_mode"] == "composite_trace"
+    assert output.metadata["warmup_period"] == algorithm.minimum_history()
+    assert payloads
+    assert payloads[0][0]["data"]["summary_metrics"]["point_count"] == len(
+        output.points
+    )
+
+
+def test_composite_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="expected_child_count must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "hard_boolean_gating_and_or_majority",
+                "alg_param": {
+                    "mode": "and",
+                    "tie_policy": "neutral",
+                    "veto_sell_count": 0,
+                    "expected_child_count": 0,
+                    "rows": [],
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="weights must not be empty"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "weighted_linear_score_blend",
+                "alg_param": {
+                    "weights": {},
+                    "buy_threshold": 0.4,
+                    "sell_threshold": -0.4,
+                    "rows": [],
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_composite_boolean_gating_short_child_set_stays_neutral_until_ready(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "hard_boolean_gating_and_or_majority",
+            "alg_param": {
+                "mode": "majority",
+                "tie_policy": "neutral",
+                "veto_sell_count": 0,
+                "expected_child_count": 3,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "boolean_truth_table.json"
+                ),
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+
+    assert output.points[-1].signal_label == "neutral"
+    assert "warmup_pending_incomplete_child_set" in output.points[-1].reason_codes
+    assert output.derived_series["warmup_ready"][-1] is False
+    assert output.derived_series["expected_child_count"][-1] == 3
+    assert output.derived_series["child_count"][-1] == 2
+
+
+def test_composite_weighted_blend_short_child_set_stays_neutral_until_ready(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "weighted_linear_score_blend",
+            "alg_param": {
+                "weights": {"trend": 0.6, "momentum": 0.3, "filter": 0.1},
+                "buy_threshold": 0.4,
+                "sell_threshold": -0.4,
+                "expected_child_count": 3,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "weighted_blend.json"
+                ),
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+
+    assert output.points[-1].signal_label == "neutral"
+    assert "warmup_pending_incomplete_child_set" in output.points[-1].reason_codes
+    assert output.derived_series["warmup_ready"][-1] is False
+    assert output.derived_series["expected_child_count"][-1] == 3
+    assert output.derived_series["child_count"][-1] == 2
+
+
+def test_composite_boolean_gating_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "hard_boolean_gating_and_or_majority",
+            "alg_param": {
+                "mode": "majority",
+                "tie_policy": "neutral",
+                "veto_sell_count": 0,
+                "expected_child_count": 3,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "boolean_truth_table.json"
+                ),
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+
+    assert {
+        "child_count",
+        "expected_child_count",
+        "warmup_ready",
+        "decision_reason",
+    }.issubset(output.derived_series)
+    assert output.summary_metrics["decision_reason_counts"]["majority_buy"] >= 1
+    assert payloads[0][0]["data"]["derived_series"]["buy_count"][0] == 2
+    assert payloads[0][0]["data"]["derived_series"]["sell_count"][2] == 3
+
+
+def test_composite_weighted_blend_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "weighted_linear_score_blend",
+            "alg_param": {
+                "weights": {"trend": 0.6, "momentum": 0.3, "filter": 0.1},
+                "buy_threshold": 0.4,
+                "sell_threshold": -0.4,
+                "expected_child_count": 3,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "weighted_blend.json"
+                ),
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+
+    assert {
+        "raw_weighted_score",
+        "child_count",
+        "expected_child_count",
+        "warmup_ready",
+    }.issubset(output.derived_series)
+    assert output.points[3].score == pytest.approx(0.87)
+    assert output.points[3].confidence == pytest.approx(0.91)
+    assert payloads[0][0]["data"]["derived_series"]["raw_weighted_score"][
+        1
+    ] == pytest.approx(-0.45)
+
+
+def test_composite_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    algorithms = [
+        (
+            "hard_boolean_gating_and_or_majority",
+            {
+                "mode": "majority",
+                "tie_policy": "neutral",
+                "veto_sell_count": 0,
+                "expected_child_count": 3,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "boolean_truth_table.json"
+                )
+                * 300,
+            },
+        ),
+        (
+            "weighted_linear_score_blend",
+            {
+                "weights": {"trend": 0.6, "momentum": 0.3, "filter": 0.1},
+                "buy_threshold": 0.4,
+                "sell_threshold": -0.4,
+                "expected_child_count": 3,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "weighted_blend.json"
+                )
+                * 300,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+
+        row_count = len(cast(list[dict[str, object]], alg_param["rows"]))
+        assert len(output.points) == row_count
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "composite_trace"
 
 
 def test_validation_rejects_missing_algorithm_key():

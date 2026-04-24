@@ -181,6 +181,8 @@ fixtures:
   expected_behaviors:
   - AND, OR, and majority rules match expected truth-table rows
   - Tie and veto policies produce deterministic final states
+  - Short child sets remain neutral until the aligned child set is complete
+  - Diagnostics expose vote counts, warmup readiness, and child contribution rows for dashboard explanation
 - fixture_id: fixture.composite_weighted_blend_v1
   domain: child_output_stream
   purpose: Weighted-score blend across aligned child strategies.
@@ -189,6 +191,8 @@ fixtures:
   expected_behaviors:
   - Weighted sum matches expected numeric result
   - Final thresholds map the score to the expected state
+  - Score and confidence inputs are clamped into normalized output ranges before threshold mapping
+  - Incomplete child sets remain neutral and expose warmup diagnostics until all children are aligned
 - fixture_id: fixture.composite_rank_aggregation_v1
   domain: cross_sectional_child_outputs
   purpose: Cross-sectional rank aggregation on a small universe.

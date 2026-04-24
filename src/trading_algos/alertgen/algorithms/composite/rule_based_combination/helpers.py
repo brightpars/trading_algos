@@ -16,6 +16,13 @@ class AlignedCompositeInputRow:
     metadata: dict[str, Any]
 
 
+@dataclass(frozen=True)
+class CompositeWarmupState:
+    is_ready: bool
+    reason_code: str
+    diagnostics: dict[str, Any]
+
+
 def normalize_child_signal_label(signal_label: str) -> str:
     normalized = str(signal_label).strip().lower()
     if normalized not in VALID_COMBINATION_SIGNALS:
@@ -149,3 +156,47 @@ def build_child_contribution_rows(
         }
         for child in child_outputs
     ]
+
+
+def evaluate_child_row_warmup(
+    row: AlignedCompositeInputRow,
+    *,
+    required_child_count: int | None = None,
+) -> CompositeWarmupState:
+    actual_child_count = len(row.child_outputs)
+    expected_child_count = (
+        actual_child_count
+        if required_child_count is None
+        else int(required_child_count)
+    )
+    if actual_child_count <= 0:
+        return CompositeWarmupState(
+            is_ready=False,
+            reason_code="warmup_pending_no_child_outputs",
+            diagnostics={
+                "expected_child_count": expected_child_count,
+                "actual_child_count": actual_child_count,
+                "missing_child_count": max(
+                    expected_child_count - actual_child_count, 0
+                ),
+            },
+        )
+    if actual_child_count < expected_child_count:
+        return CompositeWarmupState(
+            is_ready=False,
+            reason_code="warmup_pending_incomplete_child_set",
+            diagnostics={
+                "expected_child_count": expected_child_count,
+                "actual_child_count": actual_child_count,
+                "missing_child_count": expected_child_count - actual_child_count,
+            },
+        )
+    return CompositeWarmupState(
+        is_ready=True,
+        reason_code="ready",
+        diagnostics={
+            "expected_child_count": expected_child_count,
+            "actual_child_count": actual_child_count,
+            "missing_child_count": 0,
+        },
+    )

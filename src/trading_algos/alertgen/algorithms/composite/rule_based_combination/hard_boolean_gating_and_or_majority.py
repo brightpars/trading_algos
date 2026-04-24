@@ -9,6 +9,7 @@ from trading_algos.alertgen.algorithms.composite.rule_based_combination.helpers 
     build_child_contribution_rows,
     clamp_confidence,
     direction_to_signal_label,
+    evaluate_child_row_warmup,
 )
 from trading_algos.alertgen.contracts.outputs import (
     AlertAlgorithmOutput,
@@ -134,6 +135,14 @@ class HardBooleanGatingAlertAlgorithm:
         self.latest_predicted_trend = "neutral"
         self.latest_predicted_trend_confidence = 0.0
 
+    def _required_child_count(self) -> int:
+        configured = self.params.get("expected_child_count")
+        if configured is not None:
+            return int(configured)
+        if not self.rows:
+            return 0
+        return max(len(row.child_outputs) for row in self.rows)
+
     def process_list(self, _data_list: list[dict[str, Any]]) -> None:
         output = self.normalized_output()
         if not output.points:
@@ -166,7 +175,13 @@ class HardBooleanGatingAlertAlgorithm:
         )
 
     def interactive_report_payloads(self) -> list[tuple[dict[str, Any], str]]:
-        return []
+        output = self.normalized_output()
+        payload = {
+            "algorithm_key": self.algorithm_key,
+            "data": output.to_dict(),
+            "summary": output.summary_metrics,
+        }
+        return [(payload, f"composite_trace_{self.algorithm_key}_{self.symbol}")]
 
     def normalized_output(self) -> AlertAlgorithmOutput:
         points: list[AlertSeriesPoint] = []
@@ -175,41 +190,110 @@ class HardBooleanGatingAlertAlgorithm:
             "sell_signal": [],
             "composite_score": [],
             "mode": [],
+            "child_count": [],
+            "expected_child_count": [],
+            "warmup_ready": [],
+            "decision_reason": [],
+            "buy_count": [],
+            "sell_count": [],
+            "neutral_count": [],
         }
         child_outputs: list[NormalizedChildOutput] = []
+        decision_reasons: dict[str, int] = {}
+        required_child_count = self._required_child_count()
         for row in self.rows:
-            decision = evaluate_boolean_gating_row(
+            warmup_state = evaluate_child_row_warmup(
                 row,
-                mode=str(self.params["mode"]),
-                tie_policy=str(self.params["tie_policy"]),
-                veto_sell_count=int(self.params["veto_sell_count"]),
+                required_child_count=required_child_count,
             )
-            signal_label = direction_to_signal_label(decision.direction)
-            reason_codes = (str(decision.diagnostics["decision_reason"]),)
+            if warmup_state.is_ready:
+                decision = evaluate_boolean_gating_row(
+                    row,
+                    mode=str(self.params["mode"]),
+                    tie_policy=str(self.params["tie_policy"]),
+                    veto_sell_count=int(self.params["veto_sell_count"]),
+                )
+                signal_label = direction_to_signal_label(decision.direction)
+                reason_codes = (str(decision.diagnostics["decision_reason"]),)
+                diagnostics = {
+                    **decision.diagnostics,
+                    **warmup_state.diagnostics,
+                    "warmup_ready": True,
+                    "timestamp": row.timestamp,
+                }
+                score = float(decision.direction)
+                confidence = decision.confidence
+            else:
+                signal_label = "neutral"
+                reason_codes = (warmup_state.reason_code,)
+                diagnostics = {
+                    "mode": str(self.params["mode"]),
+                    "buy_count": 0,
+                    "sell_count": 0,
+                    "neutral_count": len(row.child_outputs),
+                    "child_count": len(row.child_outputs),
+                    "tie_policy": str(self.params["tie_policy"]),
+                    "veto_sell_count": int(self.params["veto_sell_count"]),
+                    "decision_reason": warmup_state.reason_code,
+                    "child_contributions": build_child_contribution_rows(
+                        row.child_outputs
+                    ),
+                    **warmup_state.diagnostics,
+                    "warmup_ready": False,
+                    "timestamp": row.timestamp,
+                }
+                score = 0.0
+                confidence = 0.0
+            decision_reason = str(diagnostics["decision_reason"])
+            decision_reasons[decision_reason] = (
+                decision_reasons.get(decision_reason, 0) + 1
+            )
             points.append(
                 AlertSeriesPoint(
                     timestamp=row.timestamp,
                     signal_label=signal_label,
-                    score=float(decision.direction),
-                    confidence=decision.confidence,
+                    score=score,
+                    confidence=confidence,
                     reason_codes=reason_codes,
                 )
             )
-            derived_series["buy_signal"].append(decision.direction > 0)
-            derived_series["sell_signal"].append(decision.direction < 0)
-            derived_series["composite_score"].append(float(decision.direction))
+            derived_series["buy_signal"].append(signal_label == "buy")
+            derived_series["sell_signal"].append(signal_label == "sell")
+            derived_series["composite_score"].append(score)
             derived_series["mode"].append(self.params["mode"])
+            derived_series["child_count"].append(diagnostics["child_count"])
+            derived_series["expected_child_count"].append(
+                diagnostics["expected_child_count"]
+            )
+            derived_series["warmup_ready"].append(diagnostics["warmup_ready"])
+            derived_series["decision_reason"].append(decision_reason)
+            derived_series["buy_count"].append(diagnostics["buy_count"])
+            derived_series["sell_count"].append(diagnostics["sell_count"])
+            derived_series["neutral_count"].append(diagnostics["neutral_count"])
             child_outputs.extend(row.child_outputs)
         return AlertAlgorithmOutput(
             algorithm_key=self.algorithm_key,
             points=tuple(points),
             derived_series=derived_series,
+            summary_metrics={
+                "point_count": len(points),
+                "buy_points": sum(1 for point in points if point.signal_label == "buy"),
+                "sell_points": sum(
+                    1 for point in points if point.signal_label == "sell"
+                ),
+                "neutral_points": sum(
+                    1 for point in points if point.signal_label == "neutral"
+                ),
+                "decision_reason_counts": decision_reasons,
+            },
             metadata={
                 "family": "rule_based_combination",
                 "subcategory": "hard",
                 "catalog_ref": "combination:1",
                 "supports_composition": True,
                 "output_contract_version": "1.0",
+                "warmup_period": self.minimum_history(),
+                "reporting_mode": "composite_trace",
                 "params": dict(self.params),
             },
             child_outputs=tuple(child_outputs),

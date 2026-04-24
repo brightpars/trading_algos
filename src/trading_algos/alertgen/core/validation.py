@@ -285,7 +285,7 @@ def require_hard_boolean_gating_param(raw_alg_param, label):
     )
     if veto_sell_count < 0:
         raise ValueError(f"{label} veto_sell_count must be >= 0")
-    return {
+    result = {
         "mode": _require_choice(
             normalized["mode"],
             f"{label} mode",
@@ -299,6 +299,11 @@ def require_hard_boolean_gating_param(raw_alg_param, label):
         "veto_sell_count": veto_sell_count,
         "rows": _require_rows_param(normalized["rows"], label),
     }
+    if normalized.get("expected_child_count") is not None:
+        result["expected_child_count"] = _require_positive_int_like(
+            normalized["expected_child_count"], f"{label} expected_child_count"
+        )
+    return result
 
 
 def require_weighted_linear_score_blend_param(raw_alg_param, label):
@@ -317,6 +322,8 @@ def require_weighted_linear_score_blend_param(raw_alg_param, label):
         )
         for key, value in raw_weights.items()
     }
+    if not weights:
+        raise ValueError(f"{label} weights must not be empty")
     buy_threshold = _require_float_like(
         normalized["buy_threshold"], f"{label} buy_threshold"
     )
@@ -325,12 +332,17 @@ def require_weighted_linear_score_blend_param(raw_alg_param, label):
     )
     if sell_threshold > buy_threshold:
         raise ValueError(f"{label} requires sell_threshold <= buy_threshold")
-    return {
+    result = {
         "weights": weights,
         "buy_threshold": buy_threshold,
         "sell_threshold": sell_threshold,
         "rows": _require_rows_param(normalized["rows"], label),
     }
+    if normalized.get("expected_child_count") is not None:
+        result["expected_child_count"] = _require_positive_int_like(
+            normalized["expected_child_count"], f"{label} expected_child_count"
+        )
+    return result
 
 
 def normalize_alertgen_sensor_config(
