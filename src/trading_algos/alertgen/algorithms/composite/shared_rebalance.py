@@ -162,6 +162,7 @@ def build_rebalance_alert_output(
                 signal_label=signal_label,
                 score=score,
                 confidence=confidence if signal_label != "neutral" else 0.0,
+                diagnostics=dict(row.diagnostics),
                 reason_codes=(reason_code,),
             )
         )

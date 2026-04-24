@@ -7916,10 +7916,8 @@ rows:
     feedback.
   typical_inputs: State features, reward function, action space, simulator or historical environment
   signal_style: Dynamic weights / actions over time
-  framework_blockers:
-  - blocker.rl_environment_v1
-  framework_dependencies:
-  - blocker.rl_environment_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - composite.alignment
   - rl.environment
@@ -7947,7 +7945,7 @@ rows:
   - rl_environment
   fixture_ids:
   - fixture.composite_rl_policy_stub_v1
-  performance_budget_id: perf.execution_engine_v1
+  performance_budget_id: perf.composite_signal_v1
   required_tests:
   - registry
   - param_validation
@@ -7975,10 +7973,8 @@ rows:
     allocations or actions.
   typical_inputs: State features, hierarchical action design, reward functions, child-policy outputs
   signal_style: Layered allocation or action plan
-  framework_blockers:
-  - blocker.rl_environment_v1
-  framework_dependencies:
-  - blocker.rl_environment_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - composite.alignment
   - rl.environment
@@ -8006,7 +8002,7 @@ rows:
   - rl_environment
   fixture_ids:
   - fixture.composite_rl_policy_stub_v1
-  performance_budget_id: perf.execution_engine_v1
+  performance_budget_id: perf.composite_signal_v1
   required_tests:
   - registry
   - param_validation

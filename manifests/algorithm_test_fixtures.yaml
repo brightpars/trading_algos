@@ -287,3 +287,7 @@ fixtures:
   expected_behaviors:
   - State vector is parsed deterministically
   - Policy action maps cleanly to output allocation structure
+  - Warmup-pending rows remain neutral with explicit environment-contract and reason-code diagnostics until min_history is satisfied
+  - Action alias, override, and template fallback configuration preserves normalized gross-exposure limits and resolved action metadata
+  - Hierarchical policy gating restricts actions to the preferred family while preserving preferred-family diagnostics in normalized and portfolio outputs
+  - Interactive report payloads preserve catalog reference alignment, rebalance counts, selected symbols, and latest allocation diagnostics for dashboard explanation
