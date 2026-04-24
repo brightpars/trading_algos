@@ -70,6 +70,8 @@ class FactorPortfolioAlertAlgorithm:
         higher_is_better: bool,
         target_value: float | None,
         weighting_mode: str,
+        field_weights: Sequence[float] | None,
+        lower_is_better_fields: Sequence[str],
     ) -> None:
         self.algorithm_key = algorithm_key
         self.symbol = symbol
@@ -82,6 +84,8 @@ class FactorPortfolioAlertAlgorithm:
         self.higher_is_better = higher_is_better
         self.target_value = target_value
         self.weighting_mode = weighting_mode
+        self.field_weights = tuple(field_weights) if field_weights is not None else None
+        self.lower_is_better_fields = tuple(lower_is_better_fields)
         self.evaluate_window_len = 1
         self.date = ""
         self.eval_dict: dict[str, Any] = {}
@@ -110,6 +114,8 @@ class FactorPortfolioAlertAlgorithm:
             minimum_universe_size=int(self.params["minimum_universe_size"]),
             target_value=self.target_value,
             weighting_mode=self.weighting_mode,
+            field_weights=self.field_weights,
+            lower_is_better_fields=self.lower_is_better_fields,
         )
 
     def minimum_history(self) -> int:
@@ -193,6 +199,8 @@ class FactorPortfolioAlertAlgorithm:
             "weights": [],
             "raw_scores": [],
             "normalized_scores": [],
+            "component_scores": [],
+            "oriented_component_scores": [],
             "missing_metric_symbols": [],
             "warmup_ready": [],
             "selection_reason": [],
@@ -232,6 +240,14 @@ class FactorPortfolioAlertAlgorithm:
             )
             derived_series["normalized_scores"].append(
                 _diagnostic_mapping(row.diagnostics.get("normalized_scores", {}))
+            )
+            derived_series["component_scores"].append(
+                _diagnostic_mapping(row.diagnostics.get("component_scores", {}))
+            )
+            derived_series["oriented_component_scores"].append(
+                _diagnostic_mapping(
+                    row.diagnostics.get("oriented_component_scores", {})
+                )
             )
             derived_series["missing_metric_symbols"].append(
                 _diagnostic_sequence(row.diagnostics.get("missing_metric_symbols", ()))
@@ -295,6 +311,8 @@ def build_factor_portfolio_algorithm(
     higher_is_better: bool,
     target_value: float | None = None,
     weighting_mode: str = "equal_weight",
+    field_weights: Sequence[float] | None = None,
+    lower_is_better_fields: Sequence[str] = (),
 ) -> FactorPortfolioAlertAlgorithm:
     return FactorPortfolioAlertAlgorithm(
         algorithm_key=algorithm_key,
@@ -308,4 +326,6 @@ def build_factor_portfolio_algorithm(
         higher_is_better=higher_is_better,
         target_value=target_value,
         weighting_mode=weighting_mode,
+        field_weights=field_weights,
+        lower_is_better_fields=lower_is_better_fields,
     )

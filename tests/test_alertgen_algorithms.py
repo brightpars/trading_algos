@@ -549,7 +549,9 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "volume_confirmed_momentum",
         "residual_momentum",
         "low_volatility_strategy",
+        "residual_volatility_strategy",
         "low_beta_betting_against_beta",
+        "defensive_equity_strategy",
         "dividend_yield_strategy",
         "growth_factor_strategy",
         "liquidity_factor_strategy",
@@ -559,8 +561,11 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "profitability_factor_strategy",
         "earnings_quality_strategy",
         "low_leverage_balance_sheet_strength",
+        "investment_quality_strategy",
+        "earnings_stability_low_earnings_variability",
         "value_strategy",
         "quality_strategy",
+        "multi_factor_composite",
         "support_resistance_bounce",
         "breakout_retest",
         "pivot_point_strategy",
@@ -6090,6 +6095,496 @@ def test_factor_wave_2_performance_smoke_on_fixture_repetition(tmp_path) -> None
                 "alg_param": {
                     "rows": rows,
                     "field_names": field_names,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    **extra_params,
+                },
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "rebalance_report"
+        assert len(output.points) >= 1
+
+
+@pytest.mark.parametrize(
+    (
+        "alg_key",
+        "field_names",
+        "expected_catalog_ref",
+        "expected_family",
+        "expected_first_top",
+        "expected_second_top",
+        "extra_params",
+    ),
+    [
+        (
+            "multi_factor_composite",
+            [
+                "price_to_book",
+                "price_to_earnings",
+                "return_on_equity",
+                "gross_margin",
+                "volatility_20d",
+                "realized_volatility",
+            ],
+            "algorithm:88",
+            "fundamental_ml_composite",
+            "AAA",
+            "BBB",
+            {
+                "field_weights": [0.20, 0.15, 0.20, 0.15, 0.15, 0.15],
+                "lower_is_better_fields": [
+                    "price_to_book",
+                    "price_to_earnings",
+                    "volatility_20d",
+                    "realized_volatility",
+                ],
+            },
+        ),
+        (
+            "residual_volatility_strategy",
+            ["beta_252d", "volatility_20d", "realized_volatility"],
+            "algorithm:102",
+            "factor_risk_premia",
+            "AAA",
+            "BBB",
+            {
+                "field_weights": [0.25, 0.35, 0.40],
+                "lower_is_better_fields": [
+                    "beta_252d",
+                    "volatility_20d",
+                    "realized_volatility",
+                ],
+            },
+        ),
+        (
+            "defensive_equity_strategy",
+            [
+                "volatility_20d",
+                "beta_252d",
+                "cash_earnings_ratio",
+                "earnings_stability",
+            ],
+            "algorithm:104",
+            "factor_risk_premia",
+            "AAA",
+            "BBB",
+            {
+                "field_weights": [0.30, 0.20, 0.25, 0.25],
+                "lower_is_better_fields": ["volatility_20d", "beta_252d"],
+            },
+        ),
+        (
+            "investment_quality_strategy",
+            [
+                "debt_to_equity",
+                "net_debt_to_ebitda",
+                "return_on_assets",
+                "gross_profitability",
+            ],
+            "algorithm:112",
+            "factor_risk_premia",
+            "AAA",
+            "BBB",
+            {
+                "field_weights": [0.25, 0.20, 0.25, 0.30],
+                "lower_is_better_fields": ["debt_to_equity", "net_debt_to_ebitda"],
+            },
+        ),
+        (
+            "earnings_stability_low_earnings_variability",
+            ["earnings_stability", "cash_earnings_ratio"],
+            "algorithm:114",
+            "factor_risk_premia",
+            "AAA",
+            "BBB",
+            {"field_weights": [0.65, 0.35]},
+        ),
+    ],
+)
+def test_factor_wave_3_registration_and_fixture_behavior(
+    tmp_path,
+    alg_key,
+    field_names,
+    expected_catalog_ref,
+    expected_family,
+    expected_first_top,
+    expected_second_top,
+    extra_params,
+) -> None:
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+    assert spec.catalog_ref == expected_catalog_ref
+    assert spec.family == expected_family
+    assert spec.output_modes == ("ranking", "selection", "weights", "diagnostics")
+
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": alg_key,
+            "alg_param": {
+                "rows": rows,
+                "field_names": field_names,
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                **extra_params,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+
+    assert [point.signal_label for point in output.points] == ["buy", "buy"]
+    assert output.derived_series["top_symbol"] == [
+        expected_first_top,
+        expected_second_top,
+    ]
+    assert output.metadata["catalog_ref"] == expected_catalog_ref
+    assert output.metadata["family"] == expected_family
+    assert portfolio_output.metadata["catalog_ref"] == expected_catalog_ref
+    assert portfolio_output.metadata["family"] == expected_family
+    assert child_output.diagnostics["catalog_ref"] == expected_catalog_ref
+    assert child_output.diagnostics["family"] == expected_family
+    assert child_output.diagnostics["selected_symbols"]
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert portfolio_output.rebalances[0].ranking[0].symbol == expected_first_top
+    assert portfolio_output.rebalances[-1].ranking[0].symbol == expected_second_top
+    assert "component_scores" in output.derived_series
+    assert "oriented_component_scores" in output.derived_series
+    assert output.derived_series["component_scores"][-1][expected_second_top]
+    assert output.derived_series["oriented_component_scores"][-1][expected_second_top]
+    if "field_weights" in extra_params:
+        assert child_output.diagnostics["field_weights"] == tuple(
+            extra_params["field_weights"]
+        )
+    if "lower_is_better_fields" in extra_params:
+        assert child_output.diagnostics["lower_is_better_fields"] == tuple(
+            sorted(extra_params["lower_is_better_fields"])
+        )
+
+
+def test_factor_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="field_weights must match field_names length"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "multi_factor_composite",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": ["price_to_book", "price_to_earnings"],
+                    "field_weights": [1.0],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+    with pytest.raises(
+        ValueError, match="lower_is_better_fields must be a subset of field_names"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "residual_volatility_strategy",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": ["beta_252d", "volatility_20d"],
+                    "field_weights": [0.5, 0.5],
+                    "lower_is_better_fields": ["beta_252d", "missing_field"],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+    with pytest.raises(ValueError, match=r"field_weights\[0\] must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "defensive_equity_strategy",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": ["volatility_20d", "beta_252d"],
+                    "field_weights": [0.0, 1.0],
+                    "lower_is_better_fields": ["volatility_20d", "beta_252d"],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+
+def test_factor_wave_3_fixture_behavior_matches_manifest_expectations(tmp_path) -> None:
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    expected_top_symbols = {
+        "multi_factor_composite": ["AAA", "BBB"],
+        "residual_volatility_strategy": ["AAA", "BBB"],
+        "defensive_equity_strategy": ["AAA", "BBB"],
+        "investment_quality_strategy": ["AAA", "BBB"],
+        "earnings_stability_low_earnings_variability": ["AAA", "BBB"],
+    }
+    params_by_alg = {
+        "multi_factor_composite": {
+            "field_names": [
+                "price_to_book",
+                "price_to_earnings",
+                "return_on_equity",
+                "gross_margin",
+                "volatility_20d",
+                "realized_volatility",
+            ],
+            "field_weights": [0.20, 0.15, 0.20, 0.15, 0.15, 0.15],
+            "lower_is_better_fields": [
+                "price_to_book",
+                "price_to_earnings",
+                "volatility_20d",
+                "realized_volatility",
+            ],
+        },
+        "residual_volatility_strategy": {
+            "field_names": ["beta_252d", "volatility_20d", "realized_volatility"],
+            "field_weights": [0.25, 0.35, 0.40],
+            "lower_is_better_fields": [
+                "beta_252d",
+                "volatility_20d",
+                "realized_volatility",
+            ],
+        },
+        "defensive_equity_strategy": {
+            "field_names": [
+                "volatility_20d",
+                "beta_252d",
+                "cash_earnings_ratio",
+                "earnings_stability",
+            ],
+            "field_weights": [0.30, 0.20, 0.25, 0.25],
+            "lower_is_better_fields": ["volatility_20d", "beta_252d"],
+        },
+        "investment_quality_strategy": {
+            "field_names": [
+                "debt_to_equity",
+                "net_debt_to_ebitda",
+                "return_on_assets",
+                "gross_profitability",
+            ],
+            "field_weights": [0.25, 0.20, 0.25, 0.30],
+            "lower_is_better_fields": ["debt_to_equity", "net_debt_to_ebitda"],
+        },
+        "earnings_stability_low_earnings_variability": {
+            "field_names": ["earnings_stability", "cash_earnings_ratio"],
+            "field_weights": [0.65, 0.35],
+        },
+    }
+
+    for alg_key, expected in expected_top_symbols.items():
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": rows,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    **params_by_alg[alg_key],
+                },
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / alg_key),
+        )
+
+        output = algorithm.normalized_output()
+        assert output.derived_series["top_symbol"] == expected
+
+
+def test_factor_wave_3_diagnostics_expose_weighted_components_and_contract(
+    tmp_path,
+) -> None:
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "multi_factor_composite",
+            "alg_param": {
+                "rows": rows,
+                "field_names": [
+                    "price_to_book",
+                    "price_to_earnings",
+                    "return_on_equity",
+                    "gross_margin",
+                    "volatility_20d",
+                    "realized_volatility",
+                ],
+                "field_weights": [0.20, 0.15, 0.20, 0.15, 0.15, 0.15],
+                "lower_is_better_fields": [
+                    "price_to_book",
+                    "price_to_earnings",
+                    "volatility_20d",
+                    "realized_volatility",
+                ],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+    latest_rebalance = portfolio_output.rebalances[-1]
+
+    assert output.summary_metrics == {"rebalance_count": 2, "selection_count": 2}
+    assert output.derived_series["selected_symbols"][-1] == ["BBB", "CCC"]
+    assert output.derived_series["weights"][-1] == {
+        "BBB": pytest.approx(0.5),
+        "CCC": pytest.approx(0.5),
+    }
+    assert latest_rebalance.diagnostics["field_weights"] == (
+        0.20,
+        0.15,
+        0.20,
+        0.15,
+        0.15,
+        0.15,
+    )
+    assert latest_rebalance.diagnostics["component_scores"]["BBB"][
+        "return_on_equity"
+    ] == pytest.approx(0.26)
+    assert latest_rebalance.diagnostics["oriented_component_scores"]["BBB"][
+        "price_to_book"
+    ] == pytest.approx(-1.1)
+    assert child_output.diagnostics["component_scores"]["BBB"][
+        "gross_margin"
+    ] == pytest.approx(0.50)
+    assert child_output.diagnostics["lower_is_better_fields"] == (
+        "price_to_book",
+        "price_to_earnings",
+        "realized_volatility",
+        "volatility_20d",
+    )
+
+
+def test_factor_wave_3_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = _build_factor_fixture_rows() * 50
+    algorithms: list[tuple[str, dict[str, Any]]] = [
+        (
+            "multi_factor_composite",
+            {
+                "field_names": [
+                    "price_to_book",
+                    "price_to_earnings",
+                    "return_on_equity",
+                    "gross_margin",
+                    "volatility_20d",
+                    "realized_volatility",
+                ],
+                "field_weights": [0.20, 0.15, 0.20, 0.15, 0.15, 0.15],
+                "lower_is_better_fields": [
+                    "price_to_book",
+                    "price_to_earnings",
+                    "volatility_20d",
+                    "realized_volatility",
+                ],
+            },
+        ),
+        (
+            "residual_volatility_strategy",
+            {
+                "field_names": [
+                    "beta_252d",
+                    "volatility_20d",
+                    "realized_volatility",
+                ],
+                "field_weights": [0.25, 0.35, 0.40],
+                "lower_is_better_fields": [
+                    "beta_252d",
+                    "volatility_20d",
+                    "realized_volatility",
+                ],
+            },
+        ),
+        (
+            "defensive_equity_strategy",
+            {
+                "field_names": [
+                    "volatility_20d",
+                    "beta_252d",
+                    "cash_earnings_ratio",
+                    "earnings_stability",
+                ],
+                "field_weights": [0.30, 0.20, 0.25, 0.25],
+                "lower_is_better_fields": ["volatility_20d", "beta_252d"],
+            },
+        ),
+        (
+            "investment_quality_strategy",
+            {
+                "field_names": [
+                    "debt_to_equity",
+                    "net_debt_to_ebitda",
+                    "return_on_assets",
+                    "gross_profitability",
+                ],
+                "field_weights": [0.25, 0.20, 0.25, 0.30],
+                "lower_is_better_fields": ["debt_to_equity", "net_debt_to_ebitda"],
+            },
+        ),
+        (
+            "earnings_stability_low_earnings_variability",
+            {
+                "field_names": ["earnings_stability", "cash_earnings_ratio"],
+                "field_weights": [0.65, 0.35],
+            },
+        ),
+    ]
+
+    for index, (alg_key, extra_params) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": rows,
                     "rebalance_frequency": "monthly",
                     "top_n": 2,
                     "bottom_n": 0,

@@ -119,6 +119,20 @@ def _require_non_negative_float_like(value, label):
     return parsed
 
 
+def _require_positive_float_list(value, label, *, minimum_length=1):
+    if not isinstance(value, list):
+        raise ValueError(f"{label} must be a list")
+    normalized = []
+    for index, item in enumerate(value):
+        parsed = _require_non_negative_float_like(item, f"{label}[{index}]")
+        if parsed == 0.0:
+            raise ValueError(f"{label}[{index}] must be > 0")
+        normalized.append(parsed)
+    if len(normalized) < minimum_length:
+        raise ValueError(f"{label} must contain at least {minimum_length} items")
+    return normalized
+
+
 def _require_choice(value, label, *, allowed):
     normalized = _require_non_empty_string(value, label).lower()
     if normalized not in allowed:
@@ -1615,6 +1629,30 @@ def require_factor_portfolio_param(raw_alg_param, label):
             target_value,
             f"{label} target_value",
         )
+    field_weights = normalized.get("field_weights")
+    if field_weights is not None:
+        normalized_field_weights = _require_positive_float_list(
+            field_weights,
+            f"{label} field_weights",
+            minimum_length=1,
+        )
+        if len(normalized_field_weights) != len(result["field_names"]):
+            raise ValueError(f"{label} field_weights must match field_names length")
+        result["field_weights"] = normalized_field_weights
+    lower_is_better_fields = normalized.get("lower_is_better_fields")
+    if lower_is_better_fields is not None:
+        normalized_lower_fields = _require_non_empty_string_list(
+            lower_is_better_fields,
+            f"{label} lower_is_better_fields",
+        )
+        invalid_fields = sorted(
+            set(normalized_lower_fields).difference(result["field_names"])
+        )
+        if invalid_fields:
+            raise ValueError(
+                f"{label} lower_is_better_fields must be a subset of field_names"
+            )
+        result["lower_is_better_fields"] = normalized_lower_fields
     return result
 
 
