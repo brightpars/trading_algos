@@ -4,8 +4,6 @@ from typing import Any
 
 from trading_algos.alertgen.algorithms.composite.shared_rebalance import (
     CompositeRebalanceRow,
-    build_portfolio_weight_output,
-    build_rebalance_alert_output,
     clamp_signed_unit,
     clamp_unit_interval,
     compute_mean,
@@ -13,6 +11,8 @@ from trading_algos.alertgen.algorithms.composite.shared_rebalance import (
     extract_sleeve_returns,
     filter_rebalance_rows,
     normalize_weight_map,
+    build_portfolio_weight_output,
+    build_rebalance_alert_output,
 )
 from trading_algos.alertgen.contracts.outputs import AlertAlgorithmOutput
 from trading_algos.alertgen.shared_utils.models import (
@@ -22,39 +22,41 @@ from trading_algos.alertgen.shared_utils.models import (
 from trading_algos.contracts.portfolio_output import RankedAsset
 
 
-def evaluate_risk_budget_rows(
+def evaluate_constrained_multi_factor_rows(
     raw_rows: list[dict[str, Any]],
     *,
     rebalance_frequency: str,
     target_gross_exposure: float,
     min_history: int,
+    max_weight: float,
 ) -> tuple[CompositeRebalanceRow, ...]:
     rows: list[CompositeRebalanceRow] = []
     for raw_row in filter_rebalance_rows(
-        raw_rows,
-        rebalance_frequency=rebalance_frequency,
+        raw_rows, rebalance_frequency=rebalance_frequency
     ):
         timestamp = str(raw_row.get("ts", raw_row.get("timestamp", ""))).strip()
-        sleeve_returns = extract_sleeve_returns(raw_row, label="risk_budgeting")
-        stats: list[tuple[str, float, float, float]] = []
+        sleeve_returns = extract_sleeve_returns(
+            raw_row,
+            label="constrained_multi_factor_optimization",
+        )
+        scored: list[tuple[str, float, float, float]] = []
         insufficient_history: list[str] = []
         for sleeve, values in sleeve_returns.items():
             if len(values) < min_history:
                 insufficient_history.append(sleeve)
                 continue
+            mean_return = compute_mean(values)
             volatility = compute_volatility(values)
-            inverse_risk_weight = 0.0 if volatility <= 0.0 else 1.0 / volatility
-            stats.append(
-                (sleeve, compute_mean(values), volatility, inverse_risk_weight)
-            )
+            stability = 0.0 if volatility <= 0.0 else mean_return / volatility
+            score = max(stability, 0.0)
+            scored.append((sleeve, mean_return, volatility, score))
         ordered = sorted(
-            stats,
-            key=lambda item: (item[2], -item[1], item[0]),
+            scored, key=lambda item: (-item[3], -item[1], item[2], item[0])
         )
         raw_weights = {
-            sleeve: inverse_risk_weight
-            for sleeve, _mean_return, _volatility, inverse_risk_weight in ordered
-            if inverse_risk_weight > 0.0
+            sleeve: min(max_weight, score)
+            for sleeve, _mean_return, _volatility, score in ordered
+            if score > 0.0
         }
         weights = normalize_weight_map(
             raw_weights,
@@ -67,48 +69,36 @@ def evaluate_risk_budget_rows(
             RankedAsset(
                 symbol=sleeve,
                 rank=index,
-                score=-volatility,
+                score=score,
                 weight=weights.get(sleeve, 0.0),
                 selected=sleeve in selected_symbols,
                 side="long" if sleeve in selected_symbols else "neutral",
             )
-            for index, (
-                sleeve,
-                _mean_return,
-                volatility,
-                _inverse_risk_weight,
-            ) in enumerate(ordered, start=1)
-        )
-        total_inverse_risk = sum(
-            inverse_risk_weight for *_head, inverse_risk_weight in ordered
-        )
-        risk_contributions = {
-            sleeve: (
-                0.0
-                if total_inverse_risk <= 0.0
-                else inverse_risk_weight / total_inverse_risk
+            for index, (sleeve, _mean_return, _volatility, score) in enumerate(
+                ordered, start=1
             )
-            for sleeve, _mean_return, _volatility, inverse_risk_weight in ordered
-        }
-        selection_reason = "selection_ready"
-        if not ordered:
-            selection_reason = "warmup_pending"
+        )
         diagnostics = {
-            "rebalance_frequency": raw_row.get("rebalance_frequency", "monthly"),
+            "rebalance_frequency": rebalance_frequency,
             "warmup_ready": bool(ordered),
-            "selection_reason": selection_reason,
+            "selection_reason": "selection_ready" if ordered else "warmup_pending",
             "selected_symbols": list(selected_symbols),
             "selected_count": len(selected_symbols),
             "target_gross_exposure": target_gross_exposure,
-            "risk_contributions": risk_contributions,
+            "max_weight": max_weight,
             "insufficient_history_sleeves": tuple(sorted(insufficient_history)),
-            "volatility_by_sleeve": {
-                sleeve: volatility
-                for sleeve, _mean_return, volatility, _inverse_risk_weight in ordered
-            },
             "mean_return_by_sleeve": {
-                sleeve: mean_return
-                for sleeve, mean_return, _volatility, _inverse_risk_weight in ordered
+                sleeve: mean_return for sleeve, mean_return, _, _ in ordered
+            },
+            "volatility_by_sleeve": {
+                sleeve: volatility for sleeve, _, volatility, _ in ordered
+            },
+            "optimization_score_by_sleeve": {
+                sleeve: score for sleeve, _, _, score in ordered
+            },
+            "constraint_flags": {
+                sleeve: weights.get(sleeve, 0.0) >= max_weight - 1e-9
+                for sleeve, _, _, _score in ordered
             },
             "top_ranked_symbol": ranking[0].symbol if ranking else None,
             "top_ranked_score": ranking[0].score if ranking else None,
@@ -125,8 +115,8 @@ def evaluate_risk_budget_rows(
     return tuple(rows)
 
 
-class RiskBudgetingRiskParityAlertAlgorithm:
-    catalog_ref = "combination:5"
+class ConstrainedMultiFactorOptimizationAlertAlgorithm:
+    catalog_ref = "combination:4"
 
     def __init__(
         self, *, algorithm_key: str, symbol: str, params: dict[str, Any]
@@ -138,11 +128,12 @@ class RiskBudgetingRiskParityAlertAlgorithm:
         self.evaluate_window_len = 1
         self.date = ""
         self.eval_dict: dict[str, Any] = {}
-        self._rows = evaluate_risk_budget_rows(
+        self._rows = evaluate_constrained_multi_factor_rows(
             list(params["rows"]),
             rebalance_frequency=str(params["rebalance_frequency"]),
             target_gross_exposure=float(params["target_gross_exposure"]),
             min_history=int(params["min_history"]),
+            max_weight=float(params["max_weight"]),
         )
         self.latest_predicted_trend = (
             "buy" if self._rows and self._rows[-1].weights else "neutral"
@@ -183,8 +174,8 @@ class RiskBudgetingRiskParityAlertAlgorithm:
         return build_portfolio_weight_output(
             self.algorithm_key,
             self._rows,
-            family="risk_overlay",
-            subcategory="risk",
+            family="optimization_based",
+            subcategory="constrained",
             catalog_ref=self.catalog_ref,
             reporting_mode="allocation_trace",
         )
@@ -192,8 +183,8 @@ class RiskBudgetingRiskParityAlertAlgorithm:
     def normalized_output(self) -> AlertAlgorithmOutput:
         return build_rebalance_alert_output(
             algorithm_key=self.algorithm_key,
-            family="risk_overlay",
-            subcategory="risk",
+            family="optimization_based",
+            subcategory="constrained",
             catalog_ref=self.catalog_ref,
             reporting_mode="allocation_trace",
             warmup_period=self.minimum_history(),
@@ -218,10 +209,10 @@ class RiskBudgetingRiskParityAlertAlgorithm:
         ]
 
 
-def build_risk_budgeting_risk_parity_algorithm(
+def build_constrained_multi_factor_optimization_algorithm(
     *, algorithm_key: str, symbol: str, alg_param: dict[str, Any], **_kwargs: Any
-) -> RiskBudgetingRiskParityAlertAlgorithm:
-    return RiskBudgetingRiskParityAlertAlgorithm(
+) -> ConstrainedMultiFactorOptimizationAlertAlgorithm:
+    return ConstrainedMultiFactorOptimizationAlertAlgorithm(
         algorithm_key=algorithm_key,
         symbol=symbol,
         params=alg_param,

@@ -13,6 +13,7 @@ from trading_algos.contracts.portfolio_output import (
     PortfolioWeightOutput,
     RankedAsset,
 )
+from trading_algos.rebalance.calendar import select_rebalance_timestamps
 from trading_algos.rebalance.runner import build_rebalance_result
 
 
@@ -31,6 +32,58 @@ class CompositeRebalanceRow:
     selected_symbols: tuple[str, ...]
     weights: dict[str, float]
     diagnostics: dict[str, Any]
+
+
+def coerce_float(value: Any) -> float | None:
+    try:
+        if value is None:
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def extract_sleeve_returns(
+    raw_row: Mapping[str, Any], *, label: str
+) -> dict[str, list[float]]:
+    sleeves = raw_row.get("sleeve_returns", raw_row.get("sleeves", {}))
+    if not isinstance(sleeves, dict):
+        raise ValueError(f"{label}: sleeve_returns must be a dict")
+    normalized: dict[str, list[float]] = {}
+    for sleeve, values in sleeves.items():
+        if not isinstance(values, list):
+            raise ValueError(f"{label}: sleeve_returns[{sleeve}] must be a list")
+        parsed = [coerce_float(item) for item in values]
+        normalized[str(sleeve)] = [item for item in parsed if item is not None]
+    return normalized
+
+
+def compute_mean(values: Sequence[float]) -> float:
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
+
+
+def compute_volatility(values: Sequence[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    mean_value = compute_mean(values)
+    variance = sum((value - mean_value) ** 2 for value in values) / len(values)
+    return variance**0.5
+
+
+def filter_rebalance_rows(
+    raw_rows: Sequence[Mapping[str, Any]], *, rebalance_frequency: str
+) -> list[dict[str, Any]]:
+    timestamp_map = {
+        str(row.get("ts", row.get("timestamp", ""))).strip(): dict(row)
+        for row in raw_rows
+    }
+    selected = select_rebalance_timestamps(
+        tuple(timestamp for timestamp in timestamp_map if timestamp),
+        frequency=rebalance_frequency,
+    )
+    return [timestamp_map[timestamp] for timestamp in selected]
 
 
 def build_portfolio_weight_output(

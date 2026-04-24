@@ -1,5 +1,11 @@
 from trading_algos.algorithmspec import AlertAlgorithmSpec, register_algorithm
 from trading_algos.alertgen.algorithms.composite.aggregate import agreegate_algs
+from trading_algos.alertgen.algorithms.composite.adaptive_state_based.catalog import (
+    register_adaptive_state_based_alert_algorithms,
+)
+from trading_algos.alertgen.algorithms.composite.optimization_based.catalog import (
+    register_optimization_based_alert_algorithms,
+)
 from trading_algos.alertgen.algorithms.composite.risk_overlay.catalog import (
     register_risk_overlay_alert_algorithms,
 )
@@ -68,6 +74,8 @@ def _build_aggregate_channel_dual_window(
 def register_composite_alert_algorithms() -> None:
     register_rule_based_combination_alert_algorithms()
     register_risk_overlay_alert_algorithms()
+    register_optimization_based_alert_algorithms()
+    register_adaptive_state_based_alert_algorithms()
     specs = [
         AlertAlgorithmSpec(
             key="aggregate_boundary_and_channel",

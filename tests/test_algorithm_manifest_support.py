@@ -98,6 +98,16 @@ def test_performance_smoke_case_loads_combination_method_budget_mapping() -> Non
             "Volatility Targeting Overlay",
             ("fixture.composite_risk_budget_v1",),
         ),
+        (
+            "combination:4",
+            "Constrained Multi-Factor Optimization",
+            ("fixture.composite_risk_budget_v1",),
+        ),
+        (
+            "combination:7",
+            "Regime Switching / HMM Gating",
+            ("fixture.composite_regime_switch_v1",),
+        ),
     ],
 )
 def test_composite_wave_2_performance_smoke_cases_load_expected_budget_mapping(
@@ -110,7 +120,12 @@ def test_composite_wave_2_performance_smoke_cases_load_expected_budget_mapping(
     assert smoke_case.catalog_ref == catalog_ref
     assert smoke_case.kind == "combination_method"
     assert smoke_case.name == expected_name
-    assert smoke_case.performance_budget_id == "perf.cross_sectional_rebalance_v1"
+    expected_budget = (
+        "perf.composite_signal_v1"
+        if catalog_ref == "combination:7"
+        else "perf.cross_sectional_rebalance_v1"
+    )
+    assert smoke_case.performance_budget_id == expected_budget
     assert smoke_case.fixture_ids == expected_fixture_ids
 
 

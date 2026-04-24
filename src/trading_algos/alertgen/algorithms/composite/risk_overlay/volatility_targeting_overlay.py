@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from math import sqrt
 from typing import Any
 
 from trading_algos.alertgen.algorithms.composite.shared_rebalance import (
@@ -9,6 +8,9 @@ from trading_algos.alertgen.algorithms.composite.shared_rebalance import (
     build_rebalance_alert_output,
     clamp_signed_unit,
     clamp_unit_interval,
+    coerce_float,
+    compute_volatility,
+    filter_rebalance_rows,
     normalize_weight_map,
 )
 from trading_algos.alertgen.contracts.outputs import AlertAlgorithmOutput
@@ -19,30 +21,13 @@ from trading_algos.alertgen.shared_utils.models import (
 from trading_algos.contracts.portfolio_output import RankedAsset
 
 
-def _coerce_float(value: Any) -> float | None:
-    try:
-        if value is None:
-            return None
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
 def _extract_portfolio_returns(raw_row: dict[str, Any]) -> list[float]:
     values = raw_row.get("portfolio_returns", raw_row.get("returns", []))
     if not isinstance(values, list):
         raise ValueError("volatility_targeting: portfolio_returns must be a list")
     return [
-        item for item in (_coerce_float(value) for value in values) if item is not None
+        item for item in (coerce_float(value) for value in values) if item is not None
     ]
-
-
-def _realized_volatility(values: list[float]) -> float:
-    if len(values) < 2:
-        return 0.0
-    mean_value = sum(values) / len(values)
-    variance = sum((value - mean_value) ** 2 for value in values) / len(values)
-    return sqrt(max(variance, 0.0))
 
 
 def evaluate_volatility_target_rows(
@@ -55,11 +40,16 @@ def evaluate_volatility_target_rows(
     min_leverage: float,
 ) -> tuple[CompositeRebalanceRow, ...]:
     rows: list[CompositeRebalanceRow] = []
-    for raw_row in raw_rows:
+    for raw_row in filter_rebalance_rows(
+        raw_rows,
+        rebalance_frequency=str(raw_rows[0].get("rebalance_frequency", "all"))
+        if raw_rows
+        else "all",
+    ):
         timestamp = str(raw_row.get("ts", raw_row.get("timestamp", ""))).strip()
         returns = _extract_portfolio_returns(raw_row)
         warmup_ready = len(returns) >= min_history
-        realized_vol = _realized_volatility(returns) if warmup_ready else 0.0
+        realized_vol = compute_volatility(returns) if warmup_ready else 0.0
         if warmup_ready and realized_vol > 0.0:
             leverage = target_volatility / realized_vol
         else:

@@ -30,6 +30,11 @@ from trading_algos.alertgen.algorithms.mean_reversion.mean_reversion_helpers imp
     cumulative_session_vwap,
     rolling_ou_reversion_ratio,
 )
+from trading_algos.regime.state import (
+    apply_regime_hysteresis,
+    normalize_probability_map,
+    smooth_regime_probabilities,
+)
 
 
 def test_simple_and_exponential_moving_averages_return_expected_shapes() -> None:
@@ -269,3 +274,30 @@ def test_align_child_outputs_normalizes_child_stream_rows() -> None:
     assert rows[0].child_outputs[0].score == 1.0
     assert rows[0].child_outputs[0].confidence == 1.0
     assert rows[0].child_outputs[1].direction == 0
+
+
+def test_regime_state_helpers_smooth_and_apply_hysteresis() -> None:
+    current = normalize_probability_map({"risk_on": 0.8, "risk_off": 0.2})
+    smoothed = smooth_regime_probabilities(
+        {"risk_on": 0.4, "risk_off": 0.6},
+        current,
+        smoothing=0.25,
+    )
+
+    assert smoothed["risk_on"] > smoothed["risk_off"]
+    assert (
+        apply_regime_hysteresis(
+            "risk_off",
+            {"risk_on": 0.54, "risk_off": 0.46},
+            switch_threshold=0.60,
+        )
+        == "risk_off"
+    )
+    assert (
+        apply_regime_hysteresis(
+            "risk_off",
+            {"risk_on": 0.70, "risk_off": 0.30},
+            switch_threshold=0.60,
+        )
+        == "risk_on"
+    )

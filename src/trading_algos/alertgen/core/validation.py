@@ -1981,6 +1981,97 @@ def require_volatility_targeting_overlay_param(raw_alg_param, label):
     }
 
 
+def require_constrained_multi_factor_optimization_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "rebalance_frequency",
+            "target_gross_exposure",
+            "min_history",
+            "max_weight",
+        ],
+        label,
+    )
+    target_gross_exposure = _require_non_negative_float_like(
+        normalized["target_gross_exposure"], f"{label} target_gross_exposure"
+    )
+    max_weight = _require_non_negative_float_like(
+        normalized["max_weight"], f"{label} max_weight"
+    )
+    if target_gross_exposure == 0.0:
+        raise ValueError(f"{label} target_gross_exposure must be > 0")
+    if max_weight == 0.0:
+        raise ValueError(f"{label} max_weight must be > 0")
+    return {
+        "rows": _require_rows_param(normalized["rows"], label),
+        "rebalance_frequency": _require_choice(
+            normalized["rebalance_frequency"],
+            f"{label} rebalance_frequency",
+            allowed={"monthly", "weekly", "all"},
+        ),
+        "target_gross_exposure": target_gross_exposure,
+        "min_history": _require_positive_int_like(
+            normalized["min_history"], f"{label} min_history"
+        ),
+        "max_weight": max_weight,
+    }
+
+
+def require_regime_switching_hmm_gating_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "regime_field",
+            "regime_map",
+            "smoothing",
+            "switch_threshold",
+        ],
+        label,
+    )
+    regime_map = normalized["regime_map"]
+    if not isinstance(regime_map, dict):
+        raise ValueError(f"{label} regime_map must be a dict")
+    normalized_map: dict[str, list[str]] = {}
+    for regime_label, child_keys in regime_map.items():
+        if not isinstance(child_keys, list):
+            raise ValueError(f"{label} regime_map[{regime_label}] must be a list")
+        normalized_map[
+            _require_non_empty_string(regime_label, f"{label} regime_map key")
+        ] = [
+            _require_non_empty_string(
+                child_key,
+                f"{label} regime_map[{regime_label}][{index}]",
+            )
+            for index, child_key in enumerate(child_keys)
+        ]
+    return {
+        "rows": _require_dict_rows(normalized["rows"], label),
+        "regime_field": _require_non_empty_string(
+            normalized["regime_field"], f"{label} regime_field"
+        ),
+        "regime_map": normalized_map,
+        "default_signal": _require_choice(
+            normalized.get("default_signal", "neutral"),
+            f"{label} default_signal",
+            allowed={"buy", "sell", "neutral"},
+        ),
+        "smoothing": _require_non_negative_float_like(
+            normalized["smoothing"], f"{label} smoothing"
+        ),
+        "switch_threshold": _require_non_negative_float_like(
+            normalized["switch_threshold"], f"{label} switch_threshold"
+        ),
+        "expected_child_count": _require_positive_int_like(
+            normalized.get("expected_child_count", 1),
+            f"{label} expected_child_count",
+        ),
+    }
+
+
 def normalize_alertgen_sensor_config(
     sensor_config, label="Alert generator sensor_config"
 ):
