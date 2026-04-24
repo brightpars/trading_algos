@@ -52,18 +52,24 @@ class FactorPortfolioAlertAlgorithm:
         alg_name: str,
         subcategory: str,
         params: dict[str, Any],
+        family: str,
         factor_name: str,
         field_names: Sequence[str],
         higher_is_better: bool,
+        target_value: float | None,
+        weighting_mode: str,
     ) -> None:
         self.algorithm_key = algorithm_key
         self.symbol = symbol
         self.alg_name = alg_name
         self.subcategory = subcategory
         self.params = params
+        self.family = family
         self.factor_name = factor_name
         self.field_names = tuple(field_names)
         self.higher_is_better = higher_is_better
+        self.target_value = target_value
+        self.weighting_mode = weighting_mode
         self.evaluate_window_len = 1
         self.date = ""
         self.eval_dict: dict[str, Any] = {}
@@ -90,6 +96,8 @@ class FactorPortfolioAlertAlgorithm:
             bottom_n=int(self.params.get("bottom_n", 0)),
             long_only=bool(self.params["long_only"]),
             minimum_universe_size=int(self.params["minimum_universe_size"]),
+            target_value=self.target_value,
+            weighting_mode=self.weighting_mode,
         )
 
     def minimum_history(self) -> int:
@@ -121,6 +129,7 @@ class FactorPortfolioAlertAlgorithm:
             self.algorithm_key,
             self._rows,
             catalog_ref=self.catalog_ref,
+            family=self.family,
             subcategory=self.subcategory,
         )
 
@@ -147,7 +156,7 @@ class FactorPortfolioAlertAlgorithm:
             regime_label="selected" if row.selected_symbols else "neutral",
             direction=1 if row.selected_symbols else 0,
             diagnostics={
-                "family": "factor_risk_premia",
+                "family": self.family,
                 "subcategory": self.subcategory,
                 "catalog_ref": self.catalog_ref,
                 "reporting_mode": "rebalance_report",
@@ -237,7 +246,7 @@ class FactorPortfolioAlertAlgorithm:
                 "selection_count": sum(1 for row in self._rows if row.selected_symbols),
             },
             metadata={
-                "family": "factor_risk_premia",
+                "family": self.family,
                 "subcategory": self.subcategory,
                 "catalog_ref": self.catalog_ref,
                 "supports_composition": True,
@@ -256,9 +265,12 @@ def build_factor_portfolio_algorithm(
     alg_name: str,
     subcategory: str,
     alg_param: dict[str, Any],
+    family: str = "factor_risk_premia",
     factor_name: str,
     field_names: Sequence[str],
     higher_is_better: bool,
+    target_value: float | None = None,
+    weighting_mode: str = "equal_weight",
 ) -> FactorPortfolioAlertAlgorithm:
     return FactorPortfolioAlertAlgorithm(
         algorithm_key=algorithm_key,
@@ -266,7 +278,10 @@ def build_factor_portfolio_algorithm(
         alg_name=alg_name,
         subcategory=subcategory,
         params=alg_param,
+        family=family,
         factor_name=factor_name,
         field_names=field_names,
         higher_is_better=higher_is_better,
+        target_value=target_value,
+        weighting_mode=weighting_mode,
     )

@@ -1,7 +1,7 @@
 import json
 from csv import DictReader
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -61,6 +61,17 @@ def _build_factor_fixture_rows() -> list[dict[str, object]]:
             "sales_growth": 0.15,
             "liquidity_score": 0.90,
             "turnover_ratio": 0.70,
+            "price_to_book": 1.2,
+            "price_to_earnings": 10.0,
+            "return_on_equity": 0.24,
+            "gross_margin": 0.48,
+            "market_cap_billions": 40.0,
+            "return_on_assets": 0.12,
+            "gross_profitability": 0.33,
+            "cash_earnings_ratio": 0.92,
+            "earnings_stability": 0.88,
+            "debt_to_equity": 0.30,
+            "net_debt_to_ebitda": 0.90,
         },
         {
             "ts": "2025-01-02",
@@ -76,6 +87,17 @@ def _build_factor_fixture_rows() -> list[dict[str, object]]:
             "sales_growth": 0.07,
             "liquidity_score": 0.65,
             "turnover_ratio": 0.55,
+            "price_to_book": 2.6,
+            "price_to_earnings": 18.0,
+            "return_on_equity": 0.12,
+            "gross_margin": 0.32,
+            "market_cap_billions": 15.0,
+            "return_on_assets": 0.07,
+            "gross_profitability": 0.19,
+            "cash_earnings_ratio": 0.74,
+            "earnings_stability": 0.71,
+            "debt_to_equity": 0.75,
+            "net_debt_to_ebitda": 1.80,
         },
         {
             "ts": "2025-01-02",
@@ -91,6 +113,17 @@ def _build_factor_fixture_rows() -> list[dict[str, object]]:
             "sales_growth": 0.13,
             "liquidity_score": 0.85,
             "turnover_ratio": 0.72,
+            "price_to_book": 1.5,
+            "price_to_earnings": 12.0,
+            "return_on_equity": 0.18,
+            "gross_margin": 0.44,
+            "market_cap_billions": 8.0,
+            "return_on_assets": 0.10,
+            "gross_profitability": 0.28,
+            "cash_earnings_ratio": 0.86,
+            "earnings_stability": 0.82,
+            "debt_to_equity": 0.45,
+            "net_debt_to_ebitda": 1.20,
         },
         {
             "ts": "2025-01-02",
@@ -106,6 +139,17 @@ def _build_factor_fixture_rows() -> list[dict[str, object]]:
             "sales_growth": 0.05,
             "liquidity_score": 0.45,
             "turnover_ratio": 0.40,
+            "price_to_book": 3.5,
+            "price_to_earnings": 24.0,
+            "return_on_equity": 0.06,
+            "gross_margin": 0.21,
+            "market_cap_billions": 2.0,
+            "return_on_assets": 0.03,
+            "gross_profitability": 0.11,
+            "cash_earnings_ratio": 0.61,
+            "earnings_stability": 0.58,
+            "debt_to_equity": 1.10,
+            "net_debt_to_ebitda": 2.60,
         },
     ]
 
@@ -127,6 +171,17 @@ def _build_factor_fixture_rows_with_multiple_rebalances() -> list[dict[str, obje
             "sales_growth": 0.09,
             "liquidity_score": 0.68,
             "turnover_ratio": 0.60,
+            "price_to_book": 2.4,
+            "price_to_earnings": 19.0,
+            "return_on_equity": 0.15,
+            "gross_margin": 0.36,
+            "market_cap_billions": 35.0,
+            "return_on_assets": 0.08,
+            "gross_profitability": 0.22,
+            "cash_earnings_ratio": 0.76,
+            "earnings_stability": 0.74,
+            "debt_to_equity": 0.60,
+            "net_debt_to_ebitda": 1.50,
         },
         {
             "ts": "2025-02-03",
@@ -142,6 +197,17 @@ def _build_factor_fixture_rows_with_multiple_rebalances() -> list[dict[str, obje
             "sales_growth": 0.18,
             "liquidity_score": 0.88,
             "turnover_ratio": 0.79,
+            "price_to_book": 1.1,
+            "price_to_earnings": 9.0,
+            "return_on_equity": 0.26,
+            "gross_margin": 0.50,
+            "market_cap_billions": 12.0,
+            "return_on_assets": 0.13,
+            "gross_profitability": 0.35,
+            "cash_earnings_ratio": 0.94,
+            "earnings_stability": 0.90,
+            "debt_to_equity": 0.28,
+            "net_debt_to_ebitda": 0.85,
         },
         {
             "ts": "2025-02-03",
@@ -157,6 +223,17 @@ def _build_factor_fixture_rows_with_multiple_rebalances() -> list[dict[str, obje
             "sales_growth": 0.15,
             "liquidity_score": 0.82,
             "turnover_ratio": 0.74,
+            "price_to_book": 1.6,
+            "price_to_earnings": 13.0,
+            "return_on_equity": 0.19,
+            "gross_margin": 0.46,
+            "market_cap_billions": 9.0,
+            "return_on_assets": 0.11,
+            "gross_profitability": 0.30,
+            "cash_earnings_ratio": 0.88,
+            "earnings_stability": 0.84,
+            "debt_to_equity": 0.40,
+            "net_debt_to_ebitda": 1.10,
         },
         {
             "ts": "2025-02-03",
@@ -172,6 +249,17 @@ def _build_factor_fixture_rows_with_multiple_rebalances() -> list[dict[str, obje
             "sales_growth": 0.06,
             "liquidity_score": 0.50,
             "turnover_ratio": 0.43,
+            "price_to_book": 3.2,
+            "price_to_earnings": 22.0,
+            "return_on_equity": 0.08,
+            "gross_margin": 0.24,
+            "market_cap_billions": 3.0,
+            "return_on_assets": 0.04,
+            "gross_profitability": 0.14,
+            "cash_earnings_ratio": 0.65,
+            "earnings_stability": 0.62,
+            "debt_to_equity": 0.95,
+            "net_debt_to_ebitda": 2.20,
         },
     ]
     return [*january_rows, *february_rows]
@@ -197,6 +285,17 @@ def _load_factor_fixture_rows(name: str) -> list[dict[str, object]]:
                 "sales_growth": float(row["sales_growth"]),
                 "liquidity_score": float(row["liquidity_score"]),
                 "turnover_ratio": float(row["turnover_ratio"]),
+                "price_to_book": float(row["price_to_book"]),
+                "price_to_earnings": float(row["price_to_earnings"]),
+                "return_on_equity": float(row["return_on_equity"]),
+                "gross_margin": float(row["gross_margin"]),
+                "market_cap_billions": float(row["market_cap_billions"]),
+                "return_on_assets": float(row["return_on_assets"]),
+                "gross_profitability": float(row["gross_profitability"]),
+                "cash_earnings_ratio": float(row["cash_earnings_ratio"]),
+                "earnings_stability": float(row["earnings_stability"]),
+                "debt_to_equity": float(row["debt_to_equity"]),
+                "net_debt_to_ebitda": float(row["net_debt_to_ebitda"]),
             }
         )
     return parsed_rows
@@ -454,6 +553,14 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "dividend_yield_strategy",
         "growth_factor_strategy",
         "liquidity_factor_strategy",
+        "minimum_variance_strategy",
+        "size_small_cap_strategy",
+        "mid_cap_tilt_strategy",
+        "profitability_factor_strategy",
+        "earnings_quality_strategy",
+        "low_leverage_balance_sheet_strength",
+        "value_strategy",
+        "quality_strategy",
         "support_resistance_bounce",
         "breakout_retest",
         "pivot_point_strategy",
@@ -929,6 +1036,104 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "minimum_universe_size": 2,
             },
         ),
+        (
+            "minimum_variance_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["volatility_20d", "realized_volatility"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "weighting_mode": "inverse_metric",
+            },
+        ),
+        (
+            "size_small_cap_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["market_cap_billions"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "mid_cap_tilt_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["market_cap_billions"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "target_value": 10.0,
+            },
+        ),
+        (
+            "profitability_factor_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["return_on_assets", "gross_profitability"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "earnings_quality_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["cash_earnings_ratio", "earnings_stability"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "low_leverage_balance_sheet_strength",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["debt_to_equity", "net_debt_to_ebitda"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "value_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["price_to_book", "price_to_earnings"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "quality_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["return_on_equity", "gross_margin"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
         ("aggregate_boundary_and_channel", {"window": 3}),
         (
             "aggregate_channel_dual_window",
@@ -1359,7 +1564,7 @@ def test_composite_weighted_blend_normalized_output_exposes_dashboard_diagnostic
 
 
 def test_composite_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
-    algorithms = [
+    algorithms: list[tuple[str, list[str], dict[str, Any]]] = [
         (
             "hard_boolean_gating_and_or_majority",
             {
@@ -5457,6 +5662,307 @@ def test_factor_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None
                     "bottom_n": 0,
                     "long_only": True,
                     "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "rebalance_report"
+        assert len(output.points) >= 1
+
+
+@pytest.mark.parametrize(
+    (
+        "alg_key",
+        "field_names",
+        "expected_catalog_ref",
+        "expected_family",
+        "expected_first_top",
+        "expected_second_top",
+    ),
+    [
+        (
+            "value_strategy",
+            ["price_to_book", "price_to_earnings"],
+            "algorithm:86",
+            "fundamental_ml_composite",
+            "AAA",
+            "BBB",
+        ),
+        (
+            "quality_strategy",
+            ["return_on_equity", "gross_margin"],
+            "algorithm:87",
+            "fundamental_ml_composite",
+            "AAA",
+            "BBB",
+        ),
+        (
+            "minimum_variance_strategy",
+            ["volatility_20d", "realized_volatility"],
+            "algorithm:101",
+            "factor_risk_premia",
+            "AAA",
+            "BBB",
+        ),
+        (
+            "size_small_cap_strategy",
+            ["market_cap_billions"],
+            "algorithm:105",
+            "factor_risk_premia",
+            "DDD",
+            "DDD",
+        ),
+        (
+            "mid_cap_tilt_strategy",
+            ["market_cap_billions"],
+            "algorithm:106",
+            "factor_risk_premia",
+            "CCC",
+            "CCC",
+        ),
+        (
+            "profitability_factor_strategy",
+            ["return_on_assets", "gross_profitability"],
+            "algorithm:110",
+            "factor_risk_premia",
+            "AAA",
+            "BBB",
+        ),
+        (
+            "earnings_quality_strategy",
+            ["cash_earnings_ratio", "earnings_stability"],
+            "algorithm:111",
+            "factor_risk_premia",
+            "AAA",
+            "BBB",
+        ),
+        (
+            "low_leverage_balance_sheet_strength",
+            ["debt_to_equity", "net_debt_to_ebitda"],
+            "algorithm:113",
+            "factor_risk_premia",
+            "AAA",
+            "BBB",
+        ),
+    ],
+)
+def test_factor_wave_2_registration_and_fixture_behavior(
+    tmp_path,
+    alg_key,
+    field_names,
+    expected_catalog_ref,
+    expected_family,
+    expected_first_top,
+    expected_second_top,
+) -> None:
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+    assert spec.catalog_ref == expected_catalog_ref
+    assert spec.family == expected_family
+    assert spec.output_modes == ("ranking", "selection", "weights", "diagnostics")
+
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    alg_param = {
+        "rows": rows,
+        "field_names": field_names,
+        "rebalance_frequency": "monthly",
+        "top_n": 2,
+        "bottom_n": 0,
+        "long_only": True,
+        "minimum_universe_size": 2,
+    }
+    if alg_key == "minimum_variance_strategy":
+        alg_param["weighting_mode"] = "inverse_metric"
+    if alg_key == "mid_cap_tilt_strategy":
+        alg_param["target_value"] = 10.0
+
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+
+    assert [point.signal_label for point in output.points] == ["buy", "buy"]
+    assert output.derived_series["top_symbol"] == [
+        expected_first_top,
+        expected_second_top,
+    ]
+    assert output.metadata["catalog_ref"] == expected_catalog_ref
+    assert output.metadata["family"] == expected_family
+    assert portfolio_output.metadata["catalog_ref"] == expected_catalog_ref
+    assert portfolio_output.metadata["family"] == expected_family
+    assert child_output.diagnostics["catalog_ref"] == expected_catalog_ref
+    assert child_output.diagnostics["family"] == expected_family
+    assert child_output.diagnostics["selected_symbols"]
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert portfolio_output.rebalances[0].ranking[0].symbol == expected_first_top
+    assert portfolio_output.rebalances[-1].ranking[0].symbol == expected_second_top
+
+    if alg_key == "minimum_variance_strategy":
+        weights = portfolio_output.rebalances[-1].weights
+        assert weights["BBB"] > weights["CCC"]
+        assert child_output.diagnostics["weighting_mode"] == "inverse_metric"
+    if alg_key == "mid_cap_tilt_strategy":
+        assert child_output.diagnostics["target_value"] == pytest.approx(10.0)
+        assert portfolio_output.rebalances[-1].diagnostics[
+            "top_ranked_score"
+        ] == pytest.approx(-1.0)
+
+
+def test_factor_wave_2_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="weighting_mode must be one of"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "minimum_variance_strategy",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": ["volatility_20d"],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    "weighting_mode": "risk_parity",
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+    with pytest.raises(ValueError, match="target_value must be a number"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "mid_cap_tilt_strategy",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": ["market_cap_billions"],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    "target_value": "mid",
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+
+def test_factor_wave_2_fixture_behavior_exposes_normalized_diagnostics_and_composition_contract(
+    tmp_path,
+) -> None:
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "quality_strategy",
+            "alg_param": {
+                "rows": rows,
+                "field_names": ["return_on_equity", "gross_margin"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+
+    assert output.summary_metrics == {"rebalance_count": 2, "selection_count": 2}
+    assert output.derived_series["selected_symbols"][-1] == ["BBB", "CCC"]
+    assert output.derived_series["weights"][-1] == {
+        "BBB": pytest.approx(0.5),
+        "CCC": pytest.approx(0.5),
+    }
+    assert portfolio_output.rebalances[-1].diagnostics["factor_name"] == "quality"
+    assert portfolio_output.rebalances[-1].diagnostics["top_ranked_symbol"] == "BBB"
+    assert child_output.diagnostics["family"] == "fundamental_ml_composite"
+    assert child_output.diagnostics["selection_reason"] == "selection_ready"
+    assert child_output.diagnostics["warmup_ready"] is True
+
+
+def test_factor_wave_2_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = _build_factor_fixture_rows() * 50
+    algorithms = [
+        (
+            "value_strategy",
+            ["price_to_book", "price_to_earnings"],
+            {},
+        ),
+        (
+            "quality_strategy",
+            ["return_on_equity", "gross_margin"],
+            {},
+        ),
+        (
+            "minimum_variance_strategy",
+            ["volatility_20d", "realized_volatility"],
+            {"weighting_mode": "inverse_metric"},
+        ),
+        (
+            "size_small_cap_strategy",
+            ["market_cap_billions"],
+            {},
+        ),
+        (
+            "mid_cap_tilt_strategy",
+            ["market_cap_billions"],
+            {"target_value": 10.0},
+        ),
+        (
+            "profitability_factor_strategy",
+            ["return_on_assets", "gross_profitability"],
+            {},
+        ),
+        (
+            "earnings_quality_strategy",
+            ["cash_earnings_ratio", "earnings_stability"],
+            {},
+        ),
+        (
+            "low_leverage_balance_sheet_strength",
+            ["debt_to_equity", "net_debt_to_ebitda"],
+            {},
+        ),
+    ]
+
+    for index, (alg_key, field_names, extra_params) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": rows,
+                    "field_names": field_names,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    **extra_params,
                 },
                 "buy": True,
                 "sell": False,

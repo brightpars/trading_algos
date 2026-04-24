@@ -44,9 +44,11 @@ def _extract_metric_value(row: PanelRow, field_names: Sequence[str]) -> float | 
 def _rank_factor_scores(
     scores: dict[str, float],
     *,
+    raw_scores: dict[str, float],
     top_n: int,
     bottom_n: int,
     long_only: bool,
+    weighting_mode: str,
 ) -> tuple[tuple[RankedAsset, ...], tuple[str, ...], dict[str, float]]:
     ordered = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     long_symbols = [symbol for symbol, _score in ordered[:top_n]]
@@ -57,9 +59,23 @@ def _rank_factor_scores(
     )
     weights: dict[str, float] = {}
     if long_symbols:
-        long_weight = 1.0 / len(long_symbols) if long_only else 0.5 / len(long_symbols)
-        for symbol in long_symbols:
-            weights[symbol] = long_weight
+        if weighting_mode == "inverse_metric":
+            inverse_values = {
+                symbol: 1.0 / max(raw_scores.get(symbol, 0.0), 1e-9)
+                for symbol in long_symbols
+            }
+            inverse_total = sum(inverse_values.values())
+            long_exposure = 1.0 if long_only else 0.5
+            for symbol in long_symbols:
+                weights[symbol] = long_exposure * (
+                    inverse_values[symbol] / inverse_total
+                )
+        else:
+            long_weight = (
+                1.0 / len(long_symbols) if long_only else 0.5 / len(long_symbols)
+            )
+            for symbol in long_symbols:
+                weights[symbol] = long_weight
     if short_symbols:
         short_weight = -0.5 / len(short_symbols)
         for symbol in short_symbols:
@@ -102,6 +118,8 @@ def evaluate_factor_strategy(
     bottom_n: int,
     long_only: bool,
     minimum_universe_size: int,
+    target_value: float | None = None,
+    weighting_mode: str = "equal_weight",
 ) -> tuple[FactorStrategyRow, ...]:
     schedule = select_rebalance_timestamps(
         panel.timestamps(), frequency=rebalance_frequency
@@ -142,15 +160,23 @@ def evaluate_factor_strategy(
         if scored_universe_size < minimum_universe_size:
             selection_reason = "warmup_pending"
         else:
-            normalized_scores = {
-                symbol: (score if higher_is_better else -score)
-                for symbol, score in raw_scores.items()
-            }
+            if target_value is not None:
+                normalized_scores = {
+                    symbol: -abs(score - target_value)
+                    for symbol, score in raw_scores.items()
+                }
+            else:
+                normalized_scores = {
+                    symbol: (score if higher_is_better else -score)
+                    for symbol, score in raw_scores.items()
+                }
             ranking, selected_symbols, weights = _rank_factor_scores(
                 normalized_scores,
+                raw_scores=raw_scores,
                 top_n=top_n,
                 bottom_n=bottom_n,
                 long_only=long_only,
+                weighting_mode=weighting_mode,
             )
             if ranking:
                 top_ranked_symbol = ranking[0].symbol
@@ -175,6 +201,8 @@ def evaluate_factor_strategy(
             "factor_name": factor_name,
             "field_names": tuple(field_names),
             "higher_is_better": higher_is_better,
+            "target_value": target_value,
+            "weighting_mode": weighting_mode,
             "rebalance_frequency": rebalance_frequency,
             "eligible_universe_size": len(universe),
             "scored_universe_size": scored_universe_size,
@@ -219,6 +247,7 @@ def build_factor_portfolio_weight_output(
     rows: Sequence[FactorStrategyRow],
     *,
     catalog_ref: str,
+    family: str,
     subcategory: str,
 ) -> PortfolioWeightOutput:
     return PortfolioWeightOutput(
@@ -234,7 +263,7 @@ def build_factor_portfolio_weight_output(
             for row in rows
         ),
         metadata={
-            "family": "factor_risk_premia",
+            "family": family,
             "subcategory": subcategory,
             "catalog_ref": catalog_ref,
             "reporting_mode": "rebalance_report",

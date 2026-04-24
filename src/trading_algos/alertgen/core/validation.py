@@ -1585,7 +1585,7 @@ def require_factor_portfolio_param(raw_alg_param, label):
     long_only = _normalize_bool_like(normalized["long_only"], f"{label} long_only")
     if long_only and bottom_n != 0:
         raise ValueError(f"{label} bottom_n must be 0 when long_only is true")
-    return {
+    result = {
         "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
         "field_names": _require_non_empty_string_list(
             normalized["field_names"], f"{label} field_names"
@@ -1602,6 +1602,20 @@ def require_factor_portfolio_param(raw_alg_param, label):
             normalized["minimum_universe_size"], f"{label} minimum_universe_size"
         ),
     }
+    weighting_mode = normalized.get("weighting_mode")
+    if weighting_mode is not None:
+        result["weighting_mode"] = _require_choice(
+            weighting_mode,
+            f"{label} weighting_mode",
+            allowed={"equal_weight", "inverse_metric"},
+        )
+    target_value = normalized.get("target_value")
+    if target_value is not None:
+        result["target_value"] = _require_float_like(
+            target_value,
+            f"{label} target_value",
+        )
+    return result
 
 
 def _require_float_like(value, label):
