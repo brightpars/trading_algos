@@ -9,6 +9,7 @@ class MultiLegPosition:
     symbol: str
     side: str
     weight: float
+    quantity_scale: float = 1.0
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -25,6 +26,8 @@ class MultiLegRebalancePoint:
     spread_value: float
     legs: tuple[MultiLegPosition, ...]
     hedge_ratio: float = 1.0
+    net_exposure: float = 0.0
+    gross_exposure: float = 0.0
     diagnostics: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

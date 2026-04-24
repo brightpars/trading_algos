@@ -30,6 +30,17 @@ from trading_algos.alertgen.algorithms.mean_reversion.mean_reversion_helpers imp
     cumulative_session_vwap,
     rolling_ou_reversion_ratio,
 )
+from trading_algos.relative_value.hedge_ratio import (
+    rolling_zscore as relative_value_rolling_zscore,
+    spread_series,
+    static_hedge_ratio,
+)
+from trading_algos.reporting.multi_leg_report import build_multi_leg_report_payload
+from trading_algos.contracts.multi_leg_output import (
+    MultiLegOutput,
+    MultiLegPosition,
+    MultiLegRebalancePoint,
+)
 from trading_algos.regime.state import (
     apply_regime_hysteresis,
     normalize_probability_map,
@@ -301,3 +312,45 @@ def test_regime_state_helpers_smooth_and_apply_hysteresis() -> None:
         )
         == "risk_on"
     )
+
+
+def test_relative_value_helpers_compute_spread_and_zscore() -> None:
+    base_prices = [100.0, 103.0, 106.0, 109.0]
+    hedge_prices = [50.0, 51.0, 52.0, 53.0]
+
+    hedge_ratio = static_hedge_ratio(base_prices, hedge_prices)
+    spreads = spread_series(base_prices, hedge_prices, hedge_ratio=hedge_ratio)
+    zscores = relative_value_rolling_zscore(spreads, 3)
+
+    assert hedge_ratio > 0.0
+    assert len(spreads) == 4
+    assert zscores[:2] == [None, None]
+    assert zscores[-1] is not None
+
+
+def test_multi_leg_report_payload_exposes_latest_leg_state() -> None:
+    output = MultiLegOutput(
+        algorithm_key="pairs_trading_distance_method",
+        rebalances=(
+            MultiLegRebalancePoint(
+                timestamp="2025-01-03",
+                spread_value=1.5,
+                hedge_ratio=0.8,
+                gross_exposure=1.8,
+                net_exposure=0.2,
+                legs=(
+                    MultiLegPosition(symbol="AAA", side="short", weight=1.0),
+                    MultiLegPosition(symbol="BBB", side="long", weight=0.8),
+                ),
+                diagnostics={"selection_reason": "entry_signal"},
+            ),
+        ),
+        metadata={"reporting_mode": "multi_leg"},
+    )
+
+    payload = build_multi_leg_report_payload(output)
+
+    assert payload["rebalance_count"] == 1
+    assert payload["latest_spread_value"] == pytest.approx(1.5)
+    assert payload["latest_hedge_ratio"] == pytest.approx(0.8)
+    assert payload["latest_legs"][0]["symbol"] == "AAA"

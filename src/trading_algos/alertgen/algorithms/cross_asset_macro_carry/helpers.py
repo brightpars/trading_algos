@@ -335,6 +335,9 @@ def build_multi_leg_output(
                 timestamp=row.timestamp,
                 spread_value=row.spread_value,
                 legs=row.legs,
+                hedge_ratio=_coerce_float(row.diagnostics.get("hedge_ratio")) or 1.0,
+                gross_exposure=sum(abs(leg.weight) for leg in row.legs),
+                net_exposure=sum(leg.weight for leg in row.legs),
                 diagnostics=row.diagnostics,
             )
             for row in rows
@@ -477,10 +480,13 @@ def build_multi_leg_rebalance_output(
     points: list[AlertSeriesPoint] = []
     derived_series: dict[str, list[Any]] = {
         "spread_value": [],
+        "zscore": [],
         "legs": [],
         "selected_symbol": [],
         "warmup_ready": [],
         "hedge_ratio": [],
+        "gross_exposure": [],
+        "net_exposure": [],
         "reason_codes": [],
         "regime_label": [],
     }
@@ -502,7 +508,13 @@ def build_multi_leg_rebalance_output(
         derived_series["warmup_ready"].append(
             bool(row.diagnostics.get("warmup_ready", False))
         )
-        derived_series["hedge_ratio"].append(1.0)
+        hedge_ratio = _coerce_float(row.diagnostics.get("hedge_ratio")) or 1.0
+        gross_exposure = sum(abs(leg.weight) for leg in row.legs)
+        net_exposure = sum(leg.weight for leg in row.legs)
+        derived_series["hedge_ratio"].append(hedge_ratio)
+        derived_series["gross_exposure"].append(gross_exposure)
+        derived_series["net_exposure"].append(net_exposure)
+        derived_series["zscore"].append(_coerce_float(row.diagnostics.get("zscore")))
         derived_series["reason_codes"].append([reason_code])
         derived_series["regime_label"].append(
             "spread_active" if row.legs else "neutral"
@@ -527,7 +539,8 @@ def build_multi_leg_rebalance_output(
                     "reason_codes": [reason_code],
                     "decision_reason": reason_code,
                     "regime_label": "spread_active" if latest.legs else "neutral",
-                    "hedge_ratio": 1.0,
+                    "hedge_ratio": _coerce_float(latest.diagnostics.get("hedge_ratio"))
+                    or 1.0,
                     **latest.diagnostics,
                 },
                 reason_codes=(reason_code,),
@@ -537,7 +550,10 @@ def build_multi_leg_rebalance_output(
         algorithm_key=algorithm_key,
         points=tuple(points),
         derived_series=derived_series,
-        summary_metrics={"rebalance_count": len(rows)},
+        summary_metrics={
+            "rebalance_count": len(rows),
+            "active_spread_count": sum(1 for row in rows if row.legs),
+        },
         metadata={
             "family": family,
             "subcategory": subcategory,

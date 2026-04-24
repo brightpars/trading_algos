@@ -46,6 +46,47 @@ FACTOR_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "factors"
 EVENT_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "events"
 
 
+def _build_stat_arb_fixture_rows() -> list[dict[str, object]]:
+    return [
+        {"ts": "2025-01-01", "symbol": "AAA", "Close": 100.0},
+        {
+            "ts": "2025-01-01",
+            "symbol": "BBB",
+            "Close": 100.0,
+            "basis": 0.0,
+            "funding_rate": 0.0,
+        },
+        {"ts": "2025-01-01", "symbol": "CCC", "Close": 50.0},
+        {"ts": "2025-01-02", "symbol": "AAA", "Close": 101.0},
+        {
+            "ts": "2025-01-02",
+            "symbol": "BBB",
+            "Close": 100.5,
+            "basis": 0.2,
+            "funding_rate": 0.05,
+        },
+        {"ts": "2025-01-02", "symbol": "CCC", "Close": 50.2},
+        {"ts": "2025-01-03", "symbol": "AAA", "Close": 108.0},
+        {
+            "ts": "2025-01-03",
+            "symbol": "BBB",
+            "Close": 101.0,
+            "basis": 1.0,
+            "funding_rate": 0.3,
+        },
+        {"ts": "2025-01-03", "symbol": "CCC", "Close": 50.5},
+        {"ts": "2025-01-04", "symbol": "AAA", "Close": 102.0},
+        {
+            "ts": "2025-01-04",
+            "symbol": "BBB",
+            "Close": 100.8,
+            "basis": 0.1,
+            "funding_rate": 0.02,
+        },
+        {"ts": "2025-01-04", "symbol": "CCC", "Close": 50.4},
+    ]
+
+
 def _build_cross_asset_fixture_rows() -> list[dict[str, object]]:
     return [
         {
@@ -724,6 +765,10 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "ornstein_uhlenbeck_reversion",
         "long_horizon_reversal",
         "volatility_adjusted_reversion",
+        "pairs_trading_distance_method",
+        "pairs_trading_cointegration",
+        "basket_statistical_arbitrage",
+        "funding_basis_arbitrage",
         "volatility_breakout",
         "atr_channel_breakout",
         "volatility_mean_reversion",
@@ -3510,6 +3555,309 @@ def test_trend_wave_2_performance_smoke_on_representative_series(tmp_path) -> No
         assert len(output.points) == len(rows)
         assert output.metadata["warmup_period"] == algorithm.minimum_history()
         assert output.metadata["reporting_mode"] == "bar_series"
+
+
+def test_stat_arb_wave_1_registration_metadata_matches_manifest_contract() -> None:
+    expected = {
+        "pairs_trading_distance_method": ("algorithm:38", "stat_arb", "pairs", 3),
+        "pairs_trading_cointegration": ("algorithm:39", "stat_arb", "pairs", 3),
+        "basket_statistical_arbitrage": ("algorithm:40", "stat_arb", "basket", 3),
+        "funding_basis_arbitrage": ("algorithm:51", "stat_arb", "funding", 3),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.category == "stat_arb"
+        assert "multi_leg_signal" in spec.output_modes
+        assert "diagnostics" in spec.output_modes
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "catalog_ref", "alg_param", "expected_reason_code"),
+    [
+        (
+            "pairs_trading_distance_method",
+            "algorithm:38",
+            {
+                "rows": _build_stat_arb_fixture_rows(),
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "hedge_ratio_method": "ratio",
+                "minimum_history": 3,
+            },
+            "entry_signal",
+        ),
+        (
+            "pairs_trading_cointegration",
+            "algorithm:39",
+            {
+                "rows": _build_stat_arb_fixture_rows(),
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "hedge_ratio_method": "ols",
+                "minimum_history": 3,
+            },
+            "cointegration_entry",
+        ),
+        (
+            "basket_statistical_arbitrage",
+            "algorithm:40",
+            {
+                "rows": _build_stat_arb_fixture_rows(),
+                "base_symbol": "AAA",
+                "basket_symbols": ["BBB", "CCC"],
+                "basket_weights": [0.6, 0.4],
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+            },
+            "basket_hold",
+        ),
+        (
+            "funding_basis_arbitrage",
+            "algorithm:51",
+            {
+                "rows": _build_stat_arb_fixture_rows(),
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "hedge_ratio_method": "ratio",
+                "minimum_history": 3,
+                "basis_field": "basis",
+                "funding_field": "funding_rate",
+                "carry_threshold": 0.5,
+            },
+            "carry_entry",
+        ),
+    ],
+)
+def test_stat_arb_wave_1_normalized_output_metadata_exposes_dashboard_contract_fields(
+    tmp_path, alg_key, catalog_ref, alg_param, expected_reason_code
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "PAIR",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+
+    assert output.metadata["family"] == "stat_arb"
+    assert output.metadata["reporting_mode"] == "multi_leg"
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert output.metadata["warmup_period"] == algorithm.minimum_history()
+    assert portfolio_output.metadata["catalog_ref"] == catalog_ref
+    assert portfolio_output.metadata["reporting_mode"] == "multi_leg"
+    assert child_output.diagnostics["family"] == "stat_arb"
+    assert child_output.diagnostics["reporting_mode"] == "rebalance_report"
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert child_output.diagnostics["decision_reason"] == expected_reason_code
+    assert output.points[-1].reason_codes == (expected_reason_code,)
+    assert output.derived_series["legs"][-1]
+    assert output.derived_series["hedge_ratio"][-1] > 0.0
+    assert output.derived_series["warmup_ready"][-1] is True
+    assert portfolio_output.rebalances[-1].legs
+    assert (
+        portfolio_output.rebalances[-1].diagnostics["selection_reason"]
+        == expected_reason_code
+    )
+
+
+def test_stat_arb_wave_1_short_history_stays_neutral_until_warmup(tmp_path) -> None:
+    rows = _build_stat_arb_fixture_rows()[:4]
+    algorithms = [
+        (
+            "pairs_trading_distance_method",
+            {
+                "rows": rows,
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "hedge_ratio_method": "ratio",
+                "minimum_history": 3,
+            },
+        ),
+        (
+            "basket_statistical_arbitrage",
+            {
+                "rows": rows,
+                "base_symbol": "AAA",
+                "basket_symbols": ["BBB", "CCC"],
+                "basket_weights": [0.6, 0.4],
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "minimum_history": 3,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "PAIR",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+
+        assert output.points
+        assert output.points[0].signal_label == "neutral"
+        assert "warmup_pending" in output.points[0].reason_codes
+        assert output.derived_series["warmup_ready"][0] is False
+        assert output.derived_series["legs"][0] == []
+
+
+def test_stat_arb_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="exit_zscore <= entry_zscore"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "PAIR",
+                "alg_key": "pairs_trading_distance_method",
+                "alg_param": {
+                    "rows": _build_stat_arb_fixture_rows(),
+                    "base_symbol": "AAA",
+                    "quote_symbol": "BBB",
+                    "lookback_window": 3,
+                    "entry_zscore": 1.0,
+                    "exit_zscore": 1.5,
+                    "rebalance_frequency": "all",
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(
+        ValueError, match="basket_weights must match basket_symbols length"
+    ):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "PAIR",
+                "alg_key": "basket_statistical_arbitrage",
+                "alg_param": {
+                    "rows": _build_stat_arb_fixture_rows(),
+                    "base_symbol": "AAA",
+                    "basket_symbols": ["BBB", "CCC"],
+                    "basket_weights": [1.0],
+                    "lookback_window": 3,
+                    "entry_zscore": 1.0,
+                    "exit_zscore": 0.25,
+                    "rebalance_frequency": "all",
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="carry_threshold must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "PAIR",
+                "alg_key": "funding_basis_arbitrage",
+                "alg_param": {
+                    "rows": _build_stat_arb_fixture_rows(),
+                    "base_symbol": "AAA",
+                    "quote_symbol": "BBB",
+                    "lookback_window": 3,
+                    "entry_zscore": 1.0,
+                    "exit_zscore": 0.25,
+                    "rebalance_frequency": "all",
+                    "carry_threshold": -0.1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_stat_arb_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = _build_stat_arb_fixture_rows() * 80
+    algorithms = [
+        (
+            "pairs_trading_distance_method",
+            {
+                "rows": rows,
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "hedge_ratio_method": "ratio",
+                "minimum_history": 3,
+            },
+        ),
+        (
+            "funding_basis_arbitrage",
+            {
+                "rows": rows,
+                "base_symbol": "AAA",
+                "quote_symbol": "BBB",
+                "lookback_window": 3,
+                "entry_zscore": 1.0,
+                "exit_zscore": 0.25,
+                "rebalance_frequency": "all",
+                "hedge_ratio_method": "ratio",
+                "minimum_history": 3,
+                "basis_field": "basis",
+                "funding_field": "funding_rate",
+                "carry_threshold": 0.5,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "PAIR",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+        portfolio_output = algorithm.portfolio_output()
+
+        assert len(output.points) == len(output.derived_series["spread_value"])
+        assert output.metadata["reporting_mode"] == "multi_leg"
+        assert portfolio_output.rebalances
 
 
 @pytest.mark.parametrize(

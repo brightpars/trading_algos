@@ -421,7 +421,11 @@ class BaseAlertAlgorithm(ABC):
         if isinstance(catalog_ref, str) and catalog_ref:
             diagnostics["catalog_ref"] = catalog_ref
         diagnostics.update(decision.annotations)
-        reason_codes = tuple(diagnostics.keys())
+        raw_reason_codes = diagnostics.get("reason_codes", ())
+        if isinstance(raw_reason_codes, (list, tuple)):
+            reason_codes = tuple(str(code) for code in raw_reason_codes)
+        else:
+            reason_codes = ()
         return (
             NormalizedChildOutput(
                 child_key=self.alg_name,

@@ -19,6 +19,9 @@ from trading_algos.alertgen.algorithms.momentum.catalog import (
 from trading_algos.alertgen.algorithms.pattern_price_action.catalog import (
     register_pattern_price_action_alert_algorithms,
 )
+from trading_algos.alertgen.algorithms.stat_arb.catalog import (
+    register_stat_arb_alert_algorithms,
+)
 from trading_algos.alertgen.algorithms.mean_reversion.catalog import (
     register_mean_reversion_alert_algorithms,
 )
@@ -43,6 +46,7 @@ def register_builtin_alert_algorithms():
     register_fundamental_ml_composite_alert_algorithms()
     register_pattern_price_action_alert_algorithms()
     register_mean_reversion_alert_algorithms()
+    register_stat_arb_alert_algorithms()
     register_volatility_options_alert_algorithms()
     register_cross_asset_macro_carry_alert_algorithms()
     register_event_driven_alert_algorithms()

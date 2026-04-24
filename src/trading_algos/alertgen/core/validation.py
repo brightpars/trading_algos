@@ -1733,6 +1733,140 @@ def require_multi_leg_rebalance_param(raw_alg_param, label):
     }
 
 
+def require_stat_arb_pair_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "base_symbol",
+            "quote_symbol",
+            "lookback_window",
+            "entry_zscore",
+            "exit_zscore",
+            "rebalance_frequency",
+        ],
+        label,
+    )
+    entry_zscore = _require_non_negative_float_like(
+        normalized["entry_zscore"], f"{label} entry_zscore"
+    )
+    exit_zscore = _require_non_negative_float_like(
+        normalized["exit_zscore"], f"{label} exit_zscore"
+    )
+    if exit_zscore > entry_zscore:
+        raise ValueError(f"{label} requires exit_zscore <= entry_zscore")
+    result = {
+        "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
+        "base_symbol": _require_non_empty_string(
+            normalized["base_symbol"], f"{label} base_symbol"
+        ),
+        "quote_symbol": _require_non_empty_string(
+            normalized["quote_symbol"], f"{label} quote_symbol"
+        ),
+        "lookback_window": _require_positive_int_like(
+            normalized["lookback_window"], f"{label} lookback_window"
+        ),
+        "entry_zscore": entry_zscore,
+        "exit_zscore": exit_zscore,
+        "rebalance_frequency": _require_choice(
+            normalized["rebalance_frequency"],
+            f"{label} rebalance_frequency",
+            allowed={"monthly", "weekly", "all"},
+        ),
+    }
+    hedge_ratio_method = normalized.get("hedge_ratio_method", "ratio")
+    result["hedge_ratio_method"] = _require_choice(
+        hedge_ratio_method,
+        f"{label} hedge_ratio_method",
+        allowed={"ratio", "ols"},
+    )
+    result["minimum_history"] = _require_positive_int_like(
+        normalized.get("minimum_history", result["lookback_window"]),
+        f"{label} minimum_history",
+    )
+    return result
+
+
+def require_stat_arb_basket_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "base_symbol",
+            "basket_symbols",
+            "lookback_window",
+            "entry_zscore",
+            "exit_zscore",
+            "rebalance_frequency",
+        ],
+        label,
+    )
+    entry_zscore = _require_non_negative_float_like(
+        normalized["entry_zscore"], f"{label} entry_zscore"
+    )
+    exit_zscore = _require_non_negative_float_like(
+        normalized["exit_zscore"], f"{label} exit_zscore"
+    )
+    if exit_zscore > entry_zscore:
+        raise ValueError(f"{label} requires exit_zscore <= entry_zscore")
+    basket_symbols = _require_non_empty_string_list(
+        normalized["basket_symbols"], f"{label} basket_symbols"
+    )
+    basket_weights = normalized.get("basket_weights")
+    parsed_weights: list[float] | None = None
+    if basket_weights is not None:
+        parsed_weights = _require_positive_float_list(
+            basket_weights,
+            f"{label} basket_weights",
+            minimum_length=1,
+        )
+        if len(parsed_weights) != len(basket_symbols):
+            raise ValueError(f"{label} basket_weights must match basket_symbols length")
+    return {
+        "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
+        "base_symbol": _require_non_empty_string(
+            normalized["base_symbol"], f"{label} base_symbol"
+        ),
+        "basket_symbols": basket_symbols,
+        "basket_weights": parsed_weights,
+        "lookback_window": _require_positive_int_like(
+            normalized["lookback_window"], f"{label} lookback_window"
+        ),
+        "entry_zscore": entry_zscore,
+        "exit_zscore": exit_zscore,
+        "rebalance_frequency": _require_choice(
+            normalized["rebalance_frequency"],
+            f"{label} rebalance_frequency",
+            allowed={"monthly", "weekly", "all"},
+        ),
+        "minimum_history": _require_positive_int_like(
+            normalized.get("minimum_history", normalized["lookback_window"]),
+            f"{label} minimum_history",
+        ),
+    }
+
+
+def require_funding_basis_arb_param(raw_alg_param, label):
+    normalized = require_stat_arb_pair_param(raw_alg_param, label)
+    funding_field = _require_non_empty_string(
+        raw_alg_param.get("funding_field", "funding_rate"), f"{label} funding_field"
+    )
+    basis_field = _require_non_empty_string(
+        raw_alg_param.get("basis_field", "basis"), f"{label} basis_field"
+    )
+    carry_threshold = _require_non_negative_float_like(
+        raw_alg_param.get("carry_threshold", 0.0), f"{label} carry_threshold"
+    )
+    return {
+        **normalized,
+        "funding_field": funding_field,
+        "basis_field": basis_field,
+        "carry_threshold": carry_threshold,
+    }
+
+
 def require_seasonality_calendar_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(

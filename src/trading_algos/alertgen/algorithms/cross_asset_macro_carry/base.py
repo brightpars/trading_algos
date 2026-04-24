@@ -177,4 +177,4 @@ class CrossAssetMultiLegAlertAlgorithm:
             "data": output.to_dict(),
             "portfolio": self.portfolio_output().to_dict(),
         }
-        return [(payload, f"rebalance_report_{self.algorithm_key}_{self.symbol}")]
+        return [(payload, f"multi_leg_report_{self.algorithm_key}_{self.symbol}")]
