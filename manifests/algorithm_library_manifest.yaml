@@ -3126,8 +3126,8 @@ rows:
   display_category: Volatility / Options
   subcategory: volatility
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -3171,7 +3171,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_1
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 52; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_1 with compression-release fixture coverage, normalized dashboard diagnostics, confirmation-state reason codes, registration validation, and performance-smoke checks.
 - catalog_ref: algorithm:53
   source_doc_ref: requirements_v4:algorithm:53
   kind: algorithm
@@ -3180,8 +3180,8 @@ rows:
   display_category: Volatility / Options
   subcategory: atr
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -3225,7 +3225,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_1
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 53; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_1 with fixture-backed ATR-band breakout checks, normalized dashboard diagnostics, confirmation-state reason codes, registration validation, and performance-smoke checks.
 - catalog_ref: algorithm:54
   source_doc_ref: requirements_v4:algorithm:54
   kind: algorithm
@@ -3234,8 +3234,8 @@ rows:
   display_category: Volatility / Options
   subcategory: volatility
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / breakout / volatility timing
   home_suitability: 1
@@ -3279,7 +3279,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_1
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 54; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_1 with elevated-volatility fixture checks, normalized dashboard diagnostics, confirmation-state reason codes, registration validation, and performance-smoke checks.
 - catalog_ref: algorithm:55
   source_doc_ref: requirements_v4:algorithm:55
   kind: algorithm

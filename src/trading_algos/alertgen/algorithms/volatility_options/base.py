@@ -70,6 +70,7 @@ class BaseVolatilityAlertAlgorithm(BaseAlertAlgorithm, ABC):
             "signal_value": self.latest_data_modifiable.get("signal_value"),
             "threshold_value": self.latest_data_modifiable.get("threshold_value"),
             "exit_value": self.latest_data_modifiable.get("exit_value"),
+            "decision_reason": self.latest_data_modifiable.get("decision_reason"),
             "reason_codes": tuple(self.latest_data_modifiable.get("reason_codes", ())),
             "aligned_count": self.latest_data_modifiable.get("aligned_count", 0),
             "confirmation_bars": self.confirmation_bars,
@@ -115,6 +116,7 @@ class BaseVolatilityAlertAlgorithm(BaseAlertAlgorithm, ABC):
         self.latest_data_modifiable["warmup_ready"] = (
             len(self.data_list) >= self.minimum_history()
         )
+        self.latest_data_modifiable["decision_reason"] = state.reason_code
 
     def trend_prediction_logic(self) -> None:
         state = self._calculate_state()
@@ -145,6 +147,12 @@ class BaseVolatilityAlertAlgorithm(BaseAlertAlgorithm, ABC):
         self.latest_data_modifiable["confirmation_state_label"] = (
             confirmation_state_label
         )
+        reason_codes = list(tuple(self.latest_data_modifiable.get("reason_codes", ())))
+        if bullish_confirmed or bearish_confirmed:
+            reason_codes.append("confirmation_confirmed")
+        elif state.bullish or state.bearish:
+            reason_codes.append("confirmation_pending")
+        self.latest_data_modifiable["reason_codes"] = tuple(reason_codes)
         if bullish_confirmed and not bearish_confirmed:
             self.latest_predicted_trend = TREND.UP
         elif bearish_confirmed and not bullish_confirmed:

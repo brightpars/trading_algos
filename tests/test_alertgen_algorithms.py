@@ -4867,17 +4867,34 @@ def test_volatility_wave_1_normalized_output_exposes_dashboard_diagnostics(
     assert child_output.diagnostics["family"] == "volatility_options"
     assert child_output.diagnostics["reporting_mode"] == "bar_series"
     assert child_output.diagnostics["warmup_ready"] is True
+    assert child_output.diagnostics["catalog_ref"] == output.metadata["catalog_ref"]
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert child_output.diagnostics["confirmation_state_label"] in {
+        "idle",
+        "pending",
+        "confirmed",
+    }
+    assert (
+        child_output.diagnostics["decision_reason"]
+        in child_output.diagnostics["reason_codes"]
+    )
     if alg_key == "volatility_breakout":
         assert any(output.derived_series["compression_flag"][:-1])
         assert any(point.signal_label == "buy" for point in output.points)
+        assert {"compression_ratio", "compression_flag", "breakout_level"}.issubset(
+            output.derived_series
+        )
     elif alg_key == "atr_channel_breakout":
-        assert "upper_band" in output.derived_series
+        assert {"channel_mid", "upper_band", "lower_band"}.issubset(
+            output.derived_series
+        )
         assert any(point.signal_label == "buy" for point in output.points)
     else:
         assert "volatility_ratio" in output.derived_series
         assert child_output.diagnostics["primary_value"] == pytest.approx(
             output.derived_series["volatility_ratio"][-1]
         )
+        assert child_output.signal_label == "sell"
 
 
 def test_volatility_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
@@ -4989,6 +5006,71 @@ def test_volatility_wave_1_fixture_behavior_matches_manifest_expectations(
     assert compression_indices
     assert breakout_indices
     assert min(compression_indices) < min(breakout_indices)
+
+    atr_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "atr_channel_breakout",
+            "alg_param": {
+                "channel_window": 5,
+                "atr_window": 5,
+                "atr_multiplier": 1.0,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "atr_channel"),
+    )
+    atr_algorithm.process_list(_load_volatility_fixture_rows("compression_release.csv"))
+    atr_output = atr_algorithm.normalized_output()
+    atr_buy_indices = [
+        index
+        for index, point in enumerate(atr_output.points)
+        if point.signal_label == "buy"
+    ]
+
+    assert atr_buy_indices
+    assert min(atr_buy_indices) >= min(breakout_indices)
+    assert atr_output.derived_series["upper_band"][atr_buy_indices[0]] is not None
+
+    mean_reversion_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "volatility_mean_reversion",
+            "alg_param": {
+                "volatility_window": 5,
+                "baseline_window": 8,
+                "high_threshold": 1.2,
+                "low_threshold": 0.8,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "mean_reversion"),
+    )
+    mean_reversion_algorithm.process_list(
+        _load_volatility_fixture_rows("compression_release.csv")
+    )
+    mean_reversion_output = mean_reversion_algorithm.normalized_output()
+    sell_indices = [
+        index
+        for index, point in enumerate(mean_reversion_output.points)
+        if point.signal_label == "sell"
+    ]
+    elevated_ratio_indices = [
+        index
+        for index, ratio in enumerate(
+            mean_reversion_output.derived_series["volatility_ratio"]
+        )
+        if isinstance(ratio, (int, float)) and ratio >= 1.2
+    ]
+
+    assert sell_indices
+    assert elevated_ratio_indices
+    assert min(elevated_ratio_indices) <= min(sell_indices)
+    assert all(index > max(compression_indices) for index in sell_indices)
 
 
 def test_volatility_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:

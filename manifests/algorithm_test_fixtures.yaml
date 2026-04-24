@@ -71,6 +71,11 @@ fixtures:
   expected_behaviors:
   - Compression flag turns on before breakout
   - Breakout signal appears only after expansion begins
+  - ATR-channel breakout stays neutral during compression and promotes a bullish breakout only after price clears the dynamic upper band
+  - Volatility mean reversion emits a sell or short-vol style signal only after realized volatility rises materially above its rolling baseline
+  - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - Diagnostics expose compression state, breakout level or ATR bands, realized-volatility ratio context, confirmation state, warmup readiness, and reason codes for dashboard explanation
+  - Normalized output metadata identifies volatility_options family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.pattern_support_rejection_v1
   domain: single_asset_ohlcv
   purpose: Support touch followed by clear rejection.
