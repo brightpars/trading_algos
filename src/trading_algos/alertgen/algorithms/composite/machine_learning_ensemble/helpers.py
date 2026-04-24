@@ -177,10 +177,13 @@ class BaseMachineLearningEnsembleAlertAlgorithm:
 
     def interactive_report_payloads(self) -> list[tuple[dict[str, Any], str]]:
         output = self.normalized_output()
+        latest_point = output.points[-1].to_dict() if output.points else None
         payload = {
             "algorithm_key": self.algorithm_key,
             "data": output.to_dict(),
             "summary": output.summary_metrics,
+            "latest_point": latest_point,
+            "latest_diagnostics": latest_point["diagnostics"] if latest_point else {},
         }
         return [(payload, f"composite_report_{self.algorithm_key}_{self.symbol}")]
 
@@ -193,12 +196,18 @@ class BaseMachineLearningEnsembleAlertAlgorithm:
             "child_count": [],
             "expected_child_count": [],
             "warmup_ready": [],
+            "warmup_diagnostics": [],
+            "child_contributions": [],
             "decision_reason": [],
+            "buy_threshold": [],
+            "sell_threshold": [],
         }
         child_outputs: list[NormalizedChildOutput] = []
         reason_counts: dict[str, int] = {}
         required_child_count = self._required_child_count()
         min_history = self.minimum_history()
+        buy_threshold = float(self.params["buy_threshold"])
+        sell_threshold = float(self.params["sell_threshold"])
         for index, row in enumerate(self.rows, start=1):
             warmup_state = evaluate_child_row_warmup(
                 row,
@@ -210,9 +219,14 @@ class BaseMachineLearningEnsembleAlertAlgorithm:
                 signal_label = direction_to_signal_label(decision.direction)
                 diagnostics = {
                     **decision.diagnostics,
+                    "child_contributions": build_child_contribution_rows(
+                        row.child_outputs
+                    ),
                     **warmup_state.diagnostics,
                     "warmup_ready": True,
                     "history_ready": True,
+                    "buy_threshold": buy_threshold,
+                    "sell_threshold": sell_threshold,
                     "timestamp": row.timestamp,
                 }
                 reason_codes = (str(decision.diagnostics["decision_reason"]),)
@@ -232,6 +246,8 @@ class BaseMachineLearningEnsembleAlertAlgorithm:
                     **warmup_state.diagnostics,
                     "warmup_ready": False,
                     "history_ready": history_ready,
+                    "buy_threshold": buy_threshold,
+                    "sell_threshold": sell_threshold,
                     "timestamp": row.timestamp,
                 }
                 signal_label = "neutral"
@@ -258,7 +274,13 @@ class BaseMachineLearningEnsembleAlertAlgorithm:
                 diagnostics["expected_child_count"]
             )
             derived_series["warmup_ready"].append(diagnostics["warmup_ready"])
+            derived_series["warmup_diagnostics"].append(dict(warmup_state.diagnostics))
+            derived_series["child_contributions"].append(
+                diagnostics["child_contributions"]
+            )
             derived_series["decision_reason"].append(decision_reason)
+            derived_series["buy_threshold"].append(buy_threshold)
+            derived_series["sell_threshold"].append(sell_threshold)
             child_outputs.extend(row.child_outputs)
         return AlertAlgorithmOutput(
             algorithm_key=self.algorithm_key,
@@ -274,6 +296,12 @@ class BaseMachineLearningEnsembleAlertAlgorithm:
                     1 for point in points if point.signal_label == "neutral"
                 ),
                 "decision_reason_counts": reason_counts,
+                "latest_signal": points[-1].signal_label if points else "neutral",
+                "latest_decision_reason": (
+                    points[-1].reason_codes[0]
+                    if points and points[-1].reason_codes
+                    else None
+                ),
             },
             metadata={
                 "family": self.family,

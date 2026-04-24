@@ -15,12 +15,12 @@
 | --- | --- |
 | algorithm rows | 121 |
 | combination-method rows | 12 |
-| ready_to_implement | 4 |
+| ready_to_implement | 1 |
 | blocked_framework | 48 |
 | in_progress | 0 |
-| complete | 81 |
-| prototype_only | 52 |
-| research_ready | 81 |
+| complete | 84 |
+| prototype_only | 49 |
+| research_ready | 84 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -37,7 +37,7 @@
 | factor_risk_premia | algorithm | 15 | 0 | 4 | 0 | 11 |
 | fixed_income_relative_value | algorithm | 2 | 0 | 2 | 0 | 0 |
 | fundamental_ml_composite | algorithm | 8 | 0 | 1 | 0 | 7 |
-| machine_learning_ensemble | combination_method | 3 | 3 | 0 | 0 | 0 |
+| machine_learning_ensemble | combination_method | 3 | 0 | 0 | 0 | 3 |
 | mean_reversion | algorithm | 12 | 0 | 0 | 0 | 12 |
 | microstructure_hft | algorithm | 8 | 0 | 8 | 0 | 0 |
 | momentum | algorithm | 11 | 0 | 0 | 0 | 11 |
@@ -76,7 +76,6 @@
 
 | batch | ready_rows |
 | --- | --- |
-| composite_wave_4 | 3 |
 | composite_wave_2 | 1 |
 
 ## Fixture coverage

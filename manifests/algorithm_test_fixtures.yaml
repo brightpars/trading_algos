@@ -271,10 +271,14 @@ fixtures:
   domain: model_prediction_streams
   purpose: Aggregation of child model predictions into one final prediction.
   inputs:
-    dataset_path: tests/fixtures/composite/ml_ensemble.parquet
+    dataset_path: tests/fixtures/composite/ml_ensemble.json
   expected_behaviors:
   - Meta-aggregation is deterministic for the fixture
   - Final thresholded state matches expected result
+  - Bagging remains neutral until min_history is satisfied, then emits the expected sell state with threshold and child-contribution diagnostics
+  - Boosting honors learning-rate and stage-weight inputs while preserving normalized score and confidence ranges
+  - Stacking exposes meta-feature values, meta-model adjustments, latest diagnostics, and interactive-report payload fields needed for dashboard explanation
+  - Short-history and incomplete-child-set evaluations remain neutral with explicit warmup reason codes and expected-versus-actual child-count diagnostics
 - fixture_id: fixture.composite_rl_policy_stub_v1
   domain: rl_environment
   purpose: Stub environment for RL allocation and hierarchical policy plumbing.

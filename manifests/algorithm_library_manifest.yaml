@@ -7736,8 +7736,8 @@ rows:
   display_category: Machine Learning Ensemble
   subcategory: bagging
   tier: tier2
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Daily to medium-term predictive systems
   home_suitability: 2
@@ -7784,7 +7784,7 @@ rows:
   - performance_smoke
   batch: composite_wave_4
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 8; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_wave_4 with shared ensemble helper reuse, fixture-backed behavior and warmup coverage, normalized diagnostics/report payload checks, and performance-smoke validation.
 - catalog_ref: combination:9
   source_doc_ref: requirements_v4:combination:9
   kind: combination_method
@@ -7793,8 +7793,8 @@ rows:
   display_category: Machine Learning Ensemble
   subcategory: boosting
   tier: tier2
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Daily to medium-term predictive systems
   home_suitability: 2
@@ -7841,7 +7841,7 @@ rows:
   - performance_smoke
   batch: composite_wave_4
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 9; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_wave_4 with shared ensemble helper reuse, fixture-backed aggregation and warmup coverage, normalized diagnostics/report payload checks, and performance-smoke validation.
 - catalog_ref: combination:10
   source_doc_ref: requirements_v4:combination:10
   kind: combination_method
@@ -7850,8 +7850,8 @@ rows:
   display_category: Machine Learning Ensemble
   subcategory: stacking
   tier: tier2
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Daily to medium-term predictive systems
   home_suitability: 2
@@ -7898,7 +7898,7 @@ rows:
   - performance_smoke
   batch: composite_wave_4
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 10; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_wave_4 with shared ensemble helper reuse, fixture-backed meta-feature behavior and warmup coverage, normalized diagnostics/report payload checks, and performance-smoke validation.
 - catalog_ref: combination:11
   source_doc_ref: requirements_v4:combination:11
   kind: combination_method

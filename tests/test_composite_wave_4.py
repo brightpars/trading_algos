@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -12,57 +13,11 @@ from trading_algos.alertgen.core.validation import normalize_alertgen_sensor_con
 from trading_algos.algorithmspec import get_performance_smoke_case
 
 
-def _ensemble_rows() -> list[dict[str, object]]:
-    return [
-        {
-            "timestamp": "2025-01-01",
-            "meta_features": {"regime_confidence": 0.2, "breadth": 0.1},
-            "child_outputs": [
-                {
-                    "child_key": "model_a",
-                    "signal_label": "buy",
-                    "score": 0.7,
-                    "confidence": 0.8,
-                },
-                {
-                    "child_key": "model_b",
-                    "signal_label": "buy",
-                    "score": 0.5,
-                    "confidence": 0.7,
-                },
-                {
-                    "child_key": "model_c",
-                    "signal_label": "neutral",
-                    "score": 0.1,
-                    "confidence": 0.4,
-                },
-            ],
-        },
-        {
-            "timestamp": "2025-01-02",
-            "meta_features": {"regime_confidence": -0.3, "breadth": -0.2},
-            "child_outputs": [
-                {
-                    "child_key": "model_a",
-                    "signal_label": "sell",
-                    "score": -0.8,
-                    "confidence": 0.9,
-                },
-                {
-                    "child_key": "model_b",
-                    "signal_label": "sell",
-                    "score": -0.6,
-                    "confidence": 0.8,
-                },
-                {
-                    "child_key": "model_c",
-                    "signal_label": "neutral",
-                    "score": -0.1,
-                    "confidence": 0.5,
-                },
-            ],
-        },
-    ]
+COMPOSITE_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "composite"
+
+
+def _load_composite_fixture_rows(name: str) -> list[dict[str, object]]:
+    return json.loads((COMPOSITE_FIXTURES_ROOT / name).read_text(encoding="utf-8"))
 
 
 def test_composite_wave_4_registration_metadata_matches_manifest_contract() -> None:
@@ -96,12 +51,13 @@ def test_composite_wave_4_registration_metadata_matches_manifest_contract() -> N
 
 
 def test_bagging_ensemble_fixture_behavior_and_contract(tmp_path: Path) -> None:
+    rows = _load_composite_fixture_rows("ml_ensemble.json")
     algorithm, _ = create_alertgen_algorithm(
         sensor_config={
             "symbol": "AAPL",
             "alg_key": "bagging_ensemble",
             "alg_param": {
-                "rows": _ensemble_rows(),
+                "rows": rows,
                 "buy_threshold": 0.2,
                 "sell_threshold": -0.2,
                 "min_history": 2,
@@ -118,22 +74,39 @@ def test_bagging_ensemble_fixture_behavior_and_contract(tmp_path: Path) -> None:
 
     output = algorithm.normalized_output()
     assert output.metadata["catalog_ref"] == "combination:8"
+    assert output.metadata["family"] == "machine_learning_ensemble"
     assert output.points[0].signal_label == "neutral"
     assert output.points[0].reason_codes == ("warmup_pending",)
     assert output.points[1].signal_label == "sell"
     assert output.points[1].diagnostics["aggregation_method"] == "bagging_average"
     assert output.points[1].diagnostics["warmup_ready"] is True
+    assert output.points[1].diagnostics["history_ready"] is True
+    assert output.points[1].diagnostics["buy_threshold"] == pytest.approx(0.2)
+    assert output.points[1].diagnostics["sell_threshold"] == pytest.approx(-0.2)
+    assert (
+        output.points[1].diagnostics["child_contributions"][0]["child_key"] == "model_a"
+    )
     assert output.derived_series["child_count"] == [3, 3]
+    assert output.derived_series["warmup_diagnostics"][0] == {
+        "expected_child_count": 3,
+        "actual_child_count": 3,
+        "missing_child_count": 0,
+    }
+    assert output.derived_series["buy_threshold"] == [0.2, 0.2]
+    assert output.derived_series["sell_threshold"] == [-0.2, -0.2]
     assert output.summary_metrics["decision_reason_counts"]["threshold_sell"] == 1
+    assert output.summary_metrics["latest_signal"] == "sell"
+    assert output.summary_metrics["latest_decision_reason"] == "threshold_sell"
 
 
 def test_boosting_ensemble_fixture_behavior_and_contract(tmp_path: Path) -> None:
+    rows = _load_composite_fixture_rows("ml_ensemble.json")
     algorithm, _ = create_alertgen_algorithm(
         sensor_config={
             "symbol": "AAPL",
             "alg_key": "boosting_ensemble",
             "alg_param": {
-                "rows": _ensemble_rows(),
+                "rows": rows,
                 "buy_threshold": 0.2,
                 "sell_threshold": -0.2,
                 "min_history": 1,
@@ -157,15 +130,20 @@ def test_boosting_ensemble_fixture_behavior_and_contract(tmp_path: Path) -> None
         "boosting_weighted_stage_average"
     )
     assert len(output.points[0].diagnostics["weighted_children"]) == 3
+    assert (
+        output.points[0].diagnostics["weighted_children"][0]["effective_weight"] > 0.0
+    )
+    assert output.summary_metrics["latest_signal"] == "sell"
 
 
 def test_stacking_meta_learning_fixture_behavior_and_contract(tmp_path: Path) -> None:
+    rows = _load_composite_fixture_rows("ml_ensemble.json")
     algorithm, _ = create_alertgen_algorithm(
         sensor_config={
             "symbol": "AAPL",
             "alg_key": "stacking_meta_learning",
             "alg_param": {
-                "rows": _ensemble_rows(),
+                "rows": rows,
                 "buy_threshold": 0.1,
                 "sell_threshold": -0.1,
                 "min_history": 1,
@@ -193,6 +171,9 @@ def test_stacking_meta_learning_fixture_behavior_and_contract(tmp_path: Path) ->
     }
     assert payload_name == "composite_report_stacking_meta_learning_AAPL"
     assert payload["data"]["metadata"]["catalog_ref"] == "combination:10"
+    assert payload["latest_point"]["signal_label"] == "sell"
+    assert payload["latest_diagnostics"]["aggregation_method"] == "stacking_meta_model"
+    assert payload["summary"]["latest_decision_reason"] == "threshold_sell"
 
 
 def test_composite_wave_4_validation_and_warmup_behaviors(tmp_path: Path) -> None:
@@ -235,7 +216,7 @@ def test_composite_wave_4_validation_and_warmup_behaviors(tmp_path: Path) -> Non
                 "symbol": "AAPL",
                 "alg_key": "boosting_ensemble",
                 "alg_param": {
-                    "rows": _ensemble_rows(),
+                    "rows": _load_composite_fixture_rows("ml_ensemble.json"),
                     "buy_threshold": 0.2,
                     "sell_threshold": -0.2,
                     "min_history": 1,
@@ -253,7 +234,7 @@ def test_composite_wave_4_validation_and_warmup_behaviors(tmp_path: Path) -> Non
                 "symbol": "AAPL",
                 "alg_key": "bagging_ensemble",
                 "alg_param": {
-                    "rows": _ensemble_rows(),
+                    "rows": _load_composite_fixture_rows("ml_ensemble.json"),
                     "buy_threshold": -0.1,
                     "sell_threshold": 0.2,
                     "min_history": 1,
@@ -270,7 +251,7 @@ def test_composite_wave_4_validation_and_warmup_behaviors(tmp_path: Path) -> Non
                 "symbol": "AAPL",
                 "alg_key": "stacking_meta_learning",
                 "alg_param": {
-                    "rows": _ensemble_rows(),
+                    "rows": _load_composite_fixture_rows("ml_ensemble.json"),
                     "buy_threshold": 0.1,
                     "sell_threshold": -0.1,
                     "min_history": 1,
@@ -281,6 +262,86 @@ def test_composite_wave_4_validation_and_warmup_behaviors(tmp_path: Path) -> Non
                 "sell": True,
             }
         )
+
+    with pytest.raises(ValueError, match="confidence_power must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "bagging_ensemble",
+                "alg_param": {
+                    "rows": _load_composite_fixture_rows("ml_ensemble.json"),
+                    "buy_threshold": 0.2,
+                    "sell_threshold": -0.2,
+                    "min_history": 1,
+                    "expected_child_count": 3,
+                    "confidence_power": -0.1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_composite_wave_4_short_history_and_clamped_score_behaviors(
+    tmp_path: Path,
+) -> None:
+    rows = _load_composite_fixture_rows("ml_ensemble.json")
+    boosting_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "boosting_ensemble",
+            "alg_param": {
+                "rows": rows,
+                "buy_threshold": 0.6,
+                "sell_threshold": -0.6,
+                "min_history": 3,
+                "expected_child_count": 3,
+                "learning_rate": 5.0,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+    boosting_output = boosting_algorithm.normalized_output()
+    assert [point.signal_label for point in boosting_output.points] == [
+        "neutral",
+        "neutral",
+    ]
+    assert [point.reason_codes for point in boosting_output.points] == [
+        ("warmup_pending",),
+        ("warmup_pending",),
+    ]
+
+    stacking_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "stacking_meta_learning",
+            "alg_param": {
+                "rows": rows,
+                "buy_threshold": 0.9,
+                "sell_threshold": -0.9,
+                "min_history": 1,
+                "expected_child_count": 3,
+                "meta_bias": 0.7,
+                "meta_feature_scale": 1.0,
+                "meta_model_weights": {
+                    "model_a": 3.0,
+                    "model_b": 3.0,
+                    "model_c": 1.0,
+                },
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+    stacking_output = stacking_algorithm.normalized_output()
+    assert stacking_output.points[0].score == pytest.approx(1.0)
+    assert stacking_output.points[0].signal_label == "buy"
+    assert stacking_output.points[0].diagnostics["raw_ensemble_score"] == pytest.approx(
+        1.0
+    )
 
 
 def test_composite_wave_4_performance_smoke_mapping() -> None:
