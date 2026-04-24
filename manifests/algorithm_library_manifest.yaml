@@ -4471,8 +4471,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: gap
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4517,7 +4517,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_2
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 75; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_2 with fixture-backed neutral gap checks, warmup coverage, normalized dashboard diagnostics, registration validation, parameter validation, and performance-smoke coverage.
 - catalog_ref: algorithm:76
   source_doc_ref: requirements_v4:algorithm:76
   kind: algorithm
@@ -4526,8 +4526,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: trendline
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4572,7 +4572,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_2
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 76; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_2 with fixture-backed trendline-break behavior checks, warmup coverage, normalized dashboard diagnostics, registration validation, parameter validation, and performance-smoke coverage.
 - catalog_ref: algorithm:77
   source_doc_ref: requirements_v4:algorithm:77
   kind: algorithm
@@ -4581,8 +4581,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: volatility
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4627,7 +4627,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_2
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 77; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_2 with fixture-backed squeeze-state checks, warmup coverage, normalized dashboard diagnostics, registration validation, parameter validation, and performance-smoke coverage.
 - catalog_ref: algorithm:78
   source_doc_ref: requirements_v4:algorithm:78
   kind: algorithm

@@ -4154,6 +4154,413 @@ def test_pattern_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> Non
         assert output.metadata["reporting_mode"] == "bar_series"
 
 
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_warmup"),
+    [
+        (
+            "gap_and_go",
+            {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "trendline_break_strategy",
+            {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "volatility_squeeze_breakout",
+            {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
+                "confirmation_bars": 1,
+            },
+            6,
+        ),
+    ],
+)
+def test_pattern_wave_2_short_history_stays_neutral_until_warmup(
+    tmp_path, alg_key, alg_param, expected_warmup
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(
+        _load_pattern_fixture_rows("support_rejection.csv")[: expected_warmup - 1]
+    )
+    output = algorithm.normalized_output()
+
+    assert algorithm.minimum_history() == expected_warmup
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert any("warmup_pending" in point.reason_codes for point in output.points)
+    assert output.metadata["warmup_period"] == expected_warmup
+
+
+@pytest.mark.parametrize(
+    (
+        "alg_key",
+        "alg_param",
+        "expected_reason_code",
+        "expected_annotation_keys",
+    ),
+    [
+        (
+            "gap_and_go",
+            {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            "awaiting_gap",
+            {
+                "gap_threshold",
+                "continuation_threshold",
+                "volume_window",
+                "relative_volume_threshold",
+                "gap_size",
+                "continuation_amount",
+                "relative_volume",
+                "gap_detected",
+                "continuation_confirmed",
+            },
+        ),
+        (
+            "trendline_break_strategy",
+            {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+            "trendline_break_bullish",
+            {
+                "trendline_window",
+                "break_buffer",
+                "slope_tolerance",
+                "trendline_level",
+                "trendline_slope",
+                "trendline_intercept",
+                "break_distance",
+                "trendline_break_detected",
+            },
+        ),
+        (
+            "volatility_squeeze_breakout",
+            {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
+                "confirmation_bars": 1,
+            },
+            "squeeze_active",
+            {
+                "squeeze_window",
+                "bollinger_multiplier",
+                "keltner_multiplier",
+                "breakout_buffer",
+                "bollinger_upper",
+                "bollinger_lower",
+                "keltner_upper",
+                "keltner_lower",
+                "squeeze_on",
+                "breakout_distance",
+            },
+        ),
+    ],
+)
+def test_pattern_wave_2_normalized_output_exposes_dashboard_diagnostics(
+    tmp_path, alg_key, alg_param, expected_reason_code, expected_annotation_keys
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    output = algorithm.normalized_output()
+    payloads = algorithm.interactive_report_payloads()
+    child_output = output.child_outputs[0]
+
+    assert payloads
+    assert any(expected_reason_code in point.reason_codes for point in output.points)
+    assert {
+        "trend_score",
+        "regime_label",
+        "reason_codes",
+        "primary_value",
+        "signal_value",
+        "threshold_value",
+        "exit_value",
+        "confirmation_state_label",
+        "warmup_ready",
+    }.issubset(output.derived_series)
+    assert output.metadata["family"] == "pattern_price_action"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == child_output.diagnostics["catalog_ref"]
+    assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert child_output.score == pytest.approx(output.derived_series["trend_score"][-1])
+    assert child_output.diagnostics["trend_score"] == pytest.approx(
+        output.derived_series["trend_score"][-1]
+    )
+    assert (
+        child_output.diagnostics["threshold_value"]
+        == output.derived_series["threshold_value"][-1]
+    )
+
+
+def test_pattern_wave_2_fixture_behavior_matches_manifest_expectations(
+    tmp_path,
+) -> None:
+    gap_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "gap_and_go",
+            "alg_param": {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "gap"),
+    )
+    gap_algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    gap_output = gap_algorithm.normalized_output()
+
+    assert all(point.signal_label == "neutral" for point in gap_output.points)
+    assert gap_output.points[-1].reason_codes[0] == "awaiting_gap"
+    assert gap_output.derived_series["gap_detected"][-1] is False
+    assert gap_output.derived_series["relative_volume"][-1] > 1.0
+    assert gap_output.child_outputs[0].diagnostics["continuation_confirmed"] is False
+
+    trendline_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "trendline_break_strategy",
+            "alg_param": {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "trendline"),
+    )
+    trendline_algorithm.process_list(
+        _load_pattern_fixture_rows("support_rejection.csv")
+    )
+    trendline_output = trendline_algorithm.normalized_output()
+
+    assert any(point.signal_label == "buy" for point in trendline_output.points)
+    assert any(
+        value is True
+        for value in trendline_output.derived_series["trendline_break_detected"]
+    )
+    assert trendline_output.points[-1].signal_label == "neutral"
+    assert trendline_output.derived_series["trendline_slope"][-1] > 0.0
+    assert (
+        trendline_output.child_outputs[0].diagnostics["trendline_break_detected"]
+        is False
+    )
+
+    squeeze_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "volatility_squeeze_breakout",
+            "alg_param": {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "squeeze"),
+    )
+    squeeze_algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    squeeze_output = squeeze_algorithm.normalized_output()
+
+    assert squeeze_output.points[-1].signal_label == "neutral"
+    assert "squeeze_active" in squeeze_output.points[-1].reason_codes
+    assert squeeze_output.derived_series["squeeze_on"][-1] is True
+    assert (
+        squeeze_output.child_outputs[0].diagnostics["bollinger_upper"]
+        <= squeeze_output.child_outputs[0].diagnostics["keltner_upper"]
+    )
+
+
+def test_pattern_wave_2_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="relative_volume_threshold must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "gap_and_go",
+                "alg_param": {
+                    "gap_threshold": 0.15,
+                    "continuation_threshold": 0.05,
+                    "volume_window": 3,
+                    "relative_volume_threshold": -0.1,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="break_buffer must be >= 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "trendline_break_strategy",
+                "alg_param": {
+                    "trendline_window": 5,
+                    "break_buffer": -0.1,
+                    "slope_tolerance": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="keltner_multiplier must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "volatility_squeeze_breakout",
+                "alg_param": {
+                    "squeeze_window": 5,
+                    "bollinger_multiplier": 2.0,
+                    "keltner_multiplier": 0.0,
+                    "breakout_buffer": 0.05,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_pattern_wave_2_registration_metadata_matches_manifest_contract() -> None:
+    expected = {
+        "gap_and_go": ("algorithm:75", "pattern_price_action", "gap", 5),
+        "trendline_break_strategy": (
+            "algorithm:76",
+            "pattern_price_action",
+            "trendline",
+            5,
+        ),
+        "volatility_squeeze_breakout": (
+            "algorithm:77",
+            "pattern_price_action",
+            "volatility",
+            6,
+        ),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.output_modes == ("signal", "score", "confidence")
+        assert spec.category == "pattern_price_action"
+
+
+def test_pattern_wave_2_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = _load_pattern_fixture_rows("support_rejection.csv") * 300
+    algorithms = [
+        (
+            "gap_and_go",
+            {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "trendline_break_strategy",
+            {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volatility_squeeze_breakout",
+            {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / f"pattern-wave-2-{index}"),
+        )
+        algorithm.process_list(rows)
+        output = algorithm.normalized_output()
+
+        assert len(output.points) == len(rows)
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "bar_series"
+        assert "trend_score" in output.derived_series
+
+
 def test_momentum_wave_2_volume_confirmation_missing_stays_neutral_with_explanatory_reason(
     tmp_path,
 ) -> None:

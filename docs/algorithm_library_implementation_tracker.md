@@ -15,12 +15,12 @@
 | --- | --- |
 | algorithm rows | 121 |
 | combination-method rows | 12 |
-| ready_to_implement | 10 |
+| ready_to_implement | 7 |
 | blocked_framework | 83 |
 | in_progress | 0 |
-| complete | 40 |
-| prototype_only | 93 |
-| research_ready | 40 |
+| complete | 43 |
+| prototype_only | 90 |
+| research_ready | 43 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -42,7 +42,7 @@
 | microstructure_hft | algorithm | 8 | 0 | 8 | 0 | 0 |
 | momentum | algorithm | 11 | 0 | 4 | 0 | 7 |
 | optimization_based | combination_method | 1 | 0 | 1 | 0 | 0 |
-| pattern_price_action | algorithm | 8 | 3 | 0 | 0 | 5 |
+| pattern_price_action | algorithm | 8 | 0 | 0 | 0 | 8 |
 | reinforcement_learning | combination_method | 2 | 0 | 2 | 0 | 0 |
 | risk_overlay | combination_method | 2 | 1 | 1 | 0 | 0 |
 | rule_based_combination | combination_method | 3 | 0 | 1 | 0 | 2 |
@@ -77,7 +77,6 @@
 | batch | ready_rows |
 | --- | --- |
 | mean_reversion_wave_3 | 3 |
-| pattern_wave_2 | 3 |
 | composite_wave_4 | 3 |
 | composite_wave_2 | 1 |
 
