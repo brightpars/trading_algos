@@ -39,7 +39,7 @@ fixtures:
   domain: multi_asset_panel
   purpose: Deterministic ranking of a small universe on rebalance dates.
   inputs:
-    dataset_path: tests/fixtures/momentum/cross_sectional_ranking.parquet
+    dataset_path: tests/fixtures/momentum/cross_sectional_ranking.csv
   expected_behaviors:
   - Known winners rank above known losers on the target rebalance date
   - Selection list is reproducible under the declared ranking rule

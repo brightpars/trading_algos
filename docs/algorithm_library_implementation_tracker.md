@@ -16,11 +16,11 @@
 | algorithm rows | 121 |
 | combination-method rows | 12 |
 | ready_to_implement | 4 |
-| blocked_framework | 83 |
+| blocked_framework | 79 |
 | in_progress | 0 |
-| complete | 46 |
-| prototype_only | 87 |
-| research_ready | 46 |
+| complete | 50 |
+| prototype_only | 83 |
+| research_ready | 50 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -40,7 +40,7 @@
 | machine_learning_ensemble | combination_method | 3 | 3 | 0 | 0 | 0 |
 | mean_reversion | algorithm | 12 | 0 | 0 | 0 | 12 |
 | microstructure_hft | algorithm | 8 | 0 | 8 | 0 | 0 |
-| momentum | algorithm | 11 | 0 | 4 | 0 | 7 |
+| momentum | algorithm | 11 | 0 | 0 | 0 | 11 |
 | optimization_based | combination_method | 1 | 0 | 1 | 0 | 0 |
 | pattern_price_action | algorithm | 8 | 0 | 0 | 0 | 8 |
 | reinforcement_learning | combination_method | 2 | 0 | 2 | 0 | 0 |

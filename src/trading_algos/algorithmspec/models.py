@@ -25,6 +25,8 @@ OutputMode = Literal[
     "confidence",
     "events",
     "ranking",
+    "selection",
+    "diagnostics",
     "regime",
     "execution_plan",
 ]

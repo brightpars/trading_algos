@@ -80,6 +80,25 @@ def _load_momentum_fixture_rows(name: str) -> list[dict[str, object]]:
     return parsed_rows
 
 
+def _load_cross_sectional_momentum_fixture_rows(name: str) -> list[dict[str, object]]:
+    with (MOMENTUM_FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
+        rows = list(DictReader(handle))
+    parsed_rows: list[dict[str, object]] = []
+    for row in rows:
+        parsed_rows.append(
+            {
+                "ts": row["ts"],
+                "symbol": row["symbol"],
+                "Open": float(row["Open"]),
+                "High": float(row["High"]),
+                "Low": float(row["Low"]),
+                "Close": float(row["Close"]),
+                "Volume": float(row["Volume"]),
+            }
+        )
+    return parsed_rows
+
+
 def _load_mean_reversion_fixture_rows(name: str) -> list[dict[str, object]]:
     with (MEAN_REVERSION_FIXTURES_ROOT / name).open(
         newline="", encoding="utf-8"
@@ -262,12 +281,16 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "rolling_channel_breakout",
         "close_high_channel_breakout",
         "rate_of_change_momentum",
+        "cross_sectional_momentum",
         "accelerating_momentum",
         "rsi_momentum_continuation",
         "stochastic_momentum",
         "cci_momentum",
         "kst_know_sure_thing",
+        "relative_strength_momentum",
+        "dual_momentum",
         "volume_confirmed_momentum",
+        "residual_momentum",
         "support_resistance_bounce",
         "breakout_retest",
         "pivot_point_strategy",
@@ -4228,6 +4251,415 @@ def test_pattern_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> Non
         assert len(output.points) == len(rows)
         assert output.metadata["warmup_period"] == algorithm.minimum_history()
         assert output.metadata["reporting_mode"] == "bar_series"
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_catalog_ref", "expected_subcategory"),
+    [
+        (
+            "cross_sectional_momentum",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+            "algorithm:16",
+            "cross",
+        ),
+        (
+            "relative_strength_momentum",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+            "algorithm:17",
+            "relative",
+        ),
+        (
+            "dual_momentum",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 1,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "absolute_momentum_threshold": 0.0,
+                "defensive_symbol": "BIL",
+            },
+            "algorithm:18",
+            "dual",
+        ),
+        (
+            "residual_momentum",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "score_adjustments": {"BBB": 5.0, "AAA": -1.0},
+            },
+            "algorithm:19",
+            "residual",
+        ),
+    ],
+)
+def test_momentum_wave_3_registration_metadata_matches_manifest_contract(
+    alg_key, alg_param, expected_catalog_ref, expected_subcategory
+) -> None:
+    del alg_param
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+
+    assert spec.catalog_ref == expected_catalog_ref
+    assert spec.family == "momentum"
+    assert spec.subcategory == expected_subcategory
+    assert spec.warmup_period == 4
+    assert spec.output_modes == ("ranking", "selection", "diagnostics")
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "alg_param", "expected_top_symbol"),
+    [
+        (
+            "cross_sectional_momentum",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+            "AAA",
+        ),
+        (
+            "relative_strength_momentum",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+            "AAA",
+        ),
+        (
+            "dual_momentum",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 1,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "absolute_momentum_threshold": 0.0,
+                "defensive_symbol": "BIL",
+            },
+            "AAA",
+        ),
+        (
+            "residual_momentum",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "score_adjustments": {"BBB": 5.0, "AAA": -1.0},
+            },
+            "BBB",
+        ),
+    ],
+)
+def test_momentum_wave_3_fixture_behavior_matches_manifest_expectations(
+    tmp_path, alg_key, alg_param, expected_top_symbol
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+
+    assert output.points
+    assert output.points[-1].signal_label == "buy"
+    assert output.derived_series["top_symbol"][-1] == expected_top_symbol
+    assert output.derived_series["selected_count"][-1] >= 1
+    assert output.metadata["family"] == "momentum"
+    assert output.metadata["reporting_mode"] == "rebalance_report"
+    assert portfolio_output.metadata["catalog_ref"] == output.metadata["catalog_ref"]
+    assert portfolio_output.rebalances[-1].ranking[0].symbol == expected_top_symbol
+    assert expected_top_symbol in portfolio_output.rebalances[-1].selected_symbols
+
+
+def test_momentum_wave_3_dual_momentum_defensive_fallback_is_used_when_threshold_fails(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "dual_momentum",
+            "alg_param": {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 1,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "absolute_momentum_threshold": 100.0,
+                "defensive_symbol": "BIL",
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.derived_series["selected_symbols"][-1] == ["BIL"]
+    assert child_output.diagnostics["selected_symbols"] == ["BIL"]
+    assert child_output.diagnostics["weights"] == {"BIL": 1.0}
+
+
+def test_momentum_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="bottom_n must be 0 when long_only is true"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "cross_sectional_momentum",
+                "alg_param": {
+                    "rows": _load_cross_sectional_momentum_fixture_rows(
+                        "cross_sectional_ranking.csv"
+                    ),
+                    "lookback_window": 1,
+                    "top_n": 2,
+                    "bottom_n": 1,
+                    "rebalance_frequency": "monthly",
+                    "long_only": True,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+    with pytest.raises(ValueError, match=r"rows\[0\] symbol is required"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "relative_strength_momentum",
+                "alg_param": {
+                    "rows": [{"ts": "2025-01-01", "Close": 100.0}],
+                    "lookback_window": 1,
+                    "top_n": 1,
+                    "rebalance_frequency": "monthly",
+                    "long_only": True,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "catalog_ref", "alg_param"),
+    [
+        (
+            "cross_sectional_momentum",
+            "algorithm:16",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+        ),
+        (
+            "relative_strength_momentum",
+            "algorithm:17",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+        ),
+        (
+            "dual_momentum",
+            "algorithm:18",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 1,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "absolute_momentum_threshold": 0.0,
+                "defensive_symbol": "BIL",
+            },
+        ),
+        (
+            "residual_momentum",
+            "algorithm:19",
+            {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "score_adjustments": {"BBB": 5.0, "AAA": -1.0},
+            },
+        ),
+    ],
+)
+def test_momentum_wave_3_normalized_output_metadata_exposes_dashboard_contract_fields(
+    tmp_path, alg_key, catalog_ref, alg_param
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": alg_key,
+            "alg_param": alg_param,
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.metadata["family"] == "momentum"
+    assert output.metadata["reporting_mode"] == "rebalance_report"
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert child_output.diagnostics["family"] == "momentum"
+    assert child_output.diagnostics["reporting_mode"] == "rebalance_report"
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref
+    assert {"selected_symbols", "weights", "eligible_universe_size"}.issubset(
+        child_output.diagnostics.keys()
+    )
+
+
+def test_momentum_wave_3_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = (
+        _load_cross_sectional_momentum_fixture_rows("cross_sectional_ranking.csv") * 50
+    )
+    algorithms = [
+        (
+            "cross_sectional_momentum",
+            {
+                "rows": rows,
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+        ),
+        (
+            "relative_strength_momentum",
+            {
+                "rows": rows,
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+        ),
+        (
+            "dual_momentum",
+            {
+                "rows": rows,
+                "lookback_window": 1,
+                "top_n": 1,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "absolute_momentum_threshold": 0.0,
+                "defensive_symbol": "BIL",
+            },
+        ),
+        (
+            "residual_momentum",
+            {
+                "rows": rows,
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "score_adjustments": {"BBB": 5.0, "AAA": -1.0},
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "rebalance_report"
+        assert len(output.points) >= 1
 
 
 @pytest.mark.parametrize(

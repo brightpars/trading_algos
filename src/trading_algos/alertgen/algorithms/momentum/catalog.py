@@ -2,14 +2,26 @@ from trading_algos.algorithmspec import AlertAlgorithmSpec, register_algorithm
 from trading_algos.alertgen.algorithms.momentum.accelerating_momentum import (
     AcceleratingMomentumAlertAlgorithm,
 )
+from trading_algos.alertgen.algorithms.momentum.cross_sectional_momentum import (
+    build_cross_sectional_momentum_algorithm,
+)
 from trading_algos.alertgen.algorithms.momentum.cci_momentum import (
     CCIMomentumAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.momentum.dual_momentum import (
+    build_dual_momentum_algorithm,
 )
 from trading_algos.alertgen.algorithms.momentum.kst_know_sure_thing import (
     KSTKnowSureThingAlertAlgorithm,
 )
 from trading_algos.alertgen.algorithms.momentum.rate_of_change_momentum import (
     RateOfChangeMomentumAlertAlgorithm,
+)
+from trading_algos.alertgen.algorithms.momentum.relative_strength_momentum import (
+    build_relative_strength_momentum_algorithm,
+)
+from trading_algos.alertgen.algorithms.momentum.residual_momentum import (
+    build_residual_momentum_algorithm,
 )
 from trading_algos.alertgen.algorithms.momentum.rsi_momentum_continuation import (
     RSIMomentumContinuationAlertAlgorithm,
@@ -23,6 +35,7 @@ from trading_algos.alertgen.algorithms.momentum.volume_confirmed_momentum import
 from trading_algos.alertgen.core.validation import (
     require_accelerating_momentum_param,
     require_cci_momentum_param,
+    require_cross_sectional_momentum_param,
     require_kst_momentum_param,
     require_roc_momentum_param,
     require_rsi_momentum_param,
@@ -112,6 +125,50 @@ def _build_volume_confirmed_momentum(symbol, report_base_path, alg_param, **_kwa
     )
 
 
+def _build_cross_sectional_momentum(symbol, report_base_path, alg_param, **_kwargs):
+    del report_base_path
+    return build_cross_sectional_momentum_algorithm(
+        algorithm_key="cross_sectional_momentum",
+        symbol=symbol,
+        alg_name="cross_sectional_momentum",
+        subcategory="cross",
+        alg_param=alg_param,
+    )
+
+
+def _build_relative_strength_momentum(symbol, report_base_path, alg_param, **_kwargs):
+    del report_base_path
+    algorithm = build_relative_strength_momentum_algorithm(
+        algorithm_key="relative_strength_momentum",
+        symbol=symbol,
+        alg_param=alg_param,
+    )
+    algorithm.catalog_ref = "algorithm:17"
+    return algorithm
+
+
+def _build_dual_momentum(symbol, report_base_path, alg_param, **_kwargs):
+    del report_base_path
+    algorithm = build_dual_momentum_algorithm(
+        algorithm_key="dual_momentum",
+        symbol=symbol,
+        alg_param=alg_param,
+    )
+    algorithm.catalog_ref = "algorithm:18"
+    return algorithm
+
+
+def _build_residual_momentum(symbol, report_base_path, alg_param, **_kwargs):
+    del report_base_path
+    algorithm = build_residual_momentum_algorithm(
+        algorithm_key="residual_momentum",
+        symbol=symbol,
+        alg_param=alg_param,
+    )
+    algorithm.catalog_ref = "algorithm:19"
+    return algorithm
+
+
 def register_momentum_alert_algorithms() -> None:
     specs = [
         AlertAlgorithmSpec(
@@ -165,6 +222,100 @@ def register_momentum_alert_algorithms() -> None:
             subcategory="rate",
             warmup_period=6,
             output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="cross_sectional_momentum",
+            name="Cross-Sectional Momentum",
+            catalog_ref="algorithm:16",
+            builder=_build_cross_sectional_momentum,
+            default_param={
+                "rows": [],
+                "lookback_window": 3,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "score_adjustments": {},
+            },
+            param_normalizer=require_cross_sectional_momentum_param,
+            description="Rank a universe by trailing returns and select the strongest assets on rebalance dates.",
+            param_schema=(
+                {
+                    "key": "rows",
+                    "label": "Rows",
+                    "type": "object_list",
+                    "required": True,
+                    "description": "Panel rows containing ts, symbol, and close values.",
+                },
+                {
+                    "key": "lookback_window",
+                    "label": "Lookback window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Trailing return lookback in bars.",
+                },
+                {
+                    "key": "top_n",
+                    "label": "Top N",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of winners to select.",
+                },
+                {
+                    "key": "bottom_n",
+                    "label": "Bottom N",
+                    "type": "integer",
+                    "required": False,
+                    "minimum": 0,
+                    "description": "Number of losers to short when long_only is false.",
+                },
+                {
+                    "key": "rebalance_frequency",
+                    "label": "Rebalance frequency",
+                    "type": "string",
+                    "required": True,
+                    "enum": ["monthly", "weekly", "all"],
+                    "description": "Schedule used to sample rebalance dates.",
+                },
+                {
+                    "key": "long_only",
+                    "label": "Long only",
+                    "type": "boolean",
+                    "required": True,
+                    "description": "Whether the strategy only allocates to winners.",
+                },
+                {
+                    "key": "score_adjustments",
+                    "label": "Score adjustments",
+                    "type": "object",
+                    "required": False,
+                    "description": "Optional per-symbol additive adjustments used by specialized variants.",
+                },
+                {
+                    "key": "absolute_momentum_threshold",
+                    "label": "Absolute momentum threshold",
+                    "type": "number",
+                    "required": False,
+                    "description": "Optional minimum score gate before an asset can be selected.",
+                },
+                {
+                    "key": "defensive_symbol",
+                    "label": "Defensive symbol",
+                    "type": "string",
+                    "required": False,
+                    "description": "Optional fallback symbol when no asset passes the gate.",
+                },
+            ),
+            tags=("momentum", "cross_sectional", "rebalance"),
+            category="momentum",
+            family="momentum",
+            subcategory="cross",
+            warmup_period=4,
+            input_domains=("multi_asset_ohlcv",),
+            asset_scope="universe",
+            output_modes=("ranking", "selection", "diagnostics"),
         ),
         AlertAlgorithmSpec(
             key="accelerating_momentum",
@@ -454,6 +605,174 @@ def register_momentum_alert_algorithms() -> None:
             output_modes=("signal", "score", "confidence"),
         ),
         AlertAlgorithmSpec(
+            key="relative_strength_momentum",
+            name="Relative Strength Momentum",
+            catalog_ref="algorithm:17",
+            builder=_build_relative_strength_momentum,
+            default_param={
+                "rows": [],
+                "lookback_window": 3,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "score_adjustments": {},
+            },
+            param_normalizer=require_cross_sectional_momentum_param,
+            description="Select assets with the strongest recent performance relative to peers.",
+            param_schema=(
+                {
+                    "key": "rows",
+                    "label": "Rows",
+                    "type": "object_list",
+                    "required": True,
+                    "description": "Panel rows containing ts, symbol, and close values.",
+                },
+                {
+                    "key": "lookback_window",
+                    "label": "Lookback window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Trailing return lookback in bars.",
+                },
+                {
+                    "key": "top_n",
+                    "label": "Top N",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of strongest assets to select.",
+                },
+                {
+                    "key": "bottom_n",
+                    "label": "Bottom N",
+                    "type": "integer",
+                    "required": False,
+                    "minimum": 0,
+                    "description": "Number of weak assets to short when long_only is false.",
+                },
+                {
+                    "key": "rebalance_frequency",
+                    "label": "Rebalance frequency",
+                    "type": "string",
+                    "required": True,
+                    "enum": ["monthly", "weekly", "all"],
+                    "description": "Schedule used to sample rebalance dates.",
+                },
+                {
+                    "key": "long_only",
+                    "label": "Long only",
+                    "type": "boolean",
+                    "required": True,
+                    "description": "Whether the strategy only allocates to winners.",
+                },
+                {
+                    "key": "score_adjustments",
+                    "label": "Score adjustments",
+                    "type": "object",
+                    "required": False,
+                    "description": "Optional per-symbol additive adjustments.",
+                },
+            ),
+            tags=("momentum", "relative_strength", "rebalance"),
+            category="momentum",
+            family="momentum",
+            subcategory="relative",
+            warmup_period=4,
+            input_domains=("multi_asset_ohlcv",),
+            asset_scope="universe",
+            output_modes=("ranking", "selection", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="dual_momentum",
+            name="Dual Momentum",
+            catalog_ref="algorithm:18",
+            builder=_build_dual_momentum,
+            default_param={
+                "rows": [],
+                "lookback_window": 3,
+                "top_n": 1,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "score_adjustments": {},
+                "absolute_momentum_threshold": 0.0,
+                "defensive_symbol": "BIL",
+            },
+            param_normalizer=require_cross_sectional_momentum_param,
+            description="Combine cross-sectional ranking with an absolute momentum gate and optional defensive allocation.",
+            param_schema=(
+                {
+                    "key": "rows",
+                    "label": "Rows",
+                    "type": "object_list",
+                    "required": True,
+                    "description": "Panel rows containing ts, symbol, and close values.",
+                },
+                {
+                    "key": "lookback_window",
+                    "label": "Lookback window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Trailing return lookback in bars.",
+                },
+                {
+                    "key": "top_n",
+                    "label": "Top N",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of strongest assets to select.",
+                },
+                {
+                    "key": "rebalance_frequency",
+                    "label": "Rebalance frequency",
+                    "type": "string",
+                    "required": True,
+                    "enum": ["monthly", "weekly", "all"],
+                    "description": "Schedule used to sample rebalance dates.",
+                },
+                {
+                    "key": "long_only",
+                    "label": "Long only",
+                    "type": "boolean",
+                    "required": True,
+                    "description": "Whether the strategy only allocates to winners.",
+                },
+                {
+                    "key": "absolute_momentum_threshold",
+                    "label": "Absolute momentum threshold",
+                    "type": "number",
+                    "required": False,
+                    "description": "Minimum score required before selecting risk assets.",
+                },
+                {
+                    "key": "defensive_symbol",
+                    "label": "Defensive symbol",
+                    "type": "string",
+                    "required": False,
+                    "description": "Fallback defensive holding when no asset passes the gate.",
+                },
+                {
+                    "key": "score_adjustments",
+                    "label": "Score adjustments",
+                    "type": "object",
+                    "required": False,
+                    "description": "Optional per-symbol additive adjustments.",
+                },
+            ),
+            tags=("momentum", "dual", "rebalance"),
+            category="momentum",
+            family="momentum",
+            subcategory="dual",
+            warmup_period=4,
+            input_domains=("multi_asset_ohlcv",),
+            asset_scope="universe",
+            output_modes=("ranking", "selection", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
             key="volume_confirmed_momentum",
             name="Volume-Confirmed Momentum",
             catalog_ref="algorithm:25",
@@ -513,6 +832,86 @@ def register_momentum_alert_algorithms() -> None:
             subcategory="volume",
             warmup_period=5,
             output_modes=("signal", "score", "confidence"),
+        ),
+        AlertAlgorithmSpec(
+            key="residual_momentum",
+            name="Residual Momentum",
+            catalog_ref="algorithm:19",
+            builder=_build_residual_momentum,
+            default_param={
+                "rows": [],
+                "lookback_window": 3,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "score_adjustments": {},
+            },
+            param_normalizer=require_cross_sectional_momentum_param,
+            description="Rank assets by adjusted momentum scores after removing simple residual effects.",
+            param_schema=(
+                {
+                    "key": "rows",
+                    "label": "Rows",
+                    "type": "object_list",
+                    "required": True,
+                    "description": "Panel rows containing ts, symbol, and close values.",
+                },
+                {
+                    "key": "lookback_window",
+                    "label": "Lookback window",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Trailing return lookback in bars.",
+                },
+                {
+                    "key": "top_n",
+                    "label": "Top N",
+                    "type": "integer",
+                    "required": True,
+                    "minimum": 1,
+                    "description": "Number of strongest assets to select.",
+                },
+                {
+                    "key": "bottom_n",
+                    "label": "Bottom N",
+                    "type": "integer",
+                    "required": False,
+                    "minimum": 0,
+                    "description": "Number of weak assets to short when long_only is false.",
+                },
+                {
+                    "key": "rebalance_frequency",
+                    "label": "Rebalance frequency",
+                    "type": "string",
+                    "required": True,
+                    "enum": ["monthly", "weekly", "all"],
+                    "description": "Schedule used to sample rebalance dates.",
+                },
+                {
+                    "key": "long_only",
+                    "label": "Long only",
+                    "type": "boolean",
+                    "required": True,
+                    "description": "Whether the strategy only allocates to winners.",
+                },
+                {
+                    "key": "score_adjustments",
+                    "label": "Score adjustments",
+                    "type": "object",
+                    "required": False,
+                    "description": "Optional per-symbol additive residual adjustments.",
+                },
+            ),
+            tags=("momentum", "residual", "rebalance"),
+            category="momentum",
+            family="momentum",
+            subcategory="residual",
+            warmup_period=4,
+            input_domains=("multi_asset_ohlcv",),
+            asset_scope="universe",
+            output_modes=("ranking", "selection", "diagnostics"),
         ),
     ]
     for spec in specs:

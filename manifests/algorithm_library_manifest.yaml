@@ -1014,8 +1014,8 @@ rows:
   display_category: Momentum
   subcategory: cross
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
   home_suitability: 2
@@ -1066,7 +1066,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_3
   source_reference_code: AQR-MOM
-  notes: Seeded from requirements_v4 row 16; initial starter-pack metadata auto-generated.
+  notes: Implemented in momentum_wave_3 with reusable multi-asset panel helpers, rebalance scheduling, normalized portfolio-weight outputs, parameter schema coverage, registry wiring, fixture-backed ranking checks, and performance-smoke validation.
 - catalog_ref: algorithm:17
   source_doc_ref: requirements_v4:algorithm:17
   kind: algorithm
@@ -1075,8 +1075,8 @@ rows:
   display_category: Momentum
   subcategory: relative
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
   home_suitability: 2
@@ -1127,7 +1127,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_3
   source_reference_code: AQR-MOM
-  notes: Seeded from requirements_v4 row 17; initial starter-pack metadata auto-generated.
+  notes: Implemented in momentum_wave_3 with shared cross-sectional ranking helpers, normalized rebalance diagnostics, schema coverage, registry wiring, fixture-backed ranking checks, and performance-smoke validation.
 - catalog_ref: algorithm:18
   source_doc_ref: requirements_v4:algorithm:18
   kind: algorithm
@@ -1136,8 +1136,8 @@ rows:
   display_category: Momentum
   subcategory: dual
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
   home_suitability: 2
@@ -1188,7 +1188,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_3
   source_reference_code: AQR-MOM
-  notes: Seeded from requirements_v4 row 18; initial starter-pack metadata auto-generated.
+  notes: Implemented in momentum_wave_3 with absolute-momentum gating, defensive fallback support, reusable rebalance helpers, normalized portfolio outputs, schema coverage, fixture-backed checks, and performance-smoke validation.
 - catalog_ref: algorithm:19
   source_doc_ref: requirements_v4:algorithm:19
   kind: algorithm
@@ -1197,8 +1197,8 @@ rows:
   display_category: Momentum
   subcategory: residual
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
   home_suitability: 2
@@ -1249,7 +1249,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_3
   source_reference_code: AQR-MOM
-  notes: Seeded from requirements_v4 row 19; initial starter-pack metadata auto-generated.
+  notes: Implemented in momentum_wave_3 with reusable cross-sectional helpers, score-adjustment support for residual ranking, normalized rebalance diagnostics, schema coverage, fixture-backed checks, and performance-smoke validation.
 - catalog_ref: algorithm:20
   source_doc_ref: requirements_v4:algorithm:20
   kind: algorithm

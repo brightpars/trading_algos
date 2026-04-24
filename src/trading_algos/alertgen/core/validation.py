@@ -1476,6 +1476,82 @@ def _require_rows_param(raw_rows, label):
     return normalized_rows
 
 
+def _require_string_float_dict(value, label):
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a dict")
+    return {
+        _require_non_empty_string(key, f"{label} key"): _require_float_like(
+            raw_value, f"{label}[{key}]"
+        )
+        for key, raw_value in value.items()
+    }
+
+
+def _require_cross_sectional_rows_param(raw_rows, label):
+    if not isinstance(raw_rows, list):
+        raise ValueError(f"{label} rows must be a list")
+    normalized_rows = []
+    for index, row in enumerate(raw_rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"{label} rows[{index}] must be a dict")
+        if row.get("symbol") in [None, ""]:
+            raise ValueError(f"{label} rows[{index}] symbol is required")
+        if row.get("ts") is None and row.get("timestamp") is None:
+            raise ValueError(f"{label} rows[{index}] timestamp is required")
+        if row.get("Close") is None and row.get("close") is None:
+            raise ValueError(f"{label} rows[{index}] close is required")
+        normalized_rows.append(dict(row))
+    return normalized_rows
+
+
+def require_cross_sectional_momentum_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "lookback_window", "top_n", "rebalance_frequency", "long_only"],
+        label,
+    )
+    lookback_window = _require_positive_int_like(
+        normalized["lookback_window"], f"{label} lookback_window"
+    )
+    top_n = _require_positive_int_like(normalized["top_n"], f"{label} top_n")
+    bottom_n = _require_int_like(normalized.get("bottom_n", 0), f"{label} bottom_n")
+    if bottom_n < 0:
+        raise ValueError(f"{label} bottom_n must be >= 0")
+    long_only = _normalize_bool_like(normalized["long_only"], f"{label} long_only")
+    if long_only and bottom_n != 0:
+        raise ValueError(f"{label} bottom_n must be 0 when long_only is true")
+    rebalance_frequency = _require_choice(
+        normalized["rebalance_frequency"],
+        f"{label} rebalance_frequency",
+        allowed={"monthly", "weekly", "all"},
+    )
+    result = {
+        "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
+        "lookback_window": lookback_window,
+        "top_n": top_n,
+        "bottom_n": bottom_n,
+        "rebalance_frequency": rebalance_frequency,
+        "long_only": long_only,
+        "score_adjustments": _require_string_float_dict(
+            normalized.get("score_adjustments"), f"{label} score_adjustments"
+        ),
+    }
+    absolute_threshold = normalized.get("absolute_momentum_threshold")
+    if absolute_threshold is not None:
+        result["absolute_momentum_threshold"] = _require_float_like(
+            absolute_threshold, f"{label} absolute_momentum_threshold"
+        )
+    defensive_symbol = normalized.get("defensive_symbol")
+    if defensive_symbol is not None:
+        result["defensive_symbol"] = _require_non_empty_string(
+            defensive_symbol, f"{label} defensive_symbol"
+        )
+    return result
+
+
 def _require_float_like(value, label):
     try:
         return float(value)
