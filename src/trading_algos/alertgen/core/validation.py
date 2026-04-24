@@ -1664,6 +1664,19 @@ def require_factor_portfolio_param(raw_alg_param, label):
                 f"{label} lower_is_better_fields must be a subset of field_names"
             )
         result["lower_is_better_fields"] = normalized_lower_fields
+    for optional_threshold_key in (
+        "sentiment_threshold",
+        "classification_threshold",
+        "return_threshold",
+        "regime_threshold",
+        "vote_threshold",
+    ):
+        optional_threshold_value = normalized.get(optional_threshold_key)
+        if optional_threshold_value is not None:
+            result[optional_threshold_key] = _require_float_like(
+                optional_threshold_value,
+                f"{label} {optional_threshold_key}",
+            )
     return result
 
 

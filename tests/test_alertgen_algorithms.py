@@ -658,6 +658,11 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "value_strategy",
         "quality_strategy",
         "multi_factor_composite",
+        "sentiment_strategy",
+        "machine_learning_classifier",
+        "machine_learning_regressor",
+        "regime_switching_strategy",
+        "ensemble_voting_strategy",
         "support_resistance_bounce",
         "breakout_retest",
         "pivot_point_strategy",
@@ -694,6 +699,8 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "weighted_linear_score_blend",
         "risk_budgeting_risk_parity",
         "volatility_targeting_overlay",
+        "constrained_multi_factor_optimization",
+        "regime_switching_hmm_gating",
         "aggregate_boundary_and_channel",
         "aggregate_channel_dual_window",
     ]
@@ -7127,6 +7134,369 @@ def test_factor_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
                 "sell": False,
             }
         )
+
+
+@pytest.mark.parametrize(
+    (
+        "alg_key",
+        "field_names",
+        "expected_catalog_ref",
+        "expected_output_modes",
+        "extra_params",
+        "expected_top_symbols",
+        "diagnostic_key",
+    ),
+    [
+        (
+            "sentiment_strategy",
+            ["sentiment_score", "sentiment_momentum"],
+            "algorithm:89",
+            ("ranking", "selection", "weights", "diagnostics"),
+            {"field_weights": [0.7, 0.3]},
+            ["AAA", "BBB"],
+            "sentiment_score",
+        ),
+        (
+            "machine_learning_classifier",
+            ["model_probability", "feature_strength"],
+            "algorithm:90",
+            ("score", "signal", "model_diagnostics"),
+            {"field_weights": [0.8, 0.2], "classification_threshold": 0.55},
+            ["AAA", "BBB"],
+            "predicted_probability",
+        ),
+        (
+            "machine_learning_regressor",
+            ["predicted_return", "return_conviction"],
+            "algorithm:91",
+            ("score", "signal", "model_diagnostics"),
+            {"field_weights": [0.75, 0.25], "return_threshold": 0.05},
+            ["AAA", "BBB"],
+            "predicted_return",
+        ),
+        (
+            "regime_switching_strategy",
+            ["regime_probability", "macro_regime_score"],
+            "algorithm:92",
+            ("regime", "signal", "diagnostics"),
+            {"field_weights": [0.6, 0.4], "regime_threshold": 0.0},
+            ["AAA", "BBB"],
+            "regime_label",
+        ),
+        (
+            "ensemble_voting_strategy",
+            ["vote_probability", "agreement_score", "member_confidence"],
+            "algorithm:93",
+            ("signal", "child_contributions", "diagnostics"),
+            {"field_weights": [0.5, 0.3, 0.2], "vote_threshold": 0.5},
+            ["AAA", "BBB"],
+            "vote_outcome",
+        ),
+    ],
+)
+def test_advanced_model_wave_1_registration_and_fixture_behavior(
+    tmp_path,
+    alg_key,
+    field_names,
+    expected_catalog_ref,
+    expected_output_modes,
+    extra_params,
+    expected_top_symbols,
+    diagnostic_key,
+) -> None:
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+    assert spec.catalog_ref == expected_catalog_ref
+    assert spec.family == "fundamental_ml_composite"
+    assert spec.output_modes == expected_output_modes
+
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    enriched_rows: list[dict[str, object]] = []
+    for row in rows:
+        updated_row = dict(row)
+        updated_row.update(
+            {
+                "sentiment_score": row["return_on_equity"],
+                "sentiment_momentum": row["gross_margin"],
+                "model_probability": row["return_on_equity"],
+                "feature_strength": row["gross_margin"],
+                "predicted_return": row["earnings_growth"],
+                "return_conviction": row["sales_growth"],
+                "regime_probability": row["beta_252d"] * -1.0,
+                "macro_regime_score": row["liquidity_score"],
+                "vote_probability": row["return_on_equity"],
+                "agreement_score": row["gross_margin"],
+                "member_confidence": row["liquidity_score"],
+            }
+        )
+        enriched_rows.append(updated_row)
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": alg_key,
+            "alg_param": {
+                "rows": enriched_rows,
+                "field_names": field_names,
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                **extra_params,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+
+    assert output.derived_series["top_symbol"] == expected_top_symbols
+    assert output.metadata["catalog_ref"] == expected_catalog_ref
+    assert portfolio_output.metadata["catalog_ref"] == expected_catalog_ref
+    assert child_output.diagnostics["family"] == "fundamental_ml_composite"
+    assert diagnostic_key in child_output.diagnostics
+    assert diagnostic_key in portfolio_output.rebalances[-1].diagnostics
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
+    assert output.points[-1].signal_label == "buy"
+
+
+def test_advanced_model_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="classification_threshold must be a number"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "machine_learning_classifier",
+                "alg_param": {
+                    "rows": _load_factor_fixture_rows("monthly_rebalance.csv"),
+                    "field_names": ["model_probability", "feature_strength"],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    "classification_threshold": "high",
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+    with pytest.raises(ValueError, match="field_weights must match field_names length"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "ensemble_voting_strategy",
+                "alg_param": {
+                    "rows": _load_factor_fixture_rows("monthly_rebalance.csv"),
+                    "field_names": [
+                        "vote_probability",
+                        "agreement_score",
+                        "member_confidence",
+                    ],
+                    "field_weights": [0.5, 0.5],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+
+def test_advanced_model_wave_1_short_history_reports_warmup_pending(tmp_path) -> None:
+    rows = [
+        {
+            "ts": "2025-01-02",
+            "symbol": "AAA",
+            "Close": 100.0,
+            "sentiment_score": 0.8,
+            "sentiment_momentum": 0.6,
+        }
+    ]
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "sentiment_strategy",
+            "alg_param": {
+                "rows": rows,
+                "field_names": ["sentiment_score", "sentiment_momentum"],
+                "field_weights": [0.7, 0.3],
+                "rebalance_frequency": "monthly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    assert output.points[-1].signal_label == "neutral"
+    assert output.points[-1].reason_codes == ("warmup_pending",)
+    assert output.derived_series["warmup_ready"][-1] is False
+
+
+def test_advanced_model_wave_1_fixture_behavior_matches_manifest_expectations(
+    tmp_path,
+) -> None:
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    params_by_alg = {
+        "sentiment_strategy": {
+            "field_names": ["sentiment_score", "sentiment_momentum"],
+            "field_weights": [0.7, 0.3],
+        },
+        "machine_learning_classifier": {
+            "field_names": ["model_probability", "feature_strength"],
+            "field_weights": [0.8, 0.2],
+            "classification_threshold": 0.55,
+        },
+        "machine_learning_regressor": {
+            "field_names": ["predicted_return", "return_conviction"],
+            "field_weights": [0.75, 0.25],
+            "return_threshold": 0.05,
+        },
+        "regime_switching_strategy": {
+            "field_names": ["regime_probability", "macro_regime_score"],
+            "field_weights": [0.6, 0.4],
+            "regime_threshold": 0.0,
+        },
+        "ensemble_voting_strategy": {
+            "field_names": ["vote_probability", "agreement_score", "member_confidence"],
+            "field_weights": [0.5, 0.3, 0.2],
+            "vote_threshold": 0.5,
+        },
+    }
+
+    for alg_key, extra_params in params_by_alg.items():
+        enriched_rows: list[dict[str, object]] = []
+        for row in rows:
+            updated_row = dict(row)
+            updated_row.update(
+                {
+                    "sentiment_score": row["return_on_equity"],
+                    "sentiment_momentum": row["gross_margin"],
+                    "model_probability": row["return_on_equity"],
+                    "feature_strength": row["gross_margin"],
+                    "predicted_return": row["earnings_growth"],
+                    "return_conviction": row["sales_growth"],
+                    "regime_probability": row["beta_252d"] * -1.0,
+                    "macro_regime_score": row["liquidity_score"],
+                    "vote_probability": row["return_on_equity"],
+                    "agreement_score": row["gross_margin"],
+                    "member_confidence": row["liquidity_score"],
+                }
+            )
+            enriched_rows.append(updated_row)
+
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": enriched_rows,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    **extra_params,
+                },
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / alg_key),
+        )
+
+        output = algorithm.normalized_output()
+        assert output.derived_series["top_symbol"] == ["AAA", "BBB"]
+
+
+def test_advanced_model_wave_1_performance_smoke_on_fixture_repetition(
+    tmp_path,
+) -> None:
+    base_rows = _load_factor_fixture_rows("monthly_rebalance.csv") * 50
+    algorithms = [
+        (
+            "sentiment_strategy",
+            ["sentiment_score", "sentiment_momentum"],
+            {"field_weights": [0.7, 0.3]},
+        ),
+        (
+            "machine_learning_classifier",
+            ["model_probability", "feature_strength"],
+            {"field_weights": [0.8, 0.2], "classification_threshold": 0.55},
+        ),
+        (
+            "machine_learning_regressor",
+            ["predicted_return", "return_conviction"],
+            {"field_weights": [0.75, 0.25], "return_threshold": 0.05},
+        ),
+        (
+            "regime_switching_strategy",
+            ["regime_probability", "macro_regime_score"],
+            {"field_weights": [0.6, 0.4], "regime_threshold": 0.0},
+        ),
+        (
+            "ensemble_voting_strategy",
+            ["vote_probability", "agreement_score", "member_confidence"],
+            {"field_weights": [0.5, 0.3, 0.2], "vote_threshold": 0.5},
+        ),
+    ]
+
+    for index, (alg_key, field_names, extra_params) in enumerate(algorithms):
+        rows: list[dict[str, object]] = []
+        for row in base_rows:
+            updated_row = dict(row)
+            updated_row.update(
+                {
+                    "sentiment_score": row.get("return_on_equity", 0.0),
+                    "sentiment_momentum": row.get("gross_margin", 0.0),
+                    "model_probability": row.get("return_on_equity", 0.0),
+                    "feature_strength": row.get("gross_margin", 0.0),
+                    "predicted_return": row.get("earnings_growth", 0.0),
+                    "return_conviction": row.get("sales_growth", 0.0),
+                    "regime_probability": -float(row.get("beta_252d", 0.0)),
+                    "macro_regime_score": row.get("liquidity_score", 0.0),
+                    "vote_probability": row.get("return_on_equity", 0.0),
+                    "agreement_score": row.get("gross_margin", 0.0),
+                    "member_confidence": row.get("liquidity_score", 0.0),
+                }
+            )
+            rows.append(updated_row)
+
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": rows,
+                    "field_names": field_names,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    **extra_params,
+                },
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "rebalance_report"
+        assert len(output.points) >= 1
 
     with pytest.raises(
         ValueError, match="lower_is_better_fields must be a subset of field_names"

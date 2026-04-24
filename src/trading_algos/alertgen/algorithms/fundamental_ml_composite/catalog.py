@@ -1,6 +1,21 @@
 from trading_algos.algorithmspec import AlertAlgorithmSpec, register_algorithm
+from trading_algos.alertgen.algorithms.fundamental_ml_composite.ensemble_voting_strategy import (
+    build_ensemble_voting_strategy,
+)
+from trading_algos.alertgen.algorithms.fundamental_ml_composite.machine_learning_classifier import (
+    build_machine_learning_classifier,
+)
+from trading_algos.alertgen.algorithms.fundamental_ml_composite.machine_learning_regressor import (
+    build_machine_learning_regressor,
+)
 from trading_algos.alertgen.algorithms.fundamental_ml_composite.quality_strategy import (
     build_quality_strategy,
+)
+from trading_algos.alertgen.algorithms.fundamental_ml_composite.regime_switching_strategy import (
+    build_regime_switching_strategy,
+)
+from trading_algos.alertgen.algorithms.fundamental_ml_composite.sentiment_strategy import (
+    build_sentiment_strategy,
 )
 from trading_algos.alertgen.algorithms.fundamental_ml_composite.multi_factor_composite import (
     build_multi_factor_composite,
@@ -92,6 +107,33 @@ def _portfolio_param_schema(
                 "description": "Subset of field_names that should be inverted because smaller values are preferred.",
             }
         )
+    return tuple(schema)
+
+
+def _advanced_model_param_schema(
+    field_description: str,
+    *,
+    threshold_key: str,
+    threshold_label: str,
+    threshold_description: str,
+    include_field_weights: bool = True,
+) -> tuple[dict[str, object], ...]:
+    schema = list(
+        _portfolio_param_schema(
+            field_description,
+            include_field_weights=include_field_weights,
+            include_lower_is_better_fields=False,
+        )
+    )
+    schema.append(
+        {
+            "key": threshold_key,
+            "label": threshold_label,
+            "type": "number",
+            "required": False,
+            "description": threshold_description,
+        }
+    )
     return tuple(schema)
 
 
@@ -196,6 +238,174 @@ def register_fundamental_ml_composite_alert_algorithms() -> None:
             input_domains=("fundamentals_pti", "multi_asset_panel"),
             asset_scope="portfolio",
             output_modes=("ranking", "selection", "weights", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="sentiment_strategy",
+            name="Sentiment Strategy",
+            catalog_ref="algorithm:89",
+            builder=build_sentiment_strategy,
+            default_param={
+                "rows": [],
+                "field_names": ["sentiment_score", "sentiment_momentum"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "field_weights": [0.7, 0.3],
+            },
+            param_normalizer=require_factor_portfolio_param,
+            description="Rank assets by aggregated sentiment features and allocate toward the strongest sentiment names.",
+            param_schema=_advanced_model_param_schema(
+                "Sentiment feature fields used to compute the rebalance score.",
+                threshold_key="sentiment_threshold",
+                threshold_label="Sentiment threshold",
+                threshold_description="Optional sentiment gate retained in diagnostics for downstream decisioning.",
+            ),
+            tags=("fundamental", "sentiment", "rebalance", "ml"),
+            category="fundamental_ml_composite",
+            family="fundamental_ml_composite",
+            subcategory="sentiment",
+            warmup_period=1,
+            input_domains=("fundamentals_pti", "multi_asset_panel"),
+            asset_scope="portfolio",
+            output_modes=("ranking", "selection", "weights", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="machine_learning_classifier",
+            name="Machine Learning Classifier",
+            catalog_ref="algorithm:90",
+            builder=build_machine_learning_classifier,
+            default_param={
+                "rows": [],
+                "field_names": ["model_probability", "feature_strength"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "field_weights": [0.8, 0.2],
+                "classification_threshold": 0.5,
+            },
+            param_normalizer=require_factor_portfolio_param,
+            description="Convert model probability features into rebalance-ready ranking, selection, and diagnostics.",
+            param_schema=_advanced_model_param_schema(
+                "Classifier-derived feature fields used to compute the probability score.",
+                threshold_key="classification_threshold",
+                threshold_label="Classification threshold",
+                threshold_description="Probability threshold used to label the top-ranked model output.",
+            ),
+            tags=("fundamental", "machine_learning", "classifier", "rebalance"),
+            category="fundamental_ml_composite",
+            family="fundamental_ml_composite",
+            subcategory="machine",
+            warmup_period=1,
+            input_domains=("feature_matrix", "label_stream"),
+            asset_scope="single_asset",
+            output_modes=("score", "signal", "model_diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="machine_learning_regressor",
+            name="Machine Learning Regressor",
+            catalog_ref="algorithm:91",
+            builder=build_machine_learning_regressor,
+            default_param={
+                "rows": [],
+                "field_names": ["predicted_return", "return_conviction"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "field_weights": [0.75, 0.25],
+                "return_threshold": 0.0,
+            },
+            param_normalizer=require_factor_portfolio_param,
+            description="Rank assets on regression-style return forecasts and emit threshold-aware diagnostics.",
+            param_schema=_advanced_model_param_schema(
+                "Regressor-derived feature fields used to compute the forecast score.",
+                threshold_key="return_threshold",
+                threshold_label="Return threshold",
+                threshold_description="Optional return threshold used to classify the top-ranked forecast direction.",
+            ),
+            tags=("fundamental", "machine_learning", "regression", "rebalance"),
+            category="fundamental_ml_composite",
+            family="fundamental_ml_composite",
+            subcategory="machine",
+            warmup_period=1,
+            input_domains=("feature_matrix", "label_stream"),
+            asset_scope="single_asset",
+            output_modes=("score", "signal", "model_diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="regime_switching_strategy",
+            name="Regime-Switching Strategy",
+            catalog_ref="algorithm:92",
+            builder=build_regime_switching_strategy,
+            default_param={
+                "rows": [],
+                "field_names": ["regime_probability", "macro_regime_score"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "field_weights": [0.6, 0.4],
+                "regime_threshold": 0.0,
+            },
+            param_normalizer=require_factor_portfolio_param,
+            description="Estimate regime state from model features and expose regime-aware rebalance diagnostics.",
+            param_schema=_advanced_model_param_schema(
+                "Regime feature fields used to score assets or sleeves on each rebalance date.",
+                threshold_key="regime_threshold",
+                threshold_label="Regime threshold",
+                threshold_description="Score threshold used to label the dominant regime in diagnostics.",
+            ),
+            tags=("fundamental", "machine_learning", "regime", "rebalance"),
+            category="fundamental_ml_composite",
+            family="fundamental_ml_composite",
+            subcategory="regime",
+            warmup_period=1,
+            input_domains=("feature_matrix", "label_stream"),
+            asset_scope="portfolio",
+            output_modes=("regime", "signal", "diagnostics"),
+        ),
+        AlertAlgorithmSpec(
+            key="ensemble_voting_strategy",
+            name="Ensemble / Voting Strategy",
+            catalog_ref="algorithm:93",
+            builder=build_ensemble_voting_strategy,
+            default_param={
+                "rows": [],
+                "field_names": [
+                    "vote_probability",
+                    "agreement_score",
+                    "member_confidence",
+                ],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+                "field_weights": [0.5, 0.3, 0.2],
+                "vote_threshold": 0.5,
+            },
+            param_normalizer=require_factor_portfolio_param,
+            description="Combine multiple model-style features into one voting score with reusable portfolio output wiring.",
+            param_schema=_advanced_model_param_schema(
+                "Ensemble member feature fields used to compute the aggregate vote score.",
+                threshold_key="vote_threshold",
+                threshold_label="Vote threshold",
+                threshold_description="Minimum normalized vote strength treated as an accepted ensemble outcome.",
+            ),
+            tags=("fundamental", "machine_learning", "ensemble", "rebalance"),
+            category="fundamental_ml_composite",
+            family="fundamental_ml_composite",
+            subcategory="ensemble",
+            warmup_period=1,
+            input_domains=("feature_matrix", "label_stream"),
+            asset_scope="portfolio",
+            output_modes=("signal", "child_contributions", "diagnostics"),
         ),
     ]
     for spec in specs:
