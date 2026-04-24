@@ -149,6 +149,7 @@ def _sample_rows(count=5, *, flat=False):
                 "High": 10,
                 "Low": 10,
                 "Close": 10,
+                "Volume": 1000,
             }
             for i in range(count)
         ]
@@ -159,6 +160,7 @@ def _sample_rows(count=5, *, flat=False):
             "High": 11 + i,
             "Low": 9 + i,
             "Close": 10.5 + i,
+            "Volume": 1000 + (i * 100),
         }
         for i in range(count)
     ]
@@ -226,6 +228,9 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "pivot_point_strategy",
         "opening_range_breakout",
         "inside_bar_breakout",
+        "gap_and_go",
+        "trendline_break_strategy",
+        "volatility_squeeze_breakout",
         "z_score_mean_reversion",
         "bollinger_bands_reversion",
         "rsi_reversion",
@@ -316,6 +321,35 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "short_window": 2,
                 "long_window": 4,
                 "minimum_spread": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "gap_and_go",
+            {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "trendline_break_strategy",
+            {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "volatility_squeeze_breakout",
+            {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
                 "confirmation_bars": 1,
             },
         ),
@@ -3410,6 +3444,38 @@ def test_momentum_wave_2_performance_smoke_on_fixture_repetition(tmp_path) -> No
             },
             3,
         ),
+        (
+            "gap_and_go",
+            {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "trendline_break_strategy",
+            {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+            5,
+        ),
+        (
+            "volatility_squeeze_breakout",
+            {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
+                "confirmation_bars": 1,
+            },
+            6,
+        ),
     ],
 )
 def test_pattern_wave_1_short_history_stays_neutral_until_warmup(
@@ -3523,6 +3589,51 @@ def test_pattern_wave_1_short_history_stays_neutral_until_warmup(
             "support_rejection.csv",
             "inside_bar_not_detected",
             {"breakout_buffer", "mother_high", "mother_low", "inside_bar_detected"},
+        ),
+        (
+            "gap_and_go",
+            {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            "support_rejection.csv",
+            "awaiting_gap",
+            {
+                "gap_threshold",
+                "continuation_threshold",
+                "volume_window",
+                "relative_volume_threshold",
+                "gap_size",
+                "relative_volume",
+            },
+        ),
+        (
+            "trendline_break_strategy",
+            {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+            "support_rejection.csv",
+            "trendline_break_bullish",
+            {"trendline_window", "break_buffer", "trendline_level", "trendline_slope"},
+        ),
+        (
+            "volatility_squeeze_breakout",
+            {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
+                "confirmation_bars": 1,
+            },
+            "support_rejection.csv",
+            "squeeze_active",
+            {"squeeze_window", "bollinger_upper", "keltner_upper", "squeeze_on"},
         ),
     ],
 )
@@ -3669,6 +3780,70 @@ def test_pattern_wave_1_fixture_behavior_matches_manifest_expectations(
     assert inside_output.points[-1].signal_label == "neutral"
     assert inside_output.derived_series["inside_bar_detected"][-1] is False
 
+    gap_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "gap_and_go",
+            "alg_param": {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "gap"),
+    )
+    gap_algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    gap_output = gap_algorithm.normalized_output()
+    assert gap_output.points[-1].signal_label == "neutral"
+    assert gap_output.points[-1].reason_codes[0] == "awaiting_gap"
+
+    trendline_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "trendline_break_strategy",
+            "alg_param": {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "trendline"),
+    )
+    trendline_algorithm.process_list(
+        _load_pattern_fixture_rows("support_rejection.csv")
+    )
+    trendline_output = trendline_algorithm.normalized_output()
+    assert trendline_output.points[-1].signal_label == "neutral"
+    assert trendline_output.derived_series["trendline_break_detected"][-1] is False
+
+    squeeze_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "volatility_squeeze_breakout",
+            "alg_param": {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path / "squeeze"),
+    )
+    squeeze_algorithm.process_list(_load_pattern_fixture_rows("support_rejection.csv"))
+    squeeze_output = squeeze_algorithm.normalized_output()
+    assert squeeze_output.points[-1].signal_label == "neutral"
+    assert "squeeze_active" in squeeze_output.points[-1].reason_codes
+
     orb_algorithm, _ = create_alertgen_algorithm(
         sensor_config={
             "symbol": "AAPL",
@@ -3782,6 +3957,56 @@ def test_pattern_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
             }
         )
 
+    with pytest.raises(ValueError, match="volume_window must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "gap_and_go",
+                "alg_param": {
+                    "gap_threshold": 0.15,
+                    "continuation_threshold": 0.05,
+                    "volume_window": 0,
+                    "relative_volume_threshold": 1.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="trendline_window must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "trendline_break_strategy",
+                "alg_param": {
+                    "trendline_window": 0,
+                    "break_buffer": 0.1,
+                    "slope_tolerance": 0.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="bollinger_multiplier must be > 0"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "volatility_squeeze_breakout",
+                "alg_param": {
+                    "squeeze_window": 5,
+                    "bollinger_multiplier": 0.0,
+                    "keltner_multiplier": 1.5,
+                    "breakout_buffer": 0.05,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
 
 def test_pattern_wave_1_registration_metadata_matches_manifest_contract() -> None:
     expected = {
@@ -3800,6 +4025,19 @@ def test_pattern_wave_1_registration_metadata_matches_manifest_contract() -> Non
             2,
         ),
         "inside_bar_breakout": ("algorithm:74", "pattern_price_action", "inside", 3),
+        "gap_and_go": ("algorithm:75", "pattern_price_action", "gap", 5),
+        "trendline_break_strategy": (
+            "algorithm:76",
+            "pattern_price_action",
+            "trendline",
+            5,
+        ),
+        "volatility_squeeze_breakout": (
+            "algorithm:77",
+            "pattern_price_action",
+            "volatility",
+            6,
+        ),
     }
 
     for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
@@ -3859,6 +4097,38 @@ def test_pattern_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> Non
             "inside_bar_breakout",
             {
                 "breakout_buffer": 0.1,
+                "confirmation_bars": 1,
+            },
+            support_rows,
+        ),
+        (
+            "gap_and_go",
+            {
+                "gap_threshold": 0.15,
+                "continuation_threshold": 0.05,
+                "volume_window": 3,
+                "relative_volume_threshold": 1.0,
+                "confirmation_bars": 1,
+            },
+            support_rows,
+        ),
+        (
+            "trendline_break_strategy",
+            {
+                "trendline_window": 5,
+                "break_buffer": 0.1,
+                "slope_tolerance": 0.0,
+                "confirmation_bars": 1,
+            },
+            support_rows,
+        ),
+        (
+            "volatility_squeeze_breakout",
+            {
+                "squeeze_window": 5,
+                "bollinger_multiplier": 2.0,
+                "keltner_multiplier": 1.5,
+                "breakout_buffer": 0.05,
                 "confirmation_bars": 1,
             },
             support_rows,

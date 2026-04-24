@@ -1259,6 +1259,101 @@ def require_inside_bar_breakout_param(raw_alg_param, label):
     }
 
 
+def require_gap_and_go_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "gap_threshold",
+            "continuation_threshold",
+            "volume_window",
+            "relative_volume_threshold",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    return {
+        "gap_threshold": _require_non_negative_float_like(
+            normalized["gap_threshold"], f"{label} gap_threshold"
+        ),
+        "continuation_threshold": _require_non_negative_float_like(
+            normalized["continuation_threshold"],
+            f"{label} continuation_threshold",
+        ),
+        "volume_window": _require_positive_int_like(
+            normalized["volume_window"], f"{label} volume_window"
+        ),
+        "relative_volume_threshold": _require_non_negative_float_like(
+            normalized["relative_volume_threshold"],
+            f"{label} relative_volume_threshold",
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_trendline_break_strategy_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["trendline_window", "break_buffer", "slope_tolerance", "confirmation_bars"],
+        label,
+    )
+    return {
+        "trendline_window": _require_positive_int_like(
+            normalized["trendline_window"], f"{label} trendline_window"
+        ),
+        "break_buffer": _require_non_negative_float_like(
+            normalized["break_buffer"], f"{label} break_buffer"
+        ),
+        "slope_tolerance": _require_float_like(
+            normalized["slope_tolerance"], f"{label} slope_tolerance"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
+def require_volatility_squeeze_breakout_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "squeeze_window",
+            "bollinger_multiplier",
+            "keltner_multiplier",
+            "breakout_buffer",
+            "confirmation_bars",
+        ],
+        label,
+    )
+    bollinger_multiplier = _require_non_negative_float_like(
+        normalized["bollinger_multiplier"], f"{label} bollinger_multiplier"
+    )
+    keltner_multiplier = _require_non_negative_float_like(
+        normalized["keltner_multiplier"], f"{label} keltner_multiplier"
+    )
+    if bollinger_multiplier == 0.0:
+        raise ValueError(f"{label} bollinger_multiplier must be > 0")
+    if keltner_multiplier == 0.0:
+        raise ValueError(f"{label} keltner_multiplier must be > 0")
+    return {
+        "squeeze_window": _require_positive_int_like(
+            normalized["squeeze_window"], f"{label} squeeze_window"
+        ),
+        "bollinger_multiplier": bollinger_multiplier,
+        "keltner_multiplier": keltner_multiplier,
+        "breakout_buffer": _require_non_negative_float_like(
+            normalized["breakout_buffer"], f"{label} breakout_buffer"
+        ),
+        "confirmation_bars": _require_positive_int_like(
+            normalized["confirmation_bars"], f"{label} confirmation_bars"
+        ),
+    }
+
+
 def _require_rows_param(raw_rows, label):
     if not isinstance(raw_rows, list):
         raise ValueError(f"{label} rows must be a list")
