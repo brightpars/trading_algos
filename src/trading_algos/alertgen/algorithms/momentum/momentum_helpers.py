@@ -166,6 +166,17 @@ def rank_cross_sectional_scores(
                 side=side,
             )
         )
+    if defensive_symbol is not None and defensive_symbol in selected_set:
+        ranking.append(
+            RankedAsset(
+                symbol=defensive_symbol,
+                rank=len(ranking) + 1,
+                score=0.0,
+                weight=weights[defensive_symbol],
+                selected=True,
+                side="defensive",
+            )
+        )
     return tuple(ranking), tuple(selected_symbols), weights
 
 
@@ -218,14 +229,32 @@ def evaluate_cross_sectional_momentum(
             long_only=long_only,
             defensive_symbol=defensive_symbol,
         )
+        defensive_symbol_used = (
+            defensive_symbol is not None
+            and selected_symbols == (defensive_symbol,)
+            and defensive_symbol not in scores
+        )
+        selection_reason = "selection_ready"
+        if defensive_symbol_used:
+            selection_reason = "defensive_fallback"
+        elif not scores and warmup_symbols:
+            selection_reason = "warmup_pending"
+        elif not scores and absolute_momentum_threshold is not None:
+            selection_reason = "absolute_momentum_filtered"
+        elif not selected_symbols:
+            selection_reason = "no_selection"
         diagnostics = {
             "lookback_window": lookback_window,
             "eligible_universe_size": len(eligible_universe),
             "scored_universe_size": len(scores),
             "warmup_pending_symbols": tuple(sorted(warmup_symbols)),
+            "warmup_ready": len(scores) > 0,
             "absolute_pass_count": absolute_pass_count,
             "selected_count": len(selected_symbols),
             "rebalance_frequency": rebalance_frequency,
+            "selection_reason": selection_reason,
+            "defensive_symbol": defensive_symbol,
+            "defensive_symbol_used": defensive_symbol_used,
         }
         row = CrossSectionalMomentumRow(
             timestamp=timestamp,

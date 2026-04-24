@@ -115,17 +115,18 @@ class CrossSectionalMomentumAlertAlgorithm:
         if not self._rows:
             return ()
         latest = self._rows[-1]
+        selection_reason = str(
+            latest.diagnostics.get("selection_reason", "no_selection")
+        )
         diagnostics = {
             "family": "momentum",
             "subcategory": self.subcategory,
             "catalog_ref": self.catalog_ref,
             "reporting_mode": "rebalance_report",
-            "warmup_ready": len(latest.ranking) > 0,
+            "warmup_ready": bool(latest.diagnostics.get("warmup_ready", False)),
             "selected_symbols": list(latest.selected_symbols),
             "weights": dict(latest.weights),
-            "reason_codes": (
-                "selection_ready" if latest.selected_symbols else "warmup_pending"
-            ),
+            "reason_codes": (selection_reason,),
             **latest.diagnostics,
         }
         return (
@@ -138,9 +139,7 @@ class CrossSectionalMomentumAlertAlgorithm:
                 regime_label="selected" if latest.selected_symbols else "neutral",
                 direction=1 if latest.selected_symbols else 0,
                 diagnostics=diagnostics,
-                reason_codes=(
-                    "selection_ready" if latest.selected_symbols else "warmup_pending",
-                ),
+                reason_codes=(selection_reason,),
             ),
         )
 
@@ -173,7 +172,7 @@ class CrossSectionalMomentumAlertAlgorithm:
                     else 0.0,
                     confidence=1.0 if row.selected_symbols else 0.0,
                     reason_codes=(
-                        "selection_ready" if row.selected_symbols else "warmup_pending",
+                        str(row.diagnostics.get("selection_reason", "no_selection")),
                     ),
                 )
             )

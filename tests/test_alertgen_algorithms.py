@@ -4497,6 +4497,108 @@ def test_momentum_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
             }
         )
 
+    with pytest.raises(ValueError, match="defensive_symbol is required"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "dual_momentum",
+                "alg_param": {
+                    "rows": _load_cross_sectional_momentum_fixture_rows(
+                        "cross_sectional_ranking.csv"
+                    ),
+                    "lookback_window": 1,
+                    "top_n": 1,
+                    "rebalance_frequency": "monthly",
+                    "long_only": True,
+                    "absolute_momentum_threshold": 100.0,
+                    "defensive_symbol": "   ",
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+
+def test_momentum_wave_3_short_history_stays_neutral_until_warmup(tmp_path) -> None:
+    rows = _load_cross_sectional_momentum_fixture_rows("cross_sectional_ranking.csv")[
+        :4
+    ]
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "cross_sectional_momentum",
+            "alg_param": {
+                "rows": rows,
+                "lookback_window": 1,
+                "top_n": 2,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+
+    assert algorithm.minimum_history() == 2
+    assert output.points
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert all(point.reason_codes == ("warmup_pending",) for point in output.points)
+    assert output.derived_series["warmup_ready"][-1] is False
+    assert portfolio_output.rebalances[-1].selected_symbols == ()
+    assert child_output.reason_codes == ("warmup_pending",)
+    assert child_output.diagnostics["warmup_pending_symbols"] == (
+        "AAA",
+        "BBB",
+        "CCC",
+        "DDD",
+    )
+
+
+def test_momentum_wave_3_diagnostics_expose_defensive_reason_and_ranked_payload(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "dual_momentum",
+            "alg_param": {
+                "rows": _load_cross_sectional_momentum_fixture_rows(
+                    "cross_sectional_ranking.csv"
+                ),
+                "lookback_window": 1,
+                "top_n": 1,
+                "bottom_n": 0,
+                "rebalance_frequency": "monthly",
+                "long_only": True,
+                "absolute_momentum_threshold": 100.0,
+                "defensive_symbol": "BIL",
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+    latest_rebalance = portfolio_output.rebalances[-1]
+
+    assert output.points[-1].reason_codes == ("defensive_fallback",)
+    assert child_output.reason_codes == ("defensive_fallback",)
+    assert child_output.diagnostics["selection_reason"] == "defensive_fallback"
+    assert child_output.diagnostics["defensive_symbol_used"] is True
+    assert latest_rebalance.ranking[-1].symbol == "BIL"
+    assert latest_rebalance.ranking[-1].side == "defensive"
+    assert latest_rebalance.ranking[-1].selected is True
+    assert latest_rebalance.ranking[-1].weight == pytest.approx(1.0)
+
 
 @pytest.mark.parametrize(
     ("alg_key", "catalog_ref", "alg_param"),
@@ -4585,9 +4687,14 @@ def test_momentum_wave_3_normalized_output_metadata_exposes_dashboard_contract_f
     assert child_output.diagnostics["family"] == "momentum"
     assert child_output.diagnostics["reporting_mode"] == "rebalance_report"
     assert child_output.diagnostics["catalog_ref"] == catalog_ref
-    assert {"selected_symbols", "weights", "eligible_universe_size"}.issubset(
-        child_output.diagnostics.keys()
-    )
+    assert {
+        "selected_symbols",
+        "weights",
+        "eligible_universe_size",
+        "selection_reason",
+        "warmup_ready",
+    }.issubset(child_output.diagnostics.keys())
+    assert child_output.reason_codes == tuple(child_output.diagnostics["reason_codes"])
 
 
 def test_momentum_wave_3_performance_smoke_on_fixture_repetition(tmp_path) -> None:
