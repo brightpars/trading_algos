@@ -252,6 +252,87 @@ def require_ribbon_param(raw_alg_param, label):
     }
 
 
+def _require_rows_param(raw_rows, label):
+    if not isinstance(raw_rows, list):
+        raise ValueError(f"{label} rows must be a list")
+    normalized_rows = []
+    for index, row in enumerate(raw_rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"{label} rows[{index}] must be a dict")
+        child_outputs = row.get("child_outputs")
+        if not isinstance(child_outputs, list):
+            raise ValueError(f"{label} rows[{index}] child_outputs must be a list")
+        normalized_rows.append(dict(row))
+    return normalized_rows
+
+
+def _require_float_like(value, label):
+    try:
+        return float(value)
+    except Exception as exc:
+        raise ValueError(f"{label} must be a number: {exc}")
+
+
+def require_hard_boolean_gating_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["mode", "tie_policy", "veto_sell_count", "rows"],
+        label,
+    )
+    veto_sell_count = _require_int_like(
+        normalized["veto_sell_count"], f"{label} veto_sell_count"
+    )
+    if veto_sell_count < 0:
+        raise ValueError(f"{label} veto_sell_count must be >= 0")
+    return {
+        "mode": _require_choice(
+            normalized["mode"],
+            f"{label} mode",
+            allowed={"and", "or", "majority"},
+        ),
+        "tie_policy": _require_choice(
+            normalized["tie_policy"],
+            f"{label} tie_policy",
+            allowed={"neutral", "buy", "sell"},
+        ),
+        "veto_sell_count": veto_sell_count,
+        "rows": _require_rows_param(normalized["rows"], label),
+    }
+
+
+def require_weighted_linear_score_blend_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["weights", "buy_threshold", "sell_threshold", "rows"],
+        label,
+    )
+    raw_weights = normalized["weights"]
+    if not isinstance(raw_weights, dict):
+        raise ValueError(f"{label} weights must be a dict")
+    weights = {
+        _require_non_empty_string(key, f"{label} weights key"): _require_float_like(
+            value, f"{label} weights[{key}]"
+        )
+        for key, value in raw_weights.items()
+    }
+    buy_threshold = _require_float_like(
+        normalized["buy_threshold"], f"{label} buy_threshold"
+    )
+    sell_threshold = _require_float_like(
+        normalized["sell_threshold"], f"{label} sell_threshold"
+    )
+    if sell_threshold > buy_threshold:
+        raise ValueError(f"{label} requires sell_threshold <= buy_threshold")
+    return {
+        "weights": weights,
+        "buy_threshold": buy_threshold,
+        "sell_threshold": sell_threshold,
+        "rows": _require_rows_param(normalized["rows"], label),
+    }
+
+
 def normalize_alertgen_sensor_config(
     sensor_config, label="Alert generator sensor_config"
 ):

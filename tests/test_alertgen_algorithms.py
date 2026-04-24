@@ -5,6 +5,15 @@ from pathlib import Path
 import pytest
 
 from trading_algos.alertgen import list_alert_algorithm_specs
+from trading_algos.alertgen.algorithms.composite.rule_based_combination.hard_boolean_gating_and_or_majority import (
+    evaluate_boolean_gating_row,
+)
+from trading_algos.alertgen.algorithms.composite.rule_based_combination.helpers import (
+    align_child_outputs,
+)
+from trading_algos.alertgen.algorithms.composite.rule_based_combination.weighted_linear_score_blend import (
+    evaluate_weighted_blend_row,
+)
 from trading_algos.alertgen.algorithms.composite.aggregate import (
     AggregateAlertAlgorithm,
     agreegate_algs,
@@ -25,6 +34,7 @@ from trading_algos.alertgen.shared_utils.reporting import serialize_analysis_rep
 
 
 FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "trend"
+COMPOSITE_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "composite"
 
 
 def _load_fixture_rows(name: str) -> list[dict[str, object]]:
@@ -43,6 +53,10 @@ def _load_fixture_rows(name: str) -> list[dict[str, object]]:
             }
         )
     return parsed_rows
+
+
+def _load_json_fixture_rows(path: Path) -> list[dict[str, object]]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _sample_rows(count=5, *, flat=False):
@@ -110,6 +124,8 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "low_anchored_boundary_breakout",
         "rolling_channel_breakout",
         "close_high_channel_breakout",
+        "hard_boolean_gating_and_or_majority",
+        "weighted_linear_score_blend",
         "aggregate_boundary_and_channel",
         "aggregate_channel_dual_window",
     ]
@@ -189,6 +205,28 @@ def test_factory_creates_registered_algorithm(tmp_path):
         ),
         ("rolling_channel_breakout", {"window": 3}),
         ("close_high_channel_breakout", {"window": 3}),
+        (
+            "hard_boolean_gating_and_or_majority",
+            {
+                "mode": "majority",
+                "tie_policy": "neutral",
+                "veto_sell_count": 0,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "boolean_truth_table.json"
+                ),
+            },
+        ),
+        (
+            "weighted_linear_score_blend",
+            {
+                "weights": {"trend": 0.6, "momentum": 0.3, "filter": 0.1},
+                "buy_threshold": 0.4,
+                "sell_threshold": -0.4,
+                "rows": _load_json_fixture_rows(
+                    COMPOSITE_FIXTURES_ROOT / "weighted_blend.json"
+                ),
+            },
+        ),
         ("aggregate_boundary_and_channel", {"window": 3}),
         (
             "aggregate_channel_dual_window",
@@ -276,6 +314,74 @@ def test_aggregate_algorithm_supports_composition_metadata_and_alias(tmp_path):
     assert metadata["sell_algorithms"]
 
 
+def test_boolean_gating_fixture_behaviors_match_truth_table() -> None:
+    rows = align_child_outputs(
+        _load_json_fixture_rows(COMPOSITE_FIXTURES_ROOT / "boolean_truth_table.json")
+    )
+
+    and_directions = [
+        evaluate_boolean_gating_row(
+            row,
+            mode="and",
+            tie_policy="neutral",
+            veto_sell_count=0,
+        ).direction
+        for row in rows
+    ]
+    or_directions = [
+        evaluate_boolean_gating_row(
+            row,
+            mode="or",
+            tie_policy="neutral",
+            veto_sell_count=0,
+        ).direction
+        for row in rows
+    ]
+    majority_directions = [
+        evaluate_boolean_gating_row(
+            row,
+            mode="majority",
+            tie_policy="neutral",
+            veto_sell_count=0,
+        ).direction
+        for row in rows
+    ]
+    veto_direction = evaluate_boolean_gating_row(
+        rows[1],
+        mode="majority",
+        tie_policy="neutral",
+        veto_sell_count=1,
+    ).direction
+
+    assert and_directions == [0, 0, -1]
+    assert or_directions == [1, 0, -1]
+    assert majority_directions == [1, 0, -1]
+    assert veto_direction == -1
+
+
+def test_weighted_blend_fixture_behaviors_match_expected_thresholds() -> None:
+    rows = align_child_outputs(
+        _load_json_fixture_rows(COMPOSITE_FIXTURES_ROOT / "weighted_blend.json")
+    )
+    weights = {"trend": 0.6, "momentum": 0.3, "filter": 0.1}
+
+    decisions = [
+        evaluate_weighted_blend_row(
+            row,
+            weights=weights,
+            buy_threshold=0.4,
+            sell_threshold=-0.4,
+        )
+        for row in rows
+    ]
+
+    assert decisions[0].score == pytest.approx(0.66)
+    assert decisions[0].direction == 1
+    assert decisions[1].score == pytest.approx(-0.45)
+    assert decisions[1].direction == -1
+    assert decisions[2].direction == 0
+
+
 def test_validation_rejects_missing_algorithm_key():
     with pytest.raises(ValueError, match="missing required keys: alg_key"):
         normalize_alertgen_sensor_config(
@@ -308,6 +414,39 @@ def test_validation_rejects_invalid_dual_window_param_shape():
                 "symbol": "AAPL",
                 "alg_key": "aggregate_channel_dual_window",
                 "alg_param": {"buy_window": 1},
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+
+def test_validation_rejects_invalid_rule_based_combination_param_shape() -> None:
+    with pytest.raises(ValueError, match="missing required keys: rows"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "hard_boolean_gating_and_or_majority",
+                "alg_param": {
+                    "mode": "and",
+                    "tie_policy": "neutral",
+                    "veto_sell_count": 0,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="requires sell_threshold <= buy_threshold"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "weighted_linear_score_blend",
+                "alg_param": {
+                    "weights": {"a": 1.0},
+                    "buy_threshold": -0.2,
+                    "sell_threshold": 0.4,
+                    "rows": [],
+                },
                 "buy": True,
                 "sell": True,
             }

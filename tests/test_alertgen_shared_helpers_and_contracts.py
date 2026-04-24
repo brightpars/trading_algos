@@ -1,5 +1,8 @@
 import pytest
 
+from trading_algos.alertgen.algorithms.composite.rule_based_combination.helpers import (
+    align_child_outputs,
+)
 from trading_algos.alertgen.contracts.outputs import (
     AlertAlgorithmOutput,
     AlertSeriesPoint,
@@ -142,3 +145,27 @@ def test_output_contract_rejects_invalid_shapes_and_ranges() -> None:
             points=(AlertSeriesPoint(timestamp="2025", signal_label="buy"),),
             derived_series={"close": [1.0, 2.0]},
         )
+
+
+def test_align_child_outputs_normalizes_child_stream_rows() -> None:
+    rows = align_child_outputs(
+        [
+            {
+                "timestamp": "2025-01-01T00:00:00Z",
+                "child_outputs": [
+                    {
+                        "child_key": "a",
+                        "signal_label": "buy",
+                        "score": 1.2,
+                        "confidence": 1.5,
+                    },
+                    {"child_key": "b", "signal_label": "neutral", "score": 0.0},
+                ],
+            }
+        ]
+    )
+
+    assert rows[0].timestamp == "2025-01-01T00:00:00Z"
+    assert rows[0].child_outputs[0].score == 1.0
+    assert rows[0].child_outputs[0].confidence == 1.0
+    assert rows[0].child_outputs[1].direction == 0

@@ -1,0 +1,26 @@
+[
+  {
+    "timestamp": "2025-01-01T00:00:00Z",
+    "child_outputs": [
+      {"child_key": "trend", "signal_label": "buy", "score": 0.8, "confidence": 0.9},
+      {"child_key": "momentum", "signal_label": "buy", "score": 0.6, "confidence": 0.7},
+      {"child_key": "filter", "signal_label": "neutral", "score": 0.0, "confidence": 0.5}
+    ]
+  },
+  {
+    "timestamp": "2025-01-02T00:00:00Z",
+    "child_outputs": [
+      {"child_key": "trend", "signal_label": "sell", "score": -0.7, "confidence": 0.8},
+      {"child_key": "momentum", "signal_label": "neutral", "score": 0.1, "confidence": 0.6},
+      {"child_key": "filter", "signal_label": "sell", "score": -0.6, "confidence": 0.9}
+    ]
+  },
+  {
+    "timestamp": "2025-01-03T00:00:00Z",
+    "child_outputs": [
+      {"child_key": "trend", "signal_label": "neutral", "score": 0.1, "confidence": 0.4},
+      {"child_key": "momentum", "signal_label": "neutral", "score": 0.0, "confidence": 0.3},
+      {"child_key": "filter", "signal_label": "neutral", "score": 0.0, "confidence": 0.2}
+    ]
+  }
+]
