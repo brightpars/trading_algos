@@ -10,6 +10,8 @@ from trading_algos.alertgen.shared_utils.indicators import commodity_channel_ind
 
 
 class CCIMomentumAlertAlgorithm(BaseMomentumAlertAlgorithm):
+    catalog_ref = "algorithm:23"
+
     def __init__(
         self,
         symbol: str,

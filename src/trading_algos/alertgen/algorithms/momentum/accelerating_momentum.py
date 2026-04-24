@@ -10,6 +10,8 @@ from trading_algos.alertgen.shared_utils.indicators import rate_of_change
 
 
 class AcceleratingMomentumAlertAlgorithm(BaseMomentumAlertAlgorithm):
+    catalog_ref = "algorithm:20"
+
     def __init__(
         self,
         symbol: str,

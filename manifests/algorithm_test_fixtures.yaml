@@ -29,6 +29,9 @@ fixtures:
   expected_behaviors:
   - Momentum score rises above bullish threshold
   - No bearish reversal occurs while continuation remains intact
+  - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - Diagnostics expose primary value, threshold context, regime label, and reason codes for dashboard explanation
+  - Normalized output metadata identifies momentum family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.momentum_cross_sectional_ranking_v1
   domain: multi_asset_panel
   purpose: Deterministic ranking of a small universe on rebalance dates.

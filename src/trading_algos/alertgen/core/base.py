@@ -32,6 +32,8 @@ DEFAULT_FIGURE_L = 4
 
 
 class BaseAlertAlgorithm(ABC):
+    catalog_ref: str | None = None
+
     def __init__(
         self, alg_name, symbol, date_str, evaluate_window_len, report_base_path
     ):
@@ -206,6 +208,21 @@ class BaseAlertAlgorithm(ABC):
             evaluate_window_len=self.evaluate_window_len,
         ).to_dict()
 
+    def output_family(self) -> str:
+        module_name = type(self).__module__
+        parts = module_name.split(".")
+        try:
+            algorithms_index = parts.index("algorithms")
+        except ValueError:
+            return "general"
+        family_index = algorithms_index + 1
+        if family_index >= len(parts):
+            return "general"
+        return parts[family_index]
+
+    def reporting_mode(self) -> str:
+        return "bar_series"
+
     def minimum_history(self) -> int:
         return 1
 
@@ -297,6 +314,7 @@ class BaseAlertAlgorithm(ABC):
         )
 
     def normalized_output(self) -> AlertAlgorithmOutput:
+        metadata_catalog_ref = self.catalog_ref
         points = []
         for item in self.data_list:
             if item.get("buy_SIGNAL"):
@@ -346,12 +364,18 @@ class BaseAlertAlgorithm(ABC):
             summary_metrics=dict(self.eval_dict),
             metadata={
                 "algorithm_name": self.alg_name,
-                "family": "trend",
+                "family": self.output_family(),
                 "symbol": self.symbol,
                 "warmup_period": self.minimum_history(),
                 "evaluate_window_len": self.evaluate_window_len,
                 "supports_composition": True,
                 "output_contract_version": "1.0",
+                "reporting_mode": self.reporting_mode(),
+                **(
+                    {"catalog_ref": metadata_catalog_ref}
+                    if isinstance(metadata_catalog_ref, str) and metadata_catalog_ref
+                    else {}
+                ),
             },
             child_outputs=self._normalized_child_outputs(),
         )
@@ -390,7 +414,12 @@ class BaseAlertAlgorithm(ABC):
             "symbol": self.symbol,
             "warmup_period": self.minimum_history(),
             "evaluate_window_len": self.evaluate_window_len,
+            "family": self.output_family(),
+            "reporting_mode": self.reporting_mode(),
         }
+        catalog_ref = getattr(self, "catalog_ref", None)
+        if isinstance(catalog_ref, str) and catalog_ref:
+            diagnostics["catalog_ref"] = catalog_ref
         diagnostics.update(decision.annotations)
         reason_codes = tuple(diagnostics.keys())
         return (

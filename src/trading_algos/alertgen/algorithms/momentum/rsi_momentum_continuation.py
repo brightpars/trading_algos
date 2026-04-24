@@ -10,6 +10,8 @@ from trading_algos.alertgen.shared_utils.indicators import relative_strength_ind
 
 
 class RSIMomentumContinuationAlertAlgorithm(BaseMomentumAlertAlgorithm):
+    catalog_ref = "algorithm:21"
+
     def __init__(
         self,
         symbol: str,

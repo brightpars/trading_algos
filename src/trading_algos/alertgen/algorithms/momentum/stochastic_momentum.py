@@ -10,6 +10,8 @@ from trading_algos.alertgen.shared_utils.indicators import stochastic_oscillator
 
 
 class StochasticMomentumAlertAlgorithm(BaseMomentumAlertAlgorithm):
+    catalog_ref = "algorithm:22"
+
     def __init__(
         self,
         symbol: str,

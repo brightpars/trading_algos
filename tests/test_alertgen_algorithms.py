@@ -1653,6 +1653,40 @@ def test_momentum_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
             }
         )
 
+    with pytest.raises(ValueError, match=r"within \[0, 100\]"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "stochastic_momentum",
+                "alg_param": {
+                    "k_window": 3,
+                    "d_window": 2,
+                    "bullish_threshold": 55.0,
+                    "bearish_threshold": 101.0,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
+    with pytest.raises(ValueError, match="bearish_threshold <= acceleration_threshold"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "AAPL",
+                "alg_key": "accelerating_momentum",
+                "alg_param": {
+                    "fast_window": 2,
+                    "slow_window": 4,
+                    "acceleration_threshold": -0.5,
+                    "bearish_threshold": 0.5,
+                    "confirmation_bars": 1,
+                },
+                "buy": True,
+                "sell": True,
+            }
+        )
+
 
 @pytest.mark.parametrize(
     ("alg_key", "alg_param"),
@@ -1806,3 +1840,133 @@ def test_momentum_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> No
         assert len(output.points) == len(rows)
         assert output.metadata["warmup_period"] == algorithm.minimum_history()
         assert "trend_score" in output.derived_series
+
+
+def test_momentum_wave_1_registration_metadata_matches_manifest_contract() -> None:
+    expected = {
+        "rate_of_change_momentum": ("algorithm:15", "momentum", "rate", 6),
+        "accelerating_momentum": ("algorithm:20", "momentum", "accelerating", 8),
+        "rsi_momentum_continuation": ("algorithm:21", "momentum", "rsi", 7),
+        "stochastic_momentum": ("algorithm:22", "momentum", "stochastic", 7),
+        "cci_momentum": ("algorithm:23", "momentum", "cci", 5),
+    }
+
+    for alg_key, (catalog_ref, family, subcategory, warmup_period) in expected.items():
+        spec = get_alert_algorithm_spec_by_key(alg_key)
+
+        assert spec.catalog_ref == catalog_ref
+        assert spec.family == family
+        assert spec.subcategory == subcategory
+        assert spec.warmup_period == warmup_period
+        assert spec.output_modes == ("signal", "score", "confidence")
+
+
+def test_momentum_wave_1_acceleration_exposes_fast_and_acceleration_diagnostics(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "accelerating_momentum",
+            "alg_param": {
+                "fast_window": 2,
+                "slow_window": 4,
+                "acceleration_threshold": 0.5,
+                "bearish_threshold": -0.5,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_momentum_fixture_rows("sustained_up.csv"))
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.points[-1].signal_label == "buy"
+    assert output.derived_series["primary_value"][-1] == pytest.approx(
+        output.derived_series["fast_roc"][-1]
+    )
+    assert output.derived_series["signal_value"][-1] == pytest.approx(
+        output.derived_series["acceleration_value"][-1]
+    )
+    assert output.derived_series["primary_value"][-1] > 0.5
+    assert output.derived_series["slow_roc"][-1] > 0.0
+    assert child_output.diagnostics["primary_value"] == pytest.approx(
+        output.derived_series["fast_roc"][-1]
+    )
+    assert child_output.diagnostics["signal_value"] == pytest.approx(
+        output.derived_series["acceleration_value"][-1]
+    )
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "catalog_ref"),
+    [
+        ("rate_of_change_momentum", "algorithm:15"),
+        ("accelerating_momentum", "algorithm:20"),
+        ("rsi_momentum_continuation", "algorithm:21"),
+        ("stochastic_momentum", "algorithm:22"),
+        ("cci_momentum", "algorithm:23"),
+    ],
+)
+def test_momentum_wave_1_normalized_output_metadata_exposes_dashboard_contract_fields(
+    tmp_path, alg_key, catalog_ref
+) -> None:
+    default_params = {
+        "rate_of_change_momentum": {
+            "window": 3,
+            "bullish_threshold": 1.0,
+            "bearish_threshold": -1.0,
+            "confirmation_bars": 1,
+        },
+        "accelerating_momentum": {
+            "fast_window": 2,
+            "slow_window": 4,
+            "acceleration_threshold": 0.5,
+            "bearish_threshold": -0.5,
+            "confirmation_bars": 1,
+        },
+        "rsi_momentum_continuation": {
+            "window": 3,
+            "bullish_threshold": 55.0,
+            "bearish_threshold": 45.0,
+            "confirmation_bars": 1,
+        },
+        "stochastic_momentum": {
+            "k_window": 3,
+            "d_window": 2,
+            "bullish_threshold": 55.0,
+            "bearish_threshold": 45.0,
+            "confirmation_bars": 1,
+        },
+        "cci_momentum": {
+            "window": 5,
+            "bullish_threshold": 50.0,
+            "bearish_threshold": -50.0,
+            "confirmation_bars": 1,
+        },
+    }
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": alg_key,
+            "alg_param": default_params[alg_key],
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_load_momentum_fixture_rows("sustained_up.csv"))
+    output = algorithm.normalized_output()
+    child_output = output.child_outputs[0]
+
+    assert output.metadata["family"] == "momentum"
+    assert output.metadata["reporting_mode"] == "bar_series"
+    assert output.metadata["catalog_ref"] == catalog_ref
+    assert child_output.diagnostics["family"] == "momentum"
+    assert child_output.diagnostics["reporting_mode"] == "bar_series"
+    assert child_output.diagnostics["catalog_ref"] == catalog_ref

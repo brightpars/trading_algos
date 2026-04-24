@@ -959,8 +959,8 @@ rows:
   display_category: Momentum
   subcategory: rate
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1005,7 +1005,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 15; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, normalized metadata/diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:16
   source_doc_ref: requirements_v4:algorithm:16
   kind: algorithm
@@ -1258,8 +1258,8 @@ rows:
   display_category: Momentum
   subcategory: accelerating
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1304,7 +1304,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 20; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, acceleration diagnostics, normalized metadata, and performance-smoke tests.
 - catalog_ref: algorithm:21
   source_doc_ref: requirements_v4:algorithm:21
   kind: algorithm
@@ -1313,8 +1313,8 @@ rows:
   display_category: Momentum
   subcategory: rsi
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1360,7 +1360,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 21; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, normalized metadata/diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:22
   source_doc_ref: requirements_v4:algorithm:22
   kind: algorithm
@@ -1369,8 +1369,8 @@ rows:
   display_category: Momentum
   subcategory: stochastic
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1416,7 +1416,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 22; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, normalized metadata/diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:23
   source_doc_ref: requirements_v4:algorithm:23
   kind: algorithm
@@ -1425,8 +1425,8 @@ rows:
   display_category: Momentum
   subcategory: cci
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1472,7 +1472,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 23; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, normalized metadata/diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:24
   source_doc_ref: requirements_v4:algorithm:24
   kind: algorithm
