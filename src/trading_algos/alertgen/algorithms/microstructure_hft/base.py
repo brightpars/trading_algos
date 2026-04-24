@@ -117,6 +117,19 @@ class BaseMicrostructureAlertAlgorithm:
             )
         self._rows = built_rows
 
+    def _summary_metrics(self) -> dict[str, Any]:
+        latest = self._rows[-1]
+        return {
+            "point_count": len(self._rows),
+            "latest_signal": latest.signal_label,
+            "latest_decision_reason": latest.reason_codes[0],
+            "latest_imbalance": latest.diagnostics.get("imbalance"),
+            "latest_microprice_edge": latest.diagnostics.get("microprice_edge"),
+            "latest_queue_fill_probability": latest.diagnostics.get(
+                "queue_fill_probability"
+            ),
+        }
+
     def current_decision(self) -> AlgorithmDecision:
         if not self._rows:
             self._build_rows()
@@ -150,15 +163,30 @@ class BaseMicrostructureAlertAlgorithm:
             points=points,
             derived_series={
                 "signal_label": [row.signal_label for row in self._rows],
+                "score": [row.score for row in self._rows],
+                "confidence": [row.confidence for row in self._rows],
                 "imbalance": [row.diagnostics.get("imbalance") for row in self._rows],
+                "spread": [row.diagnostics.get("spread") for row in self._rows],
+                "microprice": [row.diagnostics.get("microprice") for row in self._rows],
                 "microprice_edge": [
                     row.diagnostics.get("microprice_edge") for row in self._rows
                 ],
+                "inventory": [row.diagnostics.get("inventory") for row in self._rows],
                 "queue_fill_probability": [
                     row.diagnostics.get("queue_fill_probability") for row in self._rows
                 ],
+                "auction_imbalance": [
+                    row.diagnostics.get("auction_imbalance") for row in self._rows
+                ],
+                "session_phase": [
+                    row.diagnostics.get("session_phase") for row in self._rows
+                ],
+                "warmup_ready": [
+                    row.diagnostics.get("warmup_ready") for row in self._rows
+                ],
                 "decision_reason": [row.reason_codes[0] for row in self._rows],
             },
+            summary_metrics=self._summary_metrics(),
             metadata={
                 "catalog_ref": self.catalog_ref,
                 "family": self.family,

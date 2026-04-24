@@ -85,6 +85,30 @@ class BaseExecutionAlertAlgorithm:
     ) -> dict[str, Any]:
         return {}
 
+    def _summary_metrics(
+        self,
+        *,
+        points: list[AlertSeriesPoint],
+        plan_points: list[ExecutionPlanPoint],
+        child_orders: list[ExecutionChildOrder],
+    ) -> dict[str, Any]:
+        latest_point = points[-1]
+        latest_plan_point = plan_points[-1]
+        return {
+            "point_count": len(points),
+            "child_order_count": len(child_orders),
+            "latest_signal": latest_point.signal_label,
+            "latest_decision_reason": latest_point.reason_codes[0],
+            "parent_quantity": latest_plan_point.diagnostics["parent_quantity"],
+            "final_target_quantity": latest_plan_point.target_cumulative_quantity,
+            "final_achieved_quantity": latest_plan_point.achieved_cumulative_quantity,
+            "final_shortfall_quantity": max(
+                0.0,
+                latest_plan_point.target_cumulative_quantity
+                - latest_plan_point.achieved_cumulative_quantity,
+            ),
+        }
+
     def _build_outputs(self) -> None:
         total_volume = sum(float(row["available_volume"]) for row in self.rows)
         parent_qty = float(self.parent_order["quantity"])
@@ -108,13 +132,17 @@ class BaseExecutionAlertAlgorithm:
                 "family": self.family,
                 "subcategory": self.subcategory,
                 "reporting_mode": self.reporting_mode(),
+                "warmup_ready": True,
                 "parent_quantity": parent_qty,
                 "target_cumulative_quantity": target_qty,
                 "achieved_cumulative_quantity": achieved,
+                "schedule_shortfall_quantity": max(0.0, target_qty - achieved),
                 "available_volume": metrics.available_volume,
                 "reference_price": metrics.reference_price,
                 "realized_volume_share": metrics.realized_volume_share,
                 "fill_ratio": fill.fill_ratio,
+                "requested_child_quantity": requested_child,
+                "child_order_action": "submit_child" if requested_child > 0 else "wait",
                 "decision_reason": reason,
             }
             diagnostics.update(self._extra_diagnostics(metrics, target_qty, achieved))
@@ -178,21 +206,43 @@ class BaseExecutionAlertAlgorithm:
             algorithm_key=self.algorithm_key,
             points=tuple(points),
             derived_series={
+                "signal_label": [point.signal_label for point in points],
                 "target_cumulative_quantity": [
                     p.target_cumulative_quantity for p in plan_points
                 ],
                 "achieved_cumulative_quantity": [
                     p.achieved_cumulative_quantity for p in plan_points
                 ],
+                "schedule_shortfall_quantity": [
+                    p.diagnostics["schedule_shortfall_quantity"] for p in plan_points
+                ],
+                "requested_child_quantity": [
+                    p.diagnostics["requested_child_quantity"] for p in plan_points
+                ],
+                "child_order_action": [order.action for order in child_orders],
+                "fill_ratio": [p.diagnostics["fill_ratio"] for p in plan_points],
+                "reference_price": [
+                    p.diagnostics["reference_price"] for p in plan_points
+                ],
+                "realized_volume_share": [
+                    p.diagnostics["realized_volume_share"] for p in plan_points
+                ],
+                "warmup_ready": [True for _ in plan_points],
                 "decision_reason": [
                     p.diagnostics["decision_reason"] for p in plan_points
                 ],
             },
+            summary_metrics=self._summary_metrics(
+                points=points,
+                plan_points=plan_points,
+                child_orders=child_orders,
+            ),
             metadata={
                 "catalog_ref": self.catalog_ref,
                 "family": self.family,
                 "subcategory": self.subcategory,
                 "reporting_mode": self.reporting_mode(),
+                "warmup_period": self.minimum_history(),
             },
             child_outputs=(
                 NormalizedChildOutput(

@@ -240,6 +240,71 @@ def test_advanced_wave_blocked_microstructure_fixture_behavior(tmp_path) -> None
         queue_output.derived_series["queue_fill_probability"][0]
         > queue_output.derived_series["queue_fill_probability"][1]
     )
+    assert imbalance_output.derived_series["warmup_ready"] == [True, True]
+    assert (
+        imbalance_output.summary_metrics["latest_decision_reason"]
+        == "ask_depth_dominant"
+    )
+    assert queue_output.points[1].diagnostics["action"] == "cancel_or_amend"
+    imbalance_payload, imbalance_payload_name = (
+        imbalance_algorithm.interactive_report_payloads()[0]
+    )
+    assert imbalance_payload_name == "microstructure_order_book_imbalance_strategy_AAA"
+    assert imbalance_payload["data"]["metadata"]["catalog_ref"] == "algorithm:64"
+    assert imbalance_payload["data"]["summary_metrics"]["latest_signal"] == "sell"
+
+
+def test_advanced_wave_blocked_microstructure_short_history_and_diagnostics(
+    tmp_path,
+) -> None:
+    algorithms = {
+        "bid_ask_market_making": {
+            "rows": _microstructure_rows(),
+            "own_order_rows": _own_order_rows(),
+            "min_spread": 0.01,
+            "inventory_limit": 10.0,
+        },
+        "inventory_skewed_market_making": {
+            "rows": _microstructure_rows(),
+            "own_order_rows": _own_order_rows(),
+            "inventory_target": 5.0,
+            "skew_sensitivity": 1.0,
+        },
+        "microprice_strategy": {
+            "rows": _microstructure_rows(),
+            "own_order_rows": _own_order_rows(),
+            "edge_threshold": 0.002,
+        },
+        "liquidity_rebate_capture": {
+            "rows": _microstructure_rows(),
+            "own_order_rows": _own_order_rows(),
+            "maker_rebate": 0.002,
+            "adverse_selection_buffer": 0.001,
+        },
+    }
+
+    for alg_key, alg_param in algorithms.items():
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAA",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / alg_key),
+        )
+        output = algorithm.normalized_output()
+        assert output.metadata["warmup_period"] == 1
+        assert output.derived_series["warmup_ready"] == [True, True]
+        assert output.summary_metrics["point_count"] == 2
+        assert (
+            output.child_outputs[0].diagnostics["catalog_ref"]
+            == output.metadata["catalog_ref"]
+        )
+        assert (
+            output.child_outputs[0].diagnostics["reporting_mode"] == "order_book_trace"
+        )
 
 
 def test_advanced_wave_blocked_auction_phase_behavior(tmp_path) -> None:
@@ -274,6 +339,18 @@ def test_advanced_wave_blocked_auction_phase_behavior(tmp_path) -> None:
 
     assert opening_algorithm.normalized_output().points[0].signal_label == "buy"
     assert closing_algorithm.normalized_output().points[1].signal_label == "sell"
+    opening_output = opening_algorithm.normalized_output()
+    closing_output = closing_algorithm.normalized_output()
+    assert opening_output.derived_series["session_phase"] == ["opening", "opening"]
+    assert closing_output.derived_series["session_phase"] == ["closing", "closing"]
+    assert (
+        opening_output.summary_metrics["latest_decision_reason"]
+        == "opening_auction_sell_pressure"
+    )
+    assert (
+        closing_output.summary_metrics["latest_decision_reason"]
+        == "closing_auction_sell_pressure"
+    )
 
 
 def test_advanced_wave_blocked_execution_fixture_behavior(tmp_path) -> None:
@@ -327,6 +404,20 @@ def test_advanced_wave_blocked_execution_fixture_behavior(tmp_path) -> None:
     assert (
         vwap_output.derived_series["target_cumulative_quantity"][1]
         > vwap_output.derived_series["target_cumulative_quantity"][0]
+    )
+    assert twap_output.derived_series["child_order_action"] == [
+        "submit_child",
+        "submit_child",
+        "submit_child",
+    ]
+    assert twap_output.summary_metrics["child_order_count"] == 3
+    assert twap_output.metadata["warmup_period"] == 1
+    twap_payload, twap_payload_name = twap_algorithm.interactive_report_payloads()[0]
+    assert twap_payload_name == "execution_twap_AAA"
+    assert twap_payload["data"]["summary_metrics"]["final_target_quantity"] == 300.0
+    assert twap_payload["execution_plan"]["metadata"]["catalog_ref"] == "algorithm:94"
+    assert vwap_output.derived_series["realized_volume_share"] == pytest.approx(
+        [0.2, 0.3, 0.5]
     )
 
 
@@ -386,6 +477,66 @@ def test_advanced_wave_blocked_execution_variants_behavior(tmp_path) -> None:
         "sniper_triggered",
         "sniper_triggered",
     ]
+    implementation_algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAA",
+            "alg_key": "implementation_shortfall_arrival_price",
+            "alg_param": {
+                "rows": _execution_rows(),
+                "parent_order": _parent_order(),
+                "urgency": 0.8,
+                "arrival_price": 100.01,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path / "implementation"),
+    )
+    implementation_output = implementation_algorithm.normalized_output()
+    assert implementation_output.derived_series["decision_reason"] == [
+        "implementation_shortfall_active",
+        "arrival_price_slippage_risk",
+        "arrival_price_slippage_risk",
+    ]
+    assert implementation_output.summary_metrics[
+        "final_target_quantity"
+    ] == pytest.approx(300.0)
+    assert (
+        implementation_output.child_outputs[0].diagnostics["catalog_ref"]
+        == "algorithm:97"
+    )
+
+
+def test_advanced_wave_blocked_execution_report_payload_fields(tmp_path) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAA",
+            "alg_key": "pov_participation_rate",
+            "alg_param": {
+                "rows": _execution_rows(),
+                "parent_order": _parent_order(),
+                "participation_rate": 0.5,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path / "payloads"),
+    )
+
+    payload, payload_name = algorithm.interactive_report_payloads()[0]
+    assert payload_name == "execution_pov_participation_rate_AAA"
+    assert payload["data"]["metadata"]["catalog_ref"] == "algorithm:96"
+    assert payload["data"]["summary_metrics"]["latest_signal"] == "buy"
+    assert payload["data"]["derived_series"]["requested_child_quantity"] == [
+        50.0,
+        75.0,
+        125.0,
+    ]
+    assert payload["execution_plan"]["child_orders"][0]["action"] == "submit_child"
+    assert (
+        payload["execution_plan"]["plan_points"][-1]["diagnostics"]["decision_reason"]
+        == "schedule_active"
+    )
 
 
 def test_advanced_wave_blocked_performance_smoke_mappings() -> None:
