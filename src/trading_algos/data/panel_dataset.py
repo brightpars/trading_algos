@@ -7,11 +7,11 @@ from typing import Any
 
 def _normalize_timestamp(value: Any) -> str:
     if isinstance(value, datetime):
-        return value.strftime("%Y-%m-%d")
+        return value.isoformat(sep=" ", timespec="seconds")
     if isinstance(value, date):
         return value.isoformat()
     text = str(value)
-    return text[:10] if len(text) >= 10 else text
+    return text.strip()
 
 
 @dataclass(frozen=True)

@@ -13,8 +13,12 @@ RuntimeKind = Literal["batch_series", "streaming", "execution"]
 AssetScope = Literal["single_asset", "pair", "basket", "universe", "portfolio"]
 InputDomain = Literal[
     "ohlcv",
+    "single_asset_ohlcv",
     "multi_asset_ohlcv",
     "multi_asset_panel",
+    "cross_asset_panel",
+    "market_calendar",
+    "event_calendar",
     "order_book",
     "options",
     "fundamental",
@@ -26,6 +30,8 @@ OutputMode = Literal[
     "score",
     "confidence",
     "events",
+    "calendar_window",
+    "event_window_signal",
     "ranking",
     "selection",
     "weights",

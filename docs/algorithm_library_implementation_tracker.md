@@ -16,11 +16,11 @@
 | algorithm rows | 121 |
 | combination-method rows | 12 |
 | ready_to_implement | 4 |
-| blocked_framework | 66 |
+| blocked_framework | 58 |
 | in_progress | 0 |
-| complete | 63 |
-| prototype_only | 70 |
-| research_ready | 63 |
+| complete | 71 |
+| prototype_only | 62 |
+| research_ready | 71 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -31,7 +31,7 @@
 | family | kind_mix | total | ready | blocked | in_progress | complete |
 | --- | --- | --- | --- | --- | --- | --- |
 | adaptive_state_based | combination_method | 1 | 0 | 1 | 0 | 0 |
-| cross_asset_macro_carry | algorithm | 8 | 0 | 8 | 0 | 0 |
+| cross_asset_macro_carry | algorithm | 8 | 0 | 0 | 0 | 8 |
 | event_driven | algorithm | 5 | 0 | 5 | 0 | 0 |
 | execution | algorithm | 6 | 0 | 6 | 0 | 0 |
 | factor_risk_premia | algorithm | 15 | 0 | 4 | 0 | 11 |

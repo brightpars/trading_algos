@@ -1656,6 +1656,133 @@ def require_factor_portfolio_param(raw_alg_param, label):
     return result
 
 
+def require_cross_asset_ranking_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "field_names",
+            "rebalance_frequency",
+            "top_n",
+            "long_only",
+            "minimum_universe_size",
+        ],
+        label,
+    )
+    top_n = _require_positive_int_like(normalized["top_n"], f"{label} top_n")
+    bottom_n = _require_int_like(normalized.get("bottom_n", 0), f"{label} bottom_n")
+    if bottom_n < 0:
+        raise ValueError(f"{label} bottom_n must be >= 0")
+    long_only = _normalize_bool_like(normalized["long_only"], f"{label} long_only")
+    if long_only and bottom_n != 0:
+        raise ValueError(f"{label} bottom_n must be 0 when long_only is true")
+    return {
+        "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
+        "field_names": _require_non_empty_string_list(
+            normalized["field_names"], f"{label} field_names"
+        ),
+        "rebalance_frequency": _require_choice(
+            normalized["rebalance_frequency"],
+            f"{label} rebalance_frequency",
+            allowed={"monthly", "weekly", "all"},
+        ),
+        "top_n": top_n,
+        "bottom_n": bottom_n,
+        "long_only": long_only,
+        "minimum_universe_size": _require_positive_int_like(
+            normalized["minimum_universe_size"], f"{label} minimum_universe_size"
+        ),
+    }
+
+
+def require_multi_leg_rebalance_param(raw_alg_param, label):
+    normalized = require_cross_asset_ranking_param(raw_alg_param, label)
+    return {
+        **normalized,
+        "front_leg_field": _require_non_empty_string(
+            raw_alg_param.get("front_leg_field"), f"{label} front_leg_field"
+        ),
+        "back_leg_field": _require_non_empty_string(
+            raw_alg_param.get("back_leg_field"), f"{label} back_leg_field"
+        ),
+    }
+
+
+def require_seasonality_calendar_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        ["rows", "rebalance_frequency", "top_n", "long_only", "minimum_universe_size"],
+        label,
+    )
+    top_n = _require_positive_int_like(normalized["top_n"], f"{label} top_n")
+    bottom_n = _require_int_like(normalized.get("bottom_n", 0), f"{label} bottom_n")
+    if bottom_n < 0:
+        raise ValueError(f"{label} bottom_n must be >= 0")
+    long_only = _normalize_bool_like(normalized["long_only"], f"{label} long_only")
+    if long_only and bottom_n != 0:
+        raise ValueError(f"{label} bottom_n must be 0 when long_only is true")
+    result = {
+        "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
+        "rebalance_frequency": _require_choice(
+            normalized["rebalance_frequency"],
+            f"{label} rebalance_frequency",
+            allowed={"monthly", "weekly", "all"},
+        ),
+        "top_n": top_n,
+        "bottom_n": bottom_n,
+        "long_only": long_only,
+        "minimum_universe_size": _require_positive_int_like(
+            normalized["minimum_universe_size"], f"{label} minimum_universe_size"
+        ),
+    }
+    result["calendar_pattern"] = _require_choice(
+        normalized.get("calendar_pattern", "turn_of_month"),
+        f"{label} calendar_pattern",
+        allowed={"turn_of_month", "month_end", "monday", "friday"},
+    )
+    return result
+
+
+def require_event_driven_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "event_rows",
+            "rebalance_frequency",
+            "top_n",
+            "long_only",
+            "minimum_universe_size",
+            "post_event_window_days",
+        ],
+        label,
+    )
+    result = require_cross_asset_ranking_param(normalized, label)
+    event_rows = normalized["event_rows"]
+    if not isinstance(event_rows, list):
+        raise ValueError(f"{label} event_rows must be a list")
+    normalized_events: list[dict[str, object]] = []
+    for index, row in enumerate(event_rows):
+        if not isinstance(row, dict):
+            raise ValueError(f"{label} event_rows[{index}] must be a dict")
+        if row.get("symbol") in (None, ""):
+            raise ValueError(f"{label} event_rows[{index}] symbol is required")
+        if row.get("event_timestamp") in (None, ""):
+            raise ValueError(f"{label} event_rows[{index}] event_timestamp is required")
+        normalized_events.append(dict(row))
+    result["event_rows"] = normalized_events
+    result["post_event_window_days"] = _require_positive_int_like(
+        normalized["post_event_window_days"], f"{label} post_event_window_days"
+    )
+    result["surprise_field"] = _require_non_empty_string(
+        normalized.get("surprise_field", "surprise"), f"{label} surprise_field"
+    )
+    return result
+
+
 def _require_float_like(value, label):
     try:
         return float(value)

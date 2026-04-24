@@ -4636,8 +4636,8 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: carry
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4686,7 +4686,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-ARP
-  notes: Seeded from requirements_v4 row 78; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable cross-asset rebalance helpers, normalized ranking diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:79
   source_doc_ref: requirements_v4:algorithm:79
   kind: algorithm
@@ -4695,8 +4695,8 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: yield
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4749,7 +4749,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-ARP
-  notes: Seeded from requirements_v4 row 79; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable multi-leg rebalance output, spread diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:80
   source_doc_ref: requirements_v4:algorithm:80
   kind: algorithm
@@ -4758,8 +4758,8 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: curve
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4812,7 +4812,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-ARP
-  notes: Seeded from requirements_v4 row 80; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable multi-leg rebalance output, roll-down spread diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:81
   source_doc_ref: requirements_v4:algorithm:81
   kind: algorithm
@@ -4821,8 +4821,8 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: commodity
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4875,7 +4875,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-ARP
-  notes: Seeded from requirements_v4 row 81; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable multi-leg rebalance output, roll-yield spread diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:82
   source_doc_ref: requirements_v4:algorithm:82
   kind: algorithm
@@ -4884,8 +4884,8 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: risk
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4934,7 +4934,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-MULTI
-  notes: Seeded from requirements_v4 row 82; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable cross-asset rebalance helpers, normalized regime diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:83
   source_doc_ref: requirements_v4:algorithm:83
   kind: algorithm
@@ -4943,8 +4943,8 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: intermarket
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4993,7 +4993,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-MULTI
-  notes: Seeded from requirements_v4 row 83; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable cross-asset rebalance helpers, confirmation diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:84
   source_doc_ref: requirements_v4:algorithm:84
   kind: algorithm
@@ -5002,8 +5002,8 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: seasonality
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Calendar-driven swing / long-only or tactical
   home_suitability: 2
@@ -5053,7 +5053,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: QPEDIA-CAL
-  notes: Seeded from requirements_v4 row 84; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable calendar-window scoring, normalized rebalance diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:85
   source_doc_ref: requirements_v4:algorithm:85
   kind: algorithm
@@ -5062,8 +5062,8 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: earnings
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven swing
   home_suitability: 2
@@ -5119,7 +5119,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: CFA-PEAD
-  notes: Seeded from requirements_v4 row 85; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable event-window ranking helpers, after-close event handling, normalized rebalance diagnostics, and fixture-backed smoke tests.
 - catalog_ref: algorithm:86
   source_doc_ref: requirements_v4:algorithm:86
   kind: algorithm
