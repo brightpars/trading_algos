@@ -139,6 +139,18 @@ def _require_positive_int_list(value, label, *, minimum_length=1):
     return normalized
 
 
+def _require_non_empty_string_list(value, label, *, minimum_length=1):
+    if not isinstance(value, list):
+        raise ValueError(f"{label} must be a list")
+    normalized = [
+        _require_non_empty_string(item, f"{label}[{index}]")
+        for index, item in enumerate(value)
+    ]
+    if len(normalized) < minimum_length:
+        raise ValueError(f"{label} must contain at least {minimum_length} items")
+    return normalized
+
+
 def require_short_long_window_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(
@@ -1550,6 +1562,46 @@ def require_cross_sectional_momentum_param(raw_alg_param, label):
             defensive_symbol, f"{label} defensive_symbol"
         )
     return result
+
+
+def require_factor_portfolio_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "field_names",
+            "rebalance_frequency",
+            "top_n",
+            "long_only",
+            "minimum_universe_size",
+        ],
+        label,
+    )
+    top_n = _require_positive_int_like(normalized["top_n"], f"{label} top_n")
+    bottom_n = _require_int_like(normalized.get("bottom_n", 0), f"{label} bottom_n")
+    if bottom_n < 0:
+        raise ValueError(f"{label} bottom_n must be >= 0")
+    long_only = _normalize_bool_like(normalized["long_only"], f"{label} long_only")
+    if long_only and bottom_n != 0:
+        raise ValueError(f"{label} bottom_n must be 0 when long_only is true")
+    return {
+        "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
+        "field_names": _require_non_empty_string_list(
+            normalized["field_names"], f"{label} field_names"
+        ),
+        "rebalance_frequency": _require_choice(
+            normalized["rebalance_frequency"],
+            f"{label} rebalance_frequency",
+            allowed={"monthly", "weekly", "all"},
+        ),
+        "top_n": top_n,
+        "bottom_n": bottom_n,
+        "long_only": long_only,
+        "minimum_universe_size": _require_positive_int_like(
+            normalized["minimum_universe_size"], f"{label} minimum_universe_size"
+        ),
+    }
 
 
 def _require_float_like(value, label):

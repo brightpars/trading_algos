@@ -44,6 +44,71 @@ PATTERN_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "patterns
 COMPOSITE_FIXTURES_ROOT = Path(__file__).resolve().parent / "fixtures" / "composite"
 
 
+def _build_factor_fixture_rows() -> list[dict[str, object]]:
+    return [
+        {
+            "ts": "2025-01-02",
+            "symbol": "AAA",
+            "Close": 100.0,
+            "volatility_20d": 0.10,
+            "realized_volatility": 0.11,
+            "beta_252d": 0.80,
+            "market_beta": 0.82,
+            "dividend_yield": 0.040,
+            "forward_dividend_yield": 0.041,
+            "earnings_growth": 0.18,
+            "sales_growth": 0.15,
+            "liquidity_score": 0.90,
+            "turnover_ratio": 0.70,
+        },
+        {
+            "ts": "2025-01-02",
+            "symbol": "BBB",
+            "Close": 100.0,
+            "volatility_20d": 0.22,
+            "realized_volatility": 0.20,
+            "beta_252d": 1.25,
+            "market_beta": 1.20,
+            "dividend_yield": 0.020,
+            "forward_dividend_yield": 0.021,
+            "earnings_growth": 0.08,
+            "sales_growth": 0.07,
+            "liquidity_score": 0.65,
+            "turnover_ratio": 0.55,
+        },
+        {
+            "ts": "2025-01-02",
+            "symbol": "CCC",
+            "Close": 100.0,
+            "volatility_20d": 0.14,
+            "realized_volatility": 0.13,
+            "beta_252d": 0.95,
+            "market_beta": 0.97,
+            "dividend_yield": 0.055,
+            "forward_dividend_yield": 0.054,
+            "earnings_growth": 0.14,
+            "sales_growth": 0.13,
+            "liquidity_score": 0.85,
+            "turnover_ratio": 0.72,
+        },
+        {
+            "ts": "2025-01-02",
+            "symbol": "DDD",
+            "Close": 100.0,
+            "volatility_20d": 0.30,
+            "realized_volatility": 0.29,
+            "beta_252d": 1.50,
+            "market_beta": 1.45,
+            "dividend_yield": 0.015,
+            "forward_dividend_yield": 0.016,
+            "earnings_growth": 0.04,
+            "sales_growth": 0.05,
+            "liquidity_score": 0.45,
+            "turnover_ratio": 0.40,
+        },
+    ]
+
+
 def _load_fixture_rows(name: str) -> list[dict[str, object]]:
     with (FIXTURES_ROOT / name).open(newline="", encoding="utf-8") as handle:
         rows = list(DictReader(handle))
@@ -291,6 +356,11 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "dual_momentum",
         "volume_confirmed_momentum",
         "residual_momentum",
+        "low_volatility_strategy",
+        "low_beta_betting_against_beta",
+        "dividend_yield_strategy",
+        "growth_factor_strategy",
+        "liquidity_factor_strategy",
         "support_resistance_bounce",
         "breakout_retest",
         "pivot_point_strategy",
@@ -704,6 +774,66 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "rows": _load_json_fixture_rows(
                     COMPOSITE_FIXTURES_ROOT / "weighted_blend.json"
                 ),
+            },
+        ),
+        (
+            "low_volatility_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["volatility_20d", "realized_volatility"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "low_beta_betting_against_beta",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["beta_252d", "market_beta"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "dividend_yield_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["dividend_yield", "forward_dividend_yield"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "growth_factor_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["earnings_growth", "sales_growth"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+        ),
+        (
+            "liquidity_factor_strategy",
+            {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": ["liquidity_score", "turnover_ratio"],
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
             },
         ),
         ("aggregate_boundary_and_channel", {"window": 3}),
@@ -4757,6 +4887,190 @@ def test_momentum_wave_3_performance_smoke_on_fixture_repetition(tmp_path) -> No
                 "symbol": "UNIVERSE",
                 "alg_key": alg_key,
                 "alg_param": alg_param,
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        output = algorithm.normalized_output()
+
+        assert output.metadata["warmup_period"] == algorithm.minimum_history()
+        assert output.metadata["reporting_mode"] == "rebalance_report"
+        assert len(output.points) >= 1
+
+
+@pytest.mark.parametrize(
+    ("alg_key", "field_names", "expected_catalog_ref", "expected_top_symbol"),
+    [
+        (
+            "low_volatility_strategy",
+            ["volatility_20d", "realized_volatility"],
+            "algorithm:100",
+            "AAA",
+        ),
+        (
+            "low_beta_betting_against_beta",
+            ["beta_252d", "market_beta"],
+            "algorithm:103",
+            "AAA",
+        ),
+        (
+            "dividend_yield_strategy",
+            ["dividend_yield", "forward_dividend_yield"],
+            "algorithm:107",
+            "CCC",
+        ),
+        (
+            "growth_factor_strategy",
+            ["earnings_growth", "sales_growth"],
+            "algorithm:108",
+            "AAA",
+        ),
+        (
+            "liquidity_factor_strategy",
+            ["liquidity_score", "turnover_ratio"],
+            "algorithm:109",
+            "AAA",
+        ),
+    ],
+)
+def test_factor_wave_1_registration_and_fixture_behavior(
+    tmp_path, alg_key, field_names, expected_catalog_ref, expected_top_symbol
+) -> None:
+    spec = get_alert_algorithm_spec_by_key(alg_key)
+    assert spec.catalog_ref == expected_catalog_ref
+    assert spec.family == "factor_risk_premia"
+    assert spec.output_modes == ("ranking", "selection", "weights", "diagnostics")
+
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": alg_key,
+            "alg_param": {
+                "rows": _build_factor_fixture_rows(),
+                "field_names": field_names,
+                "rebalance_frequency": "monthly",
+                "top_n": 2,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+    child_output = output.child_outputs[0]
+
+    assert output.points[-1].signal_label == "buy"
+    assert output.derived_series["top_symbol"][-1] == expected_top_symbol
+    assert output.metadata["reporting_mode"] == "rebalance_report"
+    assert output.metadata["family"] == "factor_risk_premia"
+    assert portfolio_output.metadata["catalog_ref"] == expected_catalog_ref
+    assert portfolio_output.rebalances[-1].ranking[0].symbol == expected_top_symbol
+    assert child_output.diagnostics["catalog_ref"] == expected_catalog_ref
+    assert child_output.diagnostics["family"] == "factor_risk_premia"
+    assert child_output.diagnostics["selected_symbols"]
+
+
+def test_factor_wave_1_short_history_stays_neutral_until_minimum_universe_ready(
+    tmp_path,
+) -> None:
+    rows = _build_factor_fixture_rows()[:1]
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "UNIVERSE",
+            "alg_key": "low_volatility_strategy",
+            "alg_param": {
+                "rows": rows,
+                "field_names": ["volatility_20d", "realized_volatility"],
+                "rebalance_frequency": "monthly",
+                "top_n": 1,
+                "bottom_n": 0,
+                "long_only": True,
+                "minimum_universe_size": 2,
+            },
+            "buy": True,
+            "sell": False,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    output = algorithm.normalized_output()
+    portfolio_output = algorithm.portfolio_output()
+
+    assert all(point.signal_label == "neutral" for point in output.points)
+    assert output.points[-1].reason_codes == ("warmup_pending",)
+    assert output.derived_series["warmup_ready"][-1] is False
+    assert portfolio_output.rebalances[-1].selected_symbols == ()
+
+
+def test_factor_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="field_names must contain at least 1 items"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "growth_factor_strategy",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": [],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+    with pytest.raises(ValueError, match="bottom_n must be 0 when long_only is true"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "liquidity_factor_strategy",
+                "alg_param": {
+                    "rows": _build_factor_fixture_rows(),
+                    "field_names": ["liquidity_score"],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 1,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
+
+def test_factor_wave_1_performance_smoke_on_fixture_repetition(tmp_path) -> None:
+    rows = _build_factor_fixture_rows() * 50
+    algorithms = [
+        ("low_volatility_strategy", ["volatility_20d", "realized_volatility"]),
+        ("low_beta_betting_against_beta", ["beta_252d", "market_beta"]),
+        ("dividend_yield_strategy", ["dividend_yield", "forward_dividend_yield"]),
+        ("growth_factor_strategy", ["earnings_growth", "sales_growth"]),
+        ("liquidity_factor_strategy", ["liquidity_score", "turnover_ratio"]),
+    ]
+
+    for index, (alg_key, field_names) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": rows,
+                    "field_names": field_names,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                },
                 "buy": True,
                 "sell": False,
             },

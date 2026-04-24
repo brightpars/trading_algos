@@ -10,13 +10,15 @@ Normalizer = Callable[[Any, str], Any]
 AlgorithmBuilder = Callable[..., Any]
 AlgorithmStatus = Literal["draft", "beta", "stable"]
 RuntimeKind = Literal["batch_series", "streaming", "execution"]
-AssetScope = Literal["single_asset", "pair", "basket", "universe"]
+AssetScope = Literal["single_asset", "pair", "basket", "universe", "portfolio"]
 InputDomain = Literal[
     "ohlcv",
     "multi_asset_ohlcv",
+    "multi_asset_panel",
     "order_book",
     "options",
     "fundamental",
+    "fundamentals_pti",
     "events",
 ]
 OutputMode = Literal[
@@ -26,6 +28,7 @@ OutputMode = Literal[
     "events",
     "ranking",
     "selection",
+    "weights",
     "diagnostics",
     "regime",
     "execution_plan",

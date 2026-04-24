@@ -16,11 +16,11 @@
 | algorithm rows | 121 |
 | combination-method rows | 12 |
 | ready_to_implement | 4 |
-| blocked_framework | 79 |
+| blocked_framework | 74 |
 | in_progress | 0 |
-| complete | 50 |
-| prototype_only | 83 |
-| research_ready | 50 |
+| complete | 55 |
+| prototype_only | 78 |
+| research_ready | 55 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -34,7 +34,7 @@
 | cross_asset_macro_carry | algorithm | 8 | 0 | 8 | 0 | 0 |
 | event_driven | algorithm | 5 | 0 | 5 | 0 | 0 |
 | execution | algorithm | 6 | 0 | 6 | 0 | 0 |
-| factor_risk_premia | algorithm | 15 | 0 | 15 | 0 | 0 |
+| factor_risk_premia | algorithm | 15 | 0 | 10 | 0 | 5 |
 | fixed_income_relative_value | algorithm | 2 | 0 | 2 | 0 | 0 |
 | fundamental_ml_composite | algorithm | 8 | 0 | 8 | 0 | 0 |
 | machine_learning_ensemble | combination_method | 3 | 3 | 0 | 0 | 0 |

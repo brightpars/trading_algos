@@ -6010,22 +6010,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: low
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / monthly rotation / swing portfolio
   home_suitability: 1
   core_idea: Prefer lower-volatility assets or equities over higher-volatility peers.
   typical_inputs: Universe returns, realized volatility or ATR estimates, rebalance schedule, optional sector/country constraints
   signal_style: Cross-sectional rank, portfolio-selection, or long/short signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6066,7 +6060,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: MSCI-MINVOL
-  notes: Seeded from requirements_v4 row 100; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:101
   source_doc_ref: requirements_v4:algorithm:101
   kind: algorithm
@@ -6205,22 +6199,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: low
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / swing portfolio / factor sleeve
   home_suitability: 2
   core_idea: Go long low-beta assets and short or underweight high-beta assets.
   typical_inputs: Universe returns, rolling beta estimates, leverage rules, rebalance schedule
   signal_style: Cross-sectional long/short factor signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6261,7 +6249,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: AQR-BAB
-  notes: Seeded from requirements_v4 row 103; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:104
   source_doc_ref: requirements_v4:algorithm:104
   kind: algorithm
@@ -6465,22 +6453,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: dividend
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term income investing / monthly or quarterly rotation
   home_suitability: 1
   core_idea: Select assets or equities with higher dividend yield, often with quality and payout sanity checks.
   typical_inputs: Dividend yield, payout ratio, prices, optional quality filters
   signal_style: Cross-sectional rank or income-oriented buy list
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6521,7 +6503,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 107; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:108
   source_doc_ref: requirements_v4:algorithm:108
   kind: algorithm
@@ -6530,22 +6512,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: growth
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / quarterly rotation
   home_suitability: 2
   core_idea: Prefer companies with stronger growth characteristics such as earnings or sales growth.
   typical_inputs: Fundamental growth metrics, prices, rebalance schedule
   signal_style: Cross-sectional rank / portfolio selection
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6586,7 +6562,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 108; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:109
   source_doc_ref: requirements_v4:algorithm:109
   kind: algorithm
@@ -6595,22 +6571,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: liquidity
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / execution-aware portfolio construction
   home_suitability: 2
   core_idea: Use liquidity metrics either as a selection signal or as a filter for tradability and crowding control.
   typical_inputs: Volume, turnover, bid-ask proxies, market cap, rebalance schedule
   signal_style: Cross-sectional score or tradability filter
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6651,7 +6621,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 109; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:110
   source_doc_ref: requirements_v4:algorithm:110
   kind: algorithm

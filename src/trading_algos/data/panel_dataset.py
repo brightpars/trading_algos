@@ -23,6 +23,7 @@ class PanelRow:
     high: float | None = None
     low: float | None = None
     volume: float | None = None
+    extras: dict[str, Any] | None = None
 
 
 class MultiAssetPanel:
@@ -47,6 +48,22 @@ class MultiAssetPanel:
                 raise ValueError(
                     f"panel_dataset: close is required; index={index} symbol={symbol}"
                 )
+            extra_fields = {
+                str(key): value
+                for key, value in row.items()
+                if key
+                not in {
+                    "ts",
+                    "timestamp",
+                    "symbol",
+                    "Close",
+                    "close",
+                    "Open",
+                    "High",
+                    "Low",
+                    "Volume",
+                }
+            }
             rows.append(
                 PanelRow(
                     timestamp=_normalize_timestamp(
@@ -60,6 +77,7 @@ class MultiAssetPanel:
                     volume=(
                         float(row["Volume"]) if row.get("Volume") is not None else None
                     ),
+                    extras=extra_fields,
                 )
             )
         return cls(rows)
@@ -81,3 +99,25 @@ class MultiAssetPanel:
             row.symbol for row in self.rows if row.timestamp <= rebalance_timestamp
         }
         return tuple(sorted(eligible))
+
+    def rows_for_symbol_until(
+        self, symbol: str, *, timestamp: str
+    ) -> tuple[PanelRow, ...]:
+        return tuple(
+            row
+            for row in self.rows
+            if row.symbol == symbol and row.timestamp <= timestamp
+        )
+
+    def latest_row_by_symbol_on(
+        self, timestamp: str, universe: tuple[str, ...] | None = None
+    ) -> dict[str, PanelRow]:
+        allowed = set(universe) if universe is not None else None
+        latest: dict[str, PanelRow] = {}
+        for row in sorted(self.rows, key=lambda item: (item.timestamp, item.symbol)):
+            if row.timestamp > timestamp:
+                continue
+            if allowed is not None and row.symbol not in allowed:
+                continue
+            latest[row.symbol] = row
+        return latest
