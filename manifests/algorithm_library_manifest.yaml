@@ -1481,8 +1481,8 @@ rows:
   display_category: Momentum
   subcategory: kst
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1528,7 +1528,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_2
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 24; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_2 with warmup coverage, registration and validation checks, fixture-backed KST signal-cross versus zero-cross behavior, normalized diagnostics, and performance-smoke validation.
 - catalog_ref: algorithm:25
   source_doc_ref: requirements_v4:algorithm:25
   kind: algorithm
@@ -1537,8 +1537,8 @@ rows:
   display_category: Momentum
   subcategory: volume
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1583,7 +1583,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_2
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 25; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_2 with warmup coverage, registration and validation checks, fixture-backed continuation and missing-volume-confirmation behavior, normalized diagnostics, and performance-smoke validation.
 - catalog_ref: algorithm:26
   source_doc_ref: requirements_v4:algorithm:26
   kind: algorithm

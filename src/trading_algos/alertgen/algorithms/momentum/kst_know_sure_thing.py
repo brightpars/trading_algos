@@ -114,16 +114,12 @@ class KSTKnowSureThingAlertAlgorithm(BaseMomentumAlertAlgorithm):
                 aligned_count=0,
                 reason_code="warmup_pending",
             )
-        bullish = kst_value > 0.0 and (
-            self.entry_mode == "zero_cross"
-            or signal_value >= 0.0
-            or kst_value >= signal_value
-        )
-        bearish = kst_value < 0.0 and (
-            self.entry_mode == "zero_cross"
-            or signal_value <= 0.0
-            or kst_value <= signal_value
-        )
+        if self.entry_mode == "zero_cross":
+            bullish = kst_value > 0.0
+            bearish = kst_value < 0.0
+        else:
+            bullish = kst_value > 0.0 and kst_value >= signal_value
+            bearish = kst_value < 0.0 and kst_value <= signal_value
         scale = max(abs(kst_value), abs(signal_value), 1.0)
         return MomentumSignalState(
             regime=TREND.UP if bullish else TREND.DOWN if bearish else TREND.UNKNOWN,

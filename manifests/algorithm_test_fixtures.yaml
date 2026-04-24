@@ -31,6 +31,8 @@ fixtures:
   - Momentum score rises above bullish threshold
   - No bearish reversal occurs while continuation remains intact
   - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - KST signal-cross configurations may remain neutral when the oscillator stays positive but does not clear its signal line, while zero-cross mode can still promote a bullish regime
+  - Volume-confirmed momentum stays neutral with explicit confirmation-missing reason codes when price momentum is strong but relative volume stays below the configured gate
   - Diagnostics expose primary value, threshold context, regime label, and reason codes for dashboard explanation
   - Normalized output metadata identifies momentum family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.momentum_cross_sectional_ranking_v1
