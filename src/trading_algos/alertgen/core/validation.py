@@ -1867,6 +1867,90 @@ def require_funding_basis_arb_param(raw_alg_param, label):
     }
 
 
+def require_kalman_pair_param(raw_alg_param, label):
+    normalized = require_stat_arb_pair_param(raw_alg_param, label)
+    process_variance = _require_non_negative_float_like(
+        raw_alg_param.get("process_variance", 1e-4), f"{label} process_variance"
+    )
+    observation_variance = _require_non_negative_float_like(
+        raw_alg_param.get("observation_variance", 1.0),
+        f"{label} observation_variance",
+    )
+    if observation_variance == 0.0:
+        raise ValueError(f"{label} observation_variance must be > 0")
+    return {
+        **normalized,
+        "process_variance": process_variance,
+        "observation_variance": observation_variance,
+    }
+
+
+def require_curve_relative_value_param(raw_alg_param, label):
+    normalized = require_stat_arb_pair_param(raw_alg_param, label)
+    carry_field = raw_alg_param.get("carry_field")
+    carry_weight = _require_non_negative_float_like(
+        raw_alg_param.get("carry_weight", 1.0), f"{label} carry_weight"
+    )
+    result = {**normalized, "carry_weight": carry_weight}
+    if carry_field is not None:
+        result["carry_field"] = _require_non_empty_string(
+            carry_field, f"{label} carry_field"
+        )
+    return result
+
+
+def require_triangular_arb_param(raw_alg_param, label):
+    normalized = _require_param_dict(raw_alg_param, label)
+    _validate_required_keys(
+        normalized,
+        [
+            "rows",
+            "base_symbol",
+            "cross_symbol",
+            "implied_symbol",
+            "lookback_window",
+            "entry_zscore",
+            "exit_zscore",
+            "rebalance_frequency",
+        ],
+        label,
+    )
+    entry_zscore = _require_non_negative_float_like(
+        normalized["entry_zscore"], f"{label} entry_zscore"
+    )
+    exit_zscore = _require_non_negative_float_like(
+        normalized["exit_zscore"], f"{label} exit_zscore"
+    )
+    if exit_zscore > entry_zscore:
+        raise ValueError(f"{label} requires exit_zscore <= entry_zscore")
+    return {
+        "rows": _require_cross_sectional_rows_param(normalized["rows"], label),
+        "base_symbol": _require_non_empty_string(
+            normalized["base_symbol"], f"{label} base_symbol"
+        ),
+        "cross_symbol": _require_non_empty_string(
+            normalized["cross_symbol"], f"{label} cross_symbol"
+        ),
+        "implied_symbol": _require_non_empty_string(
+            normalized["implied_symbol"], f"{label} implied_symbol"
+        ),
+        "lookback_window": _require_positive_int_like(
+            normalized["lookback_window"], f"{label} lookback_window"
+        ),
+        "entry_zscore": entry_zscore,
+        "exit_zscore": exit_zscore,
+        "rebalance_frequency": _require_choice(
+            normalized["rebalance_frequency"],
+            f"{label} rebalance_frequency",
+            allowed={"monthly", "weekly", "all"},
+        ),
+        "minimum_history": _require_positive_int_like(
+            normalized.get("minimum_history", normalized["lookback_window"]),
+            f"{label} minimum_history",
+        ),
+    }
+
+
 def require_seasonality_calendar_param(raw_alg_param, label):
     normalized = _require_param_dict(raw_alg_param, label)
     _validate_required_keys(
