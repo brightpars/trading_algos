@@ -7221,7 +7221,7 @@ def test_advanced_model_wave_1_registration_and_fixture_behavior(
                 "feature_strength": row["gross_margin"],
                 "predicted_return": row["earnings_growth"],
                 "return_conviction": row["sales_growth"],
-                "regime_probability": row["beta_252d"] * -1.0,
+                "regime_probability": -float(cast(float, row["beta_252d"])),
                 "macro_regime_score": row["liquidity_score"],
                 "vote_probability": row["return_on_equity"],
                 "agreement_score": row["gross_margin"],
@@ -7264,6 +7264,26 @@ def test_advanced_model_wave_1_registration_and_fixture_behavior(
 
 
 def test_advanced_model_wave_1_validation_rejects_invalid_parameter_shapes() -> None:
+    with pytest.raises(ValueError, match="sentiment_threshold must be a number"):
+        normalize_alertgen_sensor_config(
+            {
+                "symbol": "UNIVERSE",
+                "alg_key": "sentiment_strategy",
+                "alg_param": {
+                    "rows": _load_factor_fixture_rows("monthly_rebalance.csv"),
+                    "field_names": ["sentiment_score", "sentiment_momentum"],
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    "sentiment_threshold": "bullish",
+                },
+                "buy": True,
+                "sell": False,
+            }
+        )
+
     with pytest.raises(ValueError, match="classification_threshold must be a number"):
         normalize_alertgen_sensor_config(
             {
@@ -7388,7 +7408,7 @@ def test_advanced_model_wave_1_fixture_behavior_matches_manifest_expectations(
                     "feature_strength": row["gross_margin"],
                     "predicted_return": row["earnings_growth"],
                     "return_conviction": row["sales_growth"],
-                    "regime_probability": row["beta_252d"] * -1.0,
+                    "regime_probability": -float(cast(float, row["beta_252d"])),
                     "macro_regime_score": row["liquidity_score"],
                     "vote_probability": row["return_on_equity"],
                     "agreement_score": row["gross_margin"],
@@ -7418,6 +7438,158 @@ def test_advanced_model_wave_1_fixture_behavior_matches_manifest_expectations(
 
         output = algorithm.normalized_output()
         assert output.derived_series["top_symbol"] == ["AAA", "BBB"]
+
+
+def test_advanced_model_wave_1_diagnostics_and_payloads_expose_threshold_context(
+    tmp_path,
+) -> None:
+    rows = _load_factor_fixture_rows("monthly_rebalance.csv")
+    cases = [
+        (
+            "sentiment_strategy",
+            {
+                "field_names": ["sentiment_score", "sentiment_momentum"],
+                "field_weights": [0.7, 0.3],
+                "sentiment_threshold": 0.20,
+            },
+            {
+                "sentiment_score": "return_on_equity",
+                "sentiment_momentum": "gross_margin",
+            },
+            "sentiment_label",
+            "bullish",
+        ),
+        (
+            "machine_learning_classifier",
+            {
+                "field_names": ["model_probability", "feature_strength"],
+                "field_weights": [0.8, 0.2],
+                "classification_threshold": 0.55,
+            },
+            {
+                "model_probability": "return_on_equity",
+                "feature_strength": "gross_margin",
+            },
+            "predicted_class",
+            "negative",
+        ),
+        (
+            "machine_learning_regressor",
+            {
+                "field_names": ["predicted_return", "return_conviction"],
+                "field_weights": [0.75, 0.25],
+                "return_threshold": 0.15,
+            },
+            {
+                "predicted_return": "earnings_growth",
+                "return_conviction": "sales_growth",
+            },
+            "predicted_direction",
+            "positive",
+        ),
+        (
+            "regime_switching_strategy",
+            {
+                "field_names": ["regime_probability", "macro_regime_score"],
+                "field_weights": [0.6, 0.4],
+                "regime_threshold": 0.0,
+            },
+            {
+                "regime_probability": "beta_252d",
+                "macro_regime_score": "liquidity_score",
+            },
+            "regime_label",
+            "risk_off",
+        ),
+        (
+            "ensemble_voting_strategy",
+            {
+                "field_names": [
+                    "vote_probability",
+                    "agreement_score",
+                    "member_confidence",
+                ],
+                "field_weights": [0.5, 0.3, 0.2],
+                "vote_threshold": 1.10,
+            },
+            {
+                "vote_probability": "return_on_equity",
+                "agreement_score": "gross_margin",
+                "member_confidence": "liquidity_score",
+            },
+            "vote_outcome",
+            "reject",
+        ),
+    ]
+
+    for (
+        alg_key,
+        extra_params,
+        field_mapping,
+        expected_label_key,
+        expected_label_value,
+    ) in cases:
+        enriched_rows: list[dict[str, object]] = []
+        for row in rows:
+            updated_row = dict(row)
+            for target_field, source_field in field_mapping.items():
+                source_value: object = row[source_field]
+                if (
+                    alg_key == "regime_switching_strategy"
+                    and target_field == "regime_probability"
+                ):
+                    source_value = -float(cast(float | int | str, source_value))
+                updated_row[target_field] = source_value
+            enriched_rows.append(updated_row)
+
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "UNIVERSE",
+                "alg_key": alg_key,
+                "alg_param": {
+                    "rows": enriched_rows,
+                    "rebalance_frequency": "monthly",
+                    "top_n": 2,
+                    "bottom_n": 0,
+                    "long_only": True,
+                    "minimum_universe_size": 2,
+                    **cast(dict[str, object], extra_params),
+                },
+                "buy": True,
+                "sell": False,
+            },
+            report_base_path=str(tmp_path / alg_key),
+        )
+
+        output = algorithm.normalized_output()
+        portfolio_output = algorithm.portfolio_output()
+        child_output = output.child_outputs[0]
+        payload, payload_name = algorithm.interactive_report_payloads()[0]
+        latest_diagnostics = portfolio_output.rebalances[-1].diagnostics
+
+        assert child_output.diagnostics[expected_label_key] == expected_label_value
+        assert latest_diagnostics[expected_label_key] == expected_label_value
+        assert "threshold_gap" in child_output.diagnostics
+        assert "threshold_gap" in latest_diagnostics
+        assert "threshold_passed" in child_output.diagnostics
+        assert "threshold_passed" in latest_diagnostics
+        assert child_output.diagnostics["top_selection_strength"] == pytest.approx(
+            latest_diagnostics["selection_strength"]
+        )
+        assert payload_name.startswith(f"rebalance_report_{alg_key}_")
+        assert (
+            payload["data"]["metadata"]["catalog_ref"]
+            == child_output.diagnostics["catalog_ref"]
+        )
+        assert (
+            payload["portfolio"]["metadata"]["catalog_ref"]
+            == child_output.diagnostics["catalog_ref"]
+        )
+        assert (
+            payload["portfolio"]["rebalances"][-1]["diagnostics"][expected_label_key]
+            == expected_label_value
+        )
+        assert "threshold_gap" in payload["portfolio"]["rebalances"][-1]["diagnostics"]
 
 
 def test_advanced_model_wave_1_performance_smoke_on_fixture_repetition(
@@ -7464,7 +7636,9 @@ def test_advanced_model_wave_1_performance_smoke_on_fixture_repetition(
                     "feature_strength": row.get("gross_margin", 0.0),
                     "predicted_return": row.get("earnings_growth", 0.0),
                     "return_conviction": row.get("sales_growth", 0.0),
-                    "regime_probability": -float(row.get("beta_252d", 0.0)),
+                    "regime_probability": -float(
+                        cast(float | int | str, row.get("beta_252d", 0.0))
+                    ),
                     "macro_regime_score": row.get("liquidity_score", 0.0),
                     "vote_probability": row.get("return_on_equity", 0.0),
                     "agreement_score": row.get("gross_margin", 0.0),
@@ -7485,7 +7659,7 @@ def test_advanced_model_wave_1_performance_smoke_on_fixture_repetition(
                     "bottom_n": 0,
                     "long_only": True,
                     "minimum_universe_size": 2,
-                    **extra_params,
+                    **cast(dict[str, object], extra_params),
                 },
                 "buy": True,
                 "sell": False,

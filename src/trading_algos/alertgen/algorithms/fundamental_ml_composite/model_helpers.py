@@ -33,23 +33,30 @@ def _apply_model_diagnostics(
         diagnostics["model_type"] = model_type
         diagnostics["model_score"] = top_ranked_score
         diagnostics["model_confidence"] = selection_strength
+        diagnostics["top_selection_strength"] = selection_strength
         if threshold is not None:
             diagnostics["decision_threshold"] = threshold
         if model_type == "machine_learning_classifier":
             effective_threshold = threshold if threshold is not None else 0.5
             diagnostics["predicted_probability"] = top_ranked_score
+            diagnostics["threshold_gap"] = top_ranked_score - effective_threshold
+            diagnostics["threshold_passed"] = top_ranked_score >= effective_threshold
             diagnostics["predicted_class"] = (
                 "positive" if top_ranked_score >= effective_threshold else "negative"
             )
         elif model_type == "machine_learning_regressor":
             effective_threshold = threshold if threshold is not None else 0.0
             diagnostics["predicted_return"] = top_ranked_score
+            diagnostics["threshold_gap"] = top_ranked_score - effective_threshold
+            diagnostics["threshold_passed"] = top_ranked_score >= effective_threshold
             diagnostics["predicted_direction"] = (
                 "positive" if top_ranked_score >= effective_threshold else "negative"
             )
         elif model_type == "regime_switching_strategy":
             effective_threshold = threshold if threshold is not None else 0.0
             diagnostics["regime_score"] = top_ranked_score
+            diagnostics["threshold_gap"] = top_ranked_score - effective_threshold
+            diagnostics["threshold_passed"] = top_ranked_score >= effective_threshold
             diagnostics["regime_label"] = (
                 "risk_on" if top_ranked_score >= effective_threshold else "risk_off"
             )
@@ -58,13 +65,18 @@ def _apply_model_diagnostics(
             effective_threshold = threshold if threshold is not None else 0.5
             diagnostics["vote_strength"] = selection_strength
             diagnostics["member_count"] = len(algorithm.field_names)
+            diagnostics["threshold_gap"] = selection_strength - effective_threshold
+            diagnostics["threshold_passed"] = selection_strength >= effective_threshold
             diagnostics["vote_outcome"] = (
                 "accept" if selection_strength >= effective_threshold else "reject"
             )
         elif model_type == "sentiment_strategy":
+            effective_threshold = threshold if threshold is not None else 0.0
             diagnostics["sentiment_score"] = top_ranked_score
+            diagnostics["threshold_gap"] = top_ranked_score - effective_threshold
+            diagnostics["threshold_passed"] = top_ranked_score >= effective_threshold
             diagnostics["sentiment_label"] = (
-                "bullish" if top_ranked_score >= 0.0 else "bearish"
+                "bullish" if top_ranked_score >= effective_threshold else "bearish"
             )
     return algorithm
 

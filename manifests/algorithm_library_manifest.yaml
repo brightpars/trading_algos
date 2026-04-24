@@ -5311,22 +5311,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: sentiment
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short- to medium-term event/sentiment trading
   home_suitability: 1
   core_idea: Trade news, analyst, social, or options sentiment signals.
   typical_inputs: Sentiment feed + price data
   signal_style: Directional signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5367,7 +5361,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 89; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware sentiment diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:90
   source_doc_ref: requirements_v4:algorithm:90
   kind: algorithm
@@ -5376,22 +5370,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: machine
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Any horizon; depends on feature set
   home_suitability: 2
   core_idea: Model probability of next move/state and convert to trade signal.
   typical_inputs: Feature matrix, labels, model params
   signal_style: Probability/score + buy/sell
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5431,7 +5419,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 90; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware classifier diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:91
   source_doc_ref: requirements_v4:algorithm:91
   kind: algorithm
@@ -5440,22 +5428,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: machine
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Any horizon; depends on feature set
   home_suitability: 2
   core_idea: Predict future return or target and threshold into actions.
   typical_inputs: Feature matrix, regression target
   signal_style: Predicted return + signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5495,7 +5477,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 91; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware regressor diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:92
   source_doc_ref: requirements_v4:algorithm:92
   kind: algorithm
@@ -5504,22 +5486,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: regime
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Any horizon; depends on feature set
   home_suitability: 2
   core_idea: Use HMM or similar to detect regime and switch sub-strategies.
   typical_inputs: Returns, vol, macro features
   signal_style: Regime label plus delegated signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5559,7 +5535,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 92; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware regime diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:93
   source_doc_ref: requirements_v4:algorithm:93
   kind: algorithm
@@ -5568,22 +5544,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: ensemble
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Any horizon; depends on feature set
   home_suitability: 1
   core_idea: Combine outputs of multiple sub-strategies via voting or weighting.
   typical_inputs: Child strategy outputs, weights/rules
   signal_style: Composite final signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5623,7 +5593,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 93; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware ensemble diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:94
   source_doc_ref: requirements_v4:algorithm:94
   kind: algorithm

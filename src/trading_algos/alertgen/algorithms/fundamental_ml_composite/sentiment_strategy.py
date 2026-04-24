@@ -18,5 +18,10 @@ def build_sentiment_strategy(symbol, report_base_path, alg_param, **_kwargs):
         higher_is_better=True,
         catalog_ref="algorithm:89",
         field_weights=alg_param.get("field_weights"),
+        threshold=(
+            float(alg_param["sentiment_threshold"])
+            if "sentiment_threshold" in alg_param
+            else None
+        ),
         extra_diagnostics={"signal_source": "sentiment_features"},
     )

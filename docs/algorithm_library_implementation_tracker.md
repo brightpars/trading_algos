@@ -16,11 +16,11 @@
 | algorithm rows | 121 |
 | combination-method rows | 12 |
 | ready_to_implement | 4 |
-| blocked_framework | 58 |
+| blocked_framework | 53 |
 | in_progress | 0 |
-| complete | 71 |
-| prototype_only | 62 |
-| research_ready | 71 |
+| complete | 76 |
+| prototype_only | 57 |
+| research_ready | 76 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -36,7 +36,7 @@
 | execution | algorithm | 6 | 0 | 6 | 0 | 0 |
 | factor_risk_premia | algorithm | 15 | 0 | 4 | 0 | 11 |
 | fixed_income_relative_value | algorithm | 2 | 0 | 2 | 0 | 0 |
-| fundamental_ml_composite | algorithm | 8 | 0 | 6 | 0 | 2 |
+| fundamental_ml_composite | algorithm | 8 | 0 | 1 | 0 | 7 |
 | machine_learning_ensemble | combination_method | 3 | 3 | 0 | 0 | 0 |
 | mean_reversion | algorithm | 12 | 0 | 0 | 0 | 12 |
 | microstructure_hft | algorithm | 8 | 0 | 8 | 0 | 0 |
