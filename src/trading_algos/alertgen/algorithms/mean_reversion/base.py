@@ -48,6 +48,9 @@ class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
     def _state_annotations(self) -> dict[str, object]:
         return {}
 
+    def _warmup_ready(self, state: MeanReversionSignalState) -> bool:
+        return len(self.data_list) >= self.minimum_history()
+
     def _reason_codes(self, state: MeanReversionSignalState) -> tuple[str, ...]:
         if state.primary_value is None:
             return ("warmup_pending",)
@@ -112,9 +115,7 @@ class BaseMeanReversionAlertAlgorithm(BaseAlertAlgorithm, ABC):
         self.latest_data_modifiable["signal_value"] = state.signal_value
         self.latest_data_modifiable["threshold_value"] = state.threshold_value
         self.latest_data_modifiable["exit_value"] = state.exit_value
-        self.latest_data_modifiable["warmup_ready"] = (
-            len(self.data_list) >= self.minimum_history()
-        )
+        self.latest_data_modifiable["warmup_ready"] = self._warmup_ready(state)
 
     def trend_prediction_logic(self) -> None:
         state = self._calculate_state()

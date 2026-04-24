@@ -57,10 +57,14 @@ class OrnsteinUhlenbeckReversionAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
             "ou_mean_reversion_speed": self.latest_data_modifiable.get(
                 "ou_mean_reversion_speed"
             ),
+            "ou_speed_ready": self.latest_data_modifiable.get("ou_speed_ready"),
             "ou_equilibrium": self.latest_data_modifiable.get("ou_equilibrium"),
             "ou_residual": self.latest_data_modifiable.get("ou_residual"),
             "ou_residual_zscore": self.latest_data_modifiable.get("ou_residual_zscore"),
         }
+
+    def _warmup_ready(self, state: MeanReversionSignalState) -> bool:
+        return bool(self.latest_data_modifiable.get("ou_speed_ready", False))
 
     def _calculate_state(self) -> MeanReversionSignalState:
         closes = [float(item["Close"]) for item in self.data_list]
@@ -73,6 +77,12 @@ class OrnsteinUhlenbeckReversionAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
         residual_zscore = zscores[-1]
 
         self.latest_data_modifiable["ou_mean_reversion_speed"] = mean_reversion_speed
+        self.latest_data_modifiable["ou_speed_ready"] = (
+            mean_reversion_speed is not None
+            and equilibrium is not None
+            and residual is not None
+            and residual_zscore is not None
+        )
         self.latest_data_modifiable["ou_equilibrium"] = equilibrium
         self.latest_data_modifiable["ou_residual"] = residual
         self.latest_data_modifiable["ou_residual_zscore"] = residual_zscore

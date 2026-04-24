@@ -15,12 +15,12 @@
 | --- | --- |
 | algorithm rows | 121 |
 | combination-method rows | 12 |
-| ready_to_implement | 7 |
+| ready_to_implement | 4 |
 | blocked_framework | 83 |
 | in_progress | 0 |
-| complete | 43 |
-| prototype_only | 90 |
-| research_ready | 43 |
+| complete | 46 |
+| prototype_only | 87 |
+| research_ready | 46 |
 | production_ready | 0 |
 | tier1 rows | 45 |
 | tier2 rows | 53 |
@@ -38,7 +38,7 @@
 | fixed_income_relative_value | algorithm | 2 | 0 | 2 | 0 | 0 |
 | fundamental_ml_composite | algorithm | 8 | 0 | 8 | 0 | 0 |
 | machine_learning_ensemble | combination_method | 3 | 3 | 0 | 0 | 0 |
-| mean_reversion | algorithm | 12 | 3 | 0 | 0 | 9 |
+| mean_reversion | algorithm | 12 | 0 | 0 | 0 | 12 |
 | microstructure_hft | algorithm | 8 | 0 | 8 | 0 | 0 |
 | momentum | algorithm | 11 | 0 | 4 | 0 | 7 |
 | optimization_based | combination_method | 1 | 0 | 1 | 0 | 0 |
@@ -76,7 +76,6 @@
 
 | batch | ready_rows |
 | --- | --- |
-| mean_reversion_wave_3 | 3 |
 | composite_wave_4 | 3 |
 | composite_wave_2 | 1 |
 

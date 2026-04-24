@@ -104,6 +104,17 @@ def cumulative_session_vwap(
     return result
 
 
+def normalized_gap_fill_progress(
+    *,
+    prior_close: float | None,
+    opening_price: float,
+    current_price: float,
+) -> float | None:
+    if prior_close is None or prior_close == opening_price:
+        return None
+    return (current_price - opening_price) / (prior_close - opening_price)
+
+
 def rolling_ou_reversion_ratio(
     values: Sequence[float],
     window: int,

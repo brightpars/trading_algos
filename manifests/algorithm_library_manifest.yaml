@@ -1927,8 +1927,8 @@ rows:
   display_category: Mean Reversion
   subcategory: intraday
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Intraday / session trading
   home_suitability: 1
@@ -1974,7 +1974,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_3
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 32; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_3 with session-aware warmup handling, fixture-backed intraday behavior checks, dashboard-ready VWAP diagnostics, validation coverage, registration checks, and intraday performance-smoke validation.
 - catalog_ref: algorithm:33
   source_doc_ref: requirements_v4:algorithm:33
   kind: algorithm
@@ -1983,8 +1983,8 @@ rows:
   display_category: Mean Reversion
   subcategory: opening
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Intraday / session trading
   home_suitability: 1
@@ -2029,7 +2029,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_3
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 33; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_3 with session-aware warmup handling, normalized gap-fill diagnostics, fixture-backed opening-gap behavior checks, validation coverage, registration checks, and intraday performance-smoke validation.
 - catalog_ref: algorithm:34
   source_doc_ref: requirements_v4:algorithm:34
   kind: algorithm
@@ -2093,8 +2093,8 @@ rows:
   display_category: Mean Reversion
   subcategory: ornstein
   tier: tier2
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -2139,7 +2139,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_3
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 35; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_3 with OU readiness diagnostics, fixture-backed overshoot behavior checks, validation coverage, registration checks, normalized output fields, and performance-smoke validation.
 - catalog_ref: algorithm:36
   source_doc_ref: requirements_v4:algorithm:36
   kind: algorithm

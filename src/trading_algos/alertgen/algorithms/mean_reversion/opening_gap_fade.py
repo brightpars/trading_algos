@@ -5,6 +5,7 @@ from trading_algos.alertgen.algorithms.mean_reversion.base import (
 )
 from trading_algos.alertgen.algorithms.mean_reversion.mean_reversion_helpers import (
     MeanReversionSignalState,
+    normalized_gap_fill_progress,
     parse_session_label,
     scale_score,
 )
@@ -53,6 +54,7 @@ class OpeningGapFadeAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
         return {
             "session_label": self.latest_data_modifiable.get("session_label"),
             "session_bar_index": self.latest_data_modifiable.get("session_bar_index"),
+            "session_bars_ready": self.latest_data_modifiable.get("session_bars_ready"),
             "opening_gap_percent": self.latest_data_modifiable.get(
                 "opening_gap_percent"
             ),
@@ -60,7 +62,11 @@ class OpeningGapFadeAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
                 "prior_session_close"
             ),
             "gap_fill_progress": self.latest_data_modifiable.get("gap_fill_progress"),
+            "gap_fill_ready": self.latest_data_modifiable.get("gap_fill_ready"),
         }
+
+    def _warmup_ready(self, state: MeanReversionSignalState) -> bool:
+        return bool(self.latest_data_modifiable.get("gap_fill_ready", False))
 
     def _calculate_state(self) -> MeanReversionSignalState:
         latest = self.data_list[-1]
@@ -90,18 +96,25 @@ class OpeningGapFadeAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
             gap_percent = (
                 (opening_price - prior_session_close) / prior_session_close
             ) * 100.0
-            gap_fill_progress = (
-                (close_value - prior_session_close)
-                / (opening_price - prior_session_close)
-                if opening_price != prior_session_close
-                else 0.0
+            gap_fill_progress = normalized_gap_fill_progress(
+                prior_close=prior_session_close,
+                opening_price=opening_price,
+                current_price=close_value,
             )
 
         self.latest_data_modifiable["session_label"] = latest_session
         self.latest_data_modifiable["session_bar_index"] = session_bar_index
+        self.latest_data_modifiable["session_bars_ready"] = (
+            session_bar_index >= self.min_session_bars
+        )
         self.latest_data_modifiable["opening_gap_percent"] = gap_percent
         self.latest_data_modifiable["prior_session_close"] = prior_session_close
         self.latest_data_modifiable["gap_fill_progress"] = gap_fill_progress
+        self.latest_data_modifiable["gap_fill_ready"] = (
+            gap_percent is not None
+            and gap_fill_progress is not None
+            and session_bar_index >= self.min_session_bars
+        )
 
         if (
             gap_percent is None

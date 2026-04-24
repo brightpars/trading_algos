@@ -54,11 +54,15 @@ class IntradayVWAPReversionAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
         return {
             "session_label": self.latest_data_modifiable.get("session_label"),
             "session_bar_index": self.latest_data_modifiable.get("session_bar_index"),
+            "session_bars_ready": self.latest_data_modifiable.get("session_bars_ready"),
             "session_vwap": self.latest_data_modifiable.get("session_vwap"),
             "vwap_deviation_percent": self.latest_data_modifiable.get(
                 "vwap_deviation_percent"
             ),
         }
+
+    def _warmup_ready(self, state: MeanReversionSignalState) -> bool:
+        return bool(self.latest_data_modifiable.get("session_bars_ready", False))
 
     def _calculate_state(self) -> MeanReversionSignalState:
         timestamps = [str(item["ts"]) for item in self.data_list]
@@ -84,6 +88,9 @@ class IntradayVWAPReversionAlertAlgorithm(BaseMeanReversionAlertAlgorithm):
 
         self.latest_data_modifiable["session_label"] = session_label
         self.latest_data_modifiable["session_bar_index"] = session_bar_index
+        self.latest_data_modifiable["session_bars_ready"] = (
+            session_bar_index >= self.min_session_bars
+        )
         self.latest_data_modifiable["session_vwap"] = session_vwap
         self.latest_data_modifiable["vwap_deviation_percent"] = deviation_percent
 

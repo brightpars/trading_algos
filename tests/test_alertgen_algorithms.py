@@ -5838,6 +5838,26 @@ def test_mean_reversion_wave_3_normalized_output_exposes_dashboard_diagnostics(
     assert output.metadata["catalog_ref"] == child_output.diagnostics["catalog_ref"]
     assert child_output.signal_label in {"buy", "neutral"}
     assert expected_annotation_keys.issubset(child_output.diagnostics.keys())
+    assert child_output.diagnostics["warmup_ready"] is True
+    if alg_key == "intraday_vwap_reversion":
+        assert output.derived_series["session_bars_ready"][-1] is True
+        assert child_output.diagnostics["session_bars_ready"] is True
+        assert (
+            child_output.diagnostics["session_bar_index"]
+            >= alg_param["min_session_bars"]
+        )
+    elif alg_key == "opening_gap_fade":
+        assert output.derived_series["session_bars_ready"][-1] is True
+        assert output.derived_series["gap_fill_ready"][-1] is True
+        assert child_output.diagnostics["session_bars_ready"] is True
+        assert child_output.diagnostics["gap_fill_ready"] is True
+        assert child_output.diagnostics["gap_fill_progress"] == pytest.approx(
+            -0.6666666666666655
+        )
+    elif alg_key == "ornstein_uhlenbeck_reversion":
+        assert output.derived_series["ou_speed_ready"][-1] is True
+        assert child_output.diagnostics["ou_speed_ready"] is True
+        assert child_output.diagnostics["ou_mean_reversion_speed"] >= 0.0
 
 
 def test_mean_reversion_wave_3_validation_rejects_invalid_parameter_shapes() -> None:
@@ -5948,6 +5968,82 @@ def test_mean_reversion_wave_3_fixture_behavior_emits_reversion_signals(
 
         assert any(point.signal_label == "buy" for point in output.points)
         assert output.metadata["family"] == "mean_reversion"
+
+
+def test_mean_reversion_wave_3_intraday_outputs_report_session_specific_warmup_flags(
+    tmp_path,
+) -> None:
+    algorithms = [
+        (
+            "intraday_vwap_reversion",
+            {
+                "entry_deviation_percent": 1.0,
+                "exit_deviation_percent": 0.5,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+        ),
+        (
+            "opening_gap_fade",
+            {
+                "min_gap_percent": 1.0,
+                "exit_gap_fill_percent": 0.25,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+        ),
+    ]
+
+    for index, (alg_key, alg_param) in enumerate(algorithms):
+        algorithm, _ = create_alertgen_algorithm(
+            sensor_config={
+                "symbol": "AAPL",
+                "alg_key": alg_key,
+                "alg_param": alg_param,
+                "buy": True,
+                "sell": True,
+            },
+            report_base_path=str(tmp_path / str(index)),
+        )
+        algorithm.process_list(_build_intraday_mean_reversion_rows())
+        output = algorithm.normalized_output()
+        child_output = output.child_outputs[0]
+
+        assert output.points[0].signal_label == "neutral"
+        assert output.derived_series["warmup_ready"][0] is False
+        assert output.derived_series["warmup_ready"][-1] is True
+        assert child_output.diagnostics["warmup_ready"] is True
+        assert child_output.diagnostics["reporting_mode"] == "bar_series"
+
+
+def test_mean_reversion_wave_3_opening_gap_fade_reports_gap_fill_progress_against_open(
+    tmp_path,
+) -> None:
+    algorithm, _ = create_alertgen_algorithm(
+        sensor_config={
+            "symbol": "AAPL",
+            "alg_key": "opening_gap_fade",
+            "alg_param": {
+                "min_gap_percent": 1.0,
+                "exit_gap_fill_percent": 0.25,
+                "min_session_bars": 2,
+                "confirmation_bars": 1,
+            },
+            "buy": True,
+            "sell": True,
+        },
+        report_base_path=str(tmp_path),
+    )
+
+    algorithm.process_list(_build_intraday_mean_reversion_rows())
+    output = algorithm.normalized_output()
+
+    assert output.derived_series["gap_fill_progress"][-1] == pytest.approx(
+        -0.6666666666666655
+    )
+    assert output.child_outputs[0].diagnostics["gap_fill_progress"] == pytest.approx(
+        -0.6666666666666655
+    )
 
 
 def test_mean_reversion_wave_3_registration_metadata_matches_manifest_contract() -> (
