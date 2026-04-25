@@ -4,6 +4,7 @@ from typing import Any
 
 from trading_algos.alertgen.algorithms.composite.shared_rebalance import (
     CompositeRebalanceRow,
+    build_interactive_rebalance_payload,
     build_portfolio_weight_output,
     build_rebalance_alert_output,
     clamp_signed_unit,
@@ -185,16 +186,12 @@ class VolatilityTargetingOverlayAlertAlgorithm:
         )
 
     def interactive_report_payloads(self) -> list[tuple[dict[str, Any], str]]:
-        return [
-            (
-                {
-                    "algorithm_key": self.algorithm_key,
-                    "data": self.normalized_output().to_dict(),
-                    "portfolio": self.portfolio_output().to_dict(),
-                },
-                f"rebalance_report_{self.algorithm_key}_{self.symbol}",
-            )
-        ]
+        return build_interactive_rebalance_payload(
+            algorithm_key=self.algorithm_key,
+            symbol=self.symbol,
+            output=self.normalized_output(),
+            portfolio=self.portfolio_output(),
+        )
 
 
 def build_volatility_targeting_overlay_algorithm(

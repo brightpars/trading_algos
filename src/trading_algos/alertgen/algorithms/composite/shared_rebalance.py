@@ -122,6 +122,23 @@ def build_portfolio_weight_output(
     )
 
 
+def build_interactive_rebalance_payload(
+    *,
+    algorithm_key: str,
+    symbol: str,
+    output: AlertAlgorithmOutput,
+    portfolio: PortfolioWeightOutput,
+) -> list[tuple[dict[str, Any], str]]:
+    """Build the standard dashboard-facing payload for rebalance-style composites."""
+
+    payload = {
+        "algorithm_key": algorithm_key,
+        "data": output.to_dict(),
+        "portfolio": portfolio.to_dict(),
+    }
+    return [(payload, f"rebalance_report_{algorithm_key}_{symbol}")]
+
+
 def build_rebalance_alert_output(
     *,
     algorithm_key: str,
