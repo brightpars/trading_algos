@@ -332,6 +332,7 @@ def _bulk_experiment_form_defaults() -> dict[str, str]:
         "symbol": "",
         "symbols_text": "",
         "alg_key": "",
+        "skip_non_executable_defaults": "true",
         "start_date": "",
         "start_time": "09:30",
         "end_date": "",
@@ -534,6 +535,9 @@ def create_bulk_experiment():
         "symbol": request.form.get("symbol", ""),
         "symbols_text": request.form.get("symbols_text", ""),
         "alg_key": request.form.get("alg_key", ""),
+        "skip_non_executable_defaults": request.form.get(
+            "skip_non_executable_defaults", "false"
+        ),
         "start_date": request.form.get("start_date", ""),
         "start_time": request.form.get("start_time", ""),
         "end_date": request.form.get("end_date", ""),
@@ -550,6 +554,9 @@ def create_bulk_experiment():
                 end_date=submitted_form_data["end_date"],
                 end_time=submitted_form_data["end_time"],
                 notes=submitted_form_data["notes"],
+                skip_non_executable_defaults=(
+                    submitted_form_data["skip_non_executable_defaults"] == "true"
+                ),
             )
         elif submitted_form_data["bulk_mode"] == "single_algorithm_for_symbols":
             result = service.submit_single_algorithm_for_symbols(
@@ -576,10 +583,16 @@ def create_bulk_experiment():
             form_data=submitted_form_data,
         )
         return response
-    flash(
-        f"Bulk submission created {result.created_count} queued experiments.",
-        "success",
+    success_message = (
+        f"Bulk submission created {result.created_count} queued experiments."
     )
+    if result.skipped_count:
+        skipped_list = ", ".join(result.skipped_algorithms)
+        success_message = (
+            f"{success_message} Skipped {result.skipped_count} algorithms with "
+            f"non-executable default params: {skipped_list}."
+        )
+    flash(success_message, "success")
     response = redirect(url_for("experiments.history"))
     clear_form_state(response, cookie_name=_BULK_EXPERIMENT_FORM_COOKIE)
     return response

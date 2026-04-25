@@ -7,10 +7,15 @@ from typing import Any
 @dataclass(frozen=True)
 class BulkExperimentSubmissionResult:
     created_experiment_ids: list[str]
+    skipped_algorithms: list[str]
 
     @property
     def created_count(self) -> int:
         return len(self.created_experiment_ids)
+
+    @property
+    def skipped_count(self) -> int:
+        return len(self.skipped_algorithms)
 
 
 class BulkExperimentService:
@@ -36,6 +41,7 @@ class BulkExperimentService:
         end_date: str,
         end_time: str,
         notes: str = "",
+        skip_non_executable_defaults: bool = False,
     ) -> BulkExperimentSubmissionResult:
         runnable_algorithms = (
             self.algorithm_catalog_service.list_runnable_algorithm_implementations()
@@ -47,8 +53,15 @@ class BulkExperimentService:
         self._ensure_within_batch_limit(len(runnable_algorithms))
 
         created_experiment_ids: list[str] = []
+        skipped_algorithms: list[str] = []
         for algorithm in runnable_algorithms:
             alg_key = str(algorithm["key"])
+            default_param = algorithm.get("default_param", {})
+            if skip_non_executable_defaults and self._has_non_executable_default_rows(
+                default_param
+            ):
+                skipped_algorithms.append(alg_key)
+                continue
             try:
                 experiment_id = self.experiment_service.create_experiment(
                     symbol=symbol,
@@ -59,7 +72,7 @@ class BulkExperimentService:
                     algorithms=[
                         {
                             "alg_key": alg_key,
-                            "alg_param": algorithm.get("default_param", {}),
+                            "alg_param": default_param,
                         }
                     ],
                     notes=notes,
@@ -70,7 +83,8 @@ class BulkExperimentService:
                 ) from exc
             created_experiment_ids.append(experiment_id)
         return BulkExperimentSubmissionResult(
-            created_experiment_ids=created_experiment_ids
+            created_experiment_ids=created_experiment_ids,
+            skipped_algorithms=skipped_algorithms,
         )
 
     def submit_single_algorithm_for_symbols(
@@ -112,8 +126,15 @@ class BulkExperimentService:
             for symbol in normalized_symbols
         ]
         return BulkExperimentSubmissionResult(
-            created_experiment_ids=created_experiment_ids
+            created_experiment_ids=created_experiment_ids,
+            skipped_algorithms=[],
         )
+
+    def _has_non_executable_default_rows(self, default_param: Any) -> bool:
+        if not isinstance(default_param, dict):
+            return False
+        rows = default_param.get("rows")
+        return isinstance(rows, list) and len(rows) == 0
 
     def _normalize_symbols(self, raw_symbols: str) -> list[str]:
         seen_symbols: set[str] = set()
