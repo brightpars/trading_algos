@@ -57,7 +57,7 @@ def test_manifest_integrity_matches_declared_counts() -> None:
     assert manifest["manifest_version"] == 1
     assert manifest["capability_taxonomy_version"] == 1
     assert manifest["source_catalog"]["implementation_plan_path"] == (
-        "docs/algorithm_library_systematic_implementation_plan_v2.md"
+        "docs/algorithm_library_systematic_implementation_plan.md"
     )
     assert len(algorithms) == manifest["expected_totals"]["algorithms"]
     assert (

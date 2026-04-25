@@ -2,9 +2,9 @@
 
 ## Source metadata
 
-- Requirements document path: `docs/algorithm_library_requirements_v4.md`
+- Requirements document path: `docs/algorithm_library_requirements_enriched.md`
 - Requirements document version: `4`
-- Implementation plan path: `docs/algorithm_library_systematic_implementation_plan_v2.md`
+- Implementation plan path: `docs/algorithm_library_systematic_implementation_plan.md`
 - Total algorithm rows: **121**
 - Total combination-method rows: **12**
 - Total tracked rows: **133**
@@ -16,9 +16,9 @@
 | algorithm rows | 121 |
 | combination-method rows | 12 |
 | ready_to_implement | 1 |
-| blocked_framework | 46 |
+| blocked_framework | 58 |
 | in_progress | 0 |
-| complete | 86 |
+| complete | 74 |
 | prototype_only | 49 |
 | research_ready | 84 |
 | production_ready | 0 |
@@ -31,7 +31,7 @@
 | family | kind_mix | total | ready | blocked | in_progress | complete |
 | --- | --- | --- | --- | --- | --- | --- |
 | adaptive_state_based | combination_method | 1 | 0 | 1 | 0 | 0 |
-| cross_asset_macro_carry | algorithm | 8 | 0 | 0 | 0 | 8 |
+| cross_asset_macro_carry | algorithm | 8 | 0 | 8 | 0 | 0 |
 | event_driven | algorithm | 5 | 0 | 0 | 0 | 5 |
 | execution | algorithm | 6 | 0 | 6 | 0 | 0 |
 | factor_risk_premia | algorithm | 15 | 0 | 4 | 0 | 11 |
@@ -40,7 +40,7 @@
 | machine_learning_ensemble | combination_method | 3 | 0 | 0 | 0 | 3 |
 | mean_reversion | algorithm | 12 | 0 | 0 | 0 | 12 |
 | microstructure_hft | algorithm | 8 | 0 | 8 | 0 | 0 |
-| momentum | algorithm | 11 | 0 | 0 | 0 | 11 |
+| momentum | algorithm | 11 | 0 | 4 | 0 | 7 |
 | optimization_based | combination_method | 1 | 0 | 1 | 0 | 0 |
 | pattern_price_action | algorithm | 8 | 0 | 0 | 0 | 8 |
 | reinforcement_learning | combination_method | 2 | 0 | 0 | 0 | 2 |

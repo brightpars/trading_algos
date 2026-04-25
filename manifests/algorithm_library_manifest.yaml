@@ -1,8 +1,8 @@
 manifest_version: 1
 source_catalog:
-  requirements_doc_path: docs/algorithm_library_requirements_v4.md
+  requirements_doc_path: docs/algorithm_library_requirements_enriched.md
   requirements_doc_version: 4
-  implementation_plan_path: docs/algorithm_library_systematic_implementation_plan_v2.md
+  implementation_plan_path: docs/algorithm_library_systematic_implementation_plan.md
   source_catalog_generated_from: algorithm_library_requirements_v4.html
   source_catalog_generated_at: '2026-04-23'
 expected_totals:
@@ -1014,7 +1014,7 @@ rows:
   display_category: Momentum
   subcategory: cross
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
@@ -1075,7 +1075,7 @@ rows:
   display_category: Momentum
   subcategory: relative
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
@@ -1136,7 +1136,7 @@ rows:
   display_category: Momentum
   subcategory: dual
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
@@ -1197,7 +1197,7 @@ rows:
   display_category: Momentum
   subcategory: residual
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
@@ -4636,7 +4636,7 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: carry
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
@@ -4695,7 +4695,7 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: yield
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
@@ -4758,7 +4758,7 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: curve
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
@@ -4821,7 +4821,7 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: commodity
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
@@ -4884,7 +4884,7 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: risk
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
@@ -4943,7 +4943,7 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: intermarket
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
@@ -5002,7 +5002,7 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: seasonality
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Calendar-driven swing / long-only or tactical
@@ -5062,7 +5062,7 @@ rows:
   display_category: Cross-Asset / Macro / Carry
   subcategory: earnings
   tier: tier2
-  delivery_status: complete
+  delivery_status: blocked_framework
   operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven swing
@@ -7022,7 +7022,7 @@ rows:
   code_dependencies:
   - events.calendar
   - events.window_runner
-  target_module: src/trading_algos/alertgen/algorithms/event_driven/post_earnings_announcement_drift_pead.py
+  target_module: src/trading_algos/alertgen/algorithms/event_driven/pead_post_earnings_announcement_drift.py
   target_catalog: src/trading_algos/alertgen/algorithms/event_driven/catalog.py
   required_input_domains:
   - event_calendar
