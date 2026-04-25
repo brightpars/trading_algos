@@ -69,6 +69,41 @@ def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm()
     ]
 
 
+def test_submit_all_algorithms_for_symbol_includes_alg_key_in_validation_error() -> (
+    None
+):
+    class _FailingExperimentServiceStub(_ExperimentServiceStub):
+        def create_experiment(self, **kwargs: Any) -> str:
+            algorithm = kwargs["algorithms"][0]
+            if algorithm["alg_key"] == "close_high_channel_breakout":
+                raise ValueError(
+                    "Alert generator sensor_config alg_param rows must be a non-empty list"
+                )
+            return super().create_experiment(**kwargs)
+
+    experiment_service = _FailingExperimentServiceStub()
+    service = BulkExperimentService(
+        experiment_service=experiment_service,
+        algorithm_catalog_service=_AlgorithmCatalogServiceStub(),
+    )
+
+    try:
+        service.submit_all_algorithms_for_symbol(
+            symbol="AAPL",
+            start_date="2024-01-01",
+            start_time="09:30",
+            end_date="2024-01-31",
+            end_time="16:00",
+        )
+    except ValueError as exc:
+        assert str(exc) == (
+            "Bulk submission failed for alg_key=close_high_channel_breakout: "
+            "Alert generator sensor_config alg_param rows must be a non-empty list"
+        )
+    else:
+        raise AssertionError("Expected ValueError with alg_key context")
+
+
 def test_submit_single_algorithm_for_symbols_normalizes_and_deduplicates_symbols():
     experiment_service = _ExperimentServiceStub()
     service = BulkExperimentService(

@@ -19,7 +19,7 @@ class BulkExperimentService:
         *,
         experiment_service: Any,
         algorithm_catalog_service: Any,
-        max_bulk_experiments: int = 100,
+        max_bulk_experiments: int = 200,
     ) -> None:
         if max_bulk_experiments < 1:
             raise ValueError("max_bulk_experiments must be at least 1")
@@ -46,23 +46,29 @@ class BulkExperimentService:
             )
         self._ensure_within_batch_limit(len(runnable_algorithms))
 
-        created_experiment_ids = [
-            self.experiment_service.create_experiment(
-                symbol=symbol,
-                start_date=start_date,
-                start_time=start_time,
-                end_date=end_date,
-                end_time=end_time,
-                algorithms=[
-                    {
-                        "alg_key": algorithm["key"],
-                        "alg_param": algorithm.get("default_param", {}),
-                    }
-                ],
-                notes=notes,
-            )
-            for algorithm in runnable_algorithms
-        ]
+        created_experiment_ids: list[str] = []
+        for algorithm in runnable_algorithms:
+            alg_key = str(algorithm["key"])
+            try:
+                experiment_id = self.experiment_service.create_experiment(
+                    symbol=symbol,
+                    start_date=start_date,
+                    start_time=start_time,
+                    end_date=end_date,
+                    end_time=end_time,
+                    algorithms=[
+                        {
+                            "alg_key": alg_key,
+                            "alg_param": algorithm.get("default_param", {}),
+                        }
+                    ],
+                    notes=notes,
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"Bulk submission failed for alg_key={alg_key}: {exc}"
+                ) from exc
+            created_experiment_ids.append(experiment_id)
         return BulkExperimentSubmissionResult(
             created_experiment_ids=created_experiment_ids
         )
