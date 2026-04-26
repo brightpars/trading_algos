@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import timezone
+
 from flask import (
     Blueprint,
     current_app,
@@ -50,16 +52,25 @@ def experiment_runtime_settings():
     data_source_settings = current_app.extensions[
         "data_source_settings_service"
     ].get_effective_settings()
-    cache_settings = current_app.extensions[
-        "market_data_cache_settings_service"
-    ].get_effective_settings()
-    cache_stats = current_app.extensions["market_data_cache"].stats()
     return render_template(
         "administration/experiment_runtime_settings.html",
         runtime_settings=runtime_settings,
         data_source_settings=data_source_settings,
+    )
+
+
+@bp.get("/cache")
+def cache_management():
+    cache_settings = current_app.extensions[
+        "market_data_cache_settings_service"
+    ].get_effective_settings()
+    cache_stats = current_app.extensions["market_data_cache"].stats()
+    cache_entries = current_app.extensions["cache_management_service"].list_entries()
+    return render_template(
+        "administration/cache_management.html",
         cache_settings=cache_settings,
         cache_stats=cache_stats,
+        cache_entries=cache_entries,
     )
 
 
@@ -161,17 +172,17 @@ def save_market_data_cache_settings():
         )
     except ValueError as exc:
         flash(str(exc), "danger")
-        return redirect(url_for("administration.experiment_runtime_settings"))
+        return redirect(url_for("administration.cache_management"))
 
     flash("administration: market data cache settings updated", "success")
-    return redirect(url_for("administration.experiment_runtime_settings"))
+    return redirect(url_for("administration.cache_management"))
 
 
 @bp.post("/market-data-cache/clear-memory")
 def clear_market_data_memory_cache():
     current_app.extensions["market_data_cache"].clear_memory()
     flash("administration: memory cache cleared", "success")
-    return redirect(url_for("administration.experiment_runtime_settings"))
+    return redirect(url_for("administration.cache_management"))
 
 
 @bp.post("/market-data-cache/clear-shared")
@@ -181,7 +192,93 @@ def clear_market_data_shared_cache():
         f"administration: shared cache cleared; deleted_entries={deleted_count}",
         "success",
     )
-    return redirect(url_for("administration.experiment_runtime_settings"))
+    return redirect(url_for("administration.cache_management"))
+
+
+@bp.post("/market-data-cache/fill")
+def fill_market_data_cache_entry():
+    cache_management_service = current_app.extensions["cache_management_service"]
+    symbol = request.form.get("symbol", "").strip()
+    start_raw = request.form.get("start", "").strip()
+    end_raw = request.form.get("end", "").strip()
+    if not symbol:
+        flash("Symbol is required", "danger")
+        return redirect(url_for("administration.cache_management"))
+    if not start_raw or not end_raw:
+        flash("Start and end datetime are required", "danger")
+        return redirect(url_for("administration.cache_management"))
+    try:
+        start = cache_management_service.parse_datetime_local(start_raw)
+        end = cache_management_service.parse_datetime_local(end_raw)
+        if end < start:
+            raise ValueError("End datetime must be after start datetime")
+        entry = cache_management_service.fill_entry(symbol=symbol, start=start, end=end)
+    except (ValueError, DataSourceUnavailableError) as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("administration.cache_management"))
+    flash(
+        "administration: cache entry filled; "
+        f"symbol={entry.symbol} candle_count={entry.candle_count}",
+        "success",
+    )
+    return redirect(url_for("administration.cache_management"))
+
+
+@bp.post("/market-data-cache/delete")
+def delete_market_data_cache_entry():
+    cache_management_service = current_app.extensions["cache_management_service"]
+    symbol = request.form.get("symbol", "").strip()
+    start_raw = request.form.get("start", "").strip()
+    end_raw = request.form.get("end", "").strip()
+    if not symbol or not start_raw or not end_raw:
+        flash("Cache entry identifier is incomplete", "danger")
+        return redirect(url_for("administration.cache_management"))
+    try:
+        start = cache_management_service.parse_datetime_local(start_raw)
+        end = cache_management_service.parse_datetime_local(end_raw)
+        deletion = cache_management_service.delete_entry(
+            symbol=symbol,
+            start=start,
+            end=end,
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("administration.cache_management"))
+    if not deletion["memory"] and not deletion["shared"]:
+        flash("administration: cache entry delete skipped; reason=not_found", "warning")
+        return redirect(url_for("administration.cache_management"))
+    flash(
+        "administration: cache entry deleted; "
+        f"symbol={symbol.upper()} memory={deletion['memory']} shared={deletion['shared']}",
+        "success",
+    )
+    return redirect(url_for("administration.cache_management"))
+
+
+@bp.get("/market-data-cache/chart")
+def market_data_cache_chart():
+    cache_management_service = current_app.extensions["cache_management_service"]
+    symbol = request.args.get("symbol", "").strip()
+    start_raw = request.args.get("start", "").strip()
+    end_raw = request.args.get("end", "").strip()
+    if not symbol or not start_raw or not end_raw:
+        return jsonify({"message": "Missing cache entry identifier"}), 400
+    try:
+        start = cache_management_service.parse_datetime_local(start_raw)
+        end = cache_management_service.parse_datetime_local(end_raw)
+    except ValueError as exc:
+        return jsonify({"message": str(exc)}), 400
+    for entry in cache_management_service.list_entries():
+        if entry.symbol == symbol.upper() and entry.start == start and entry.end == end:
+            return jsonify(
+                {
+                    "symbol": entry.symbol,
+                    "start": entry.start.astimezone(timezone.utc).isoformat(),
+                    "end": entry.end.astimezone(timezone.utc).isoformat(),
+                    "chart": entry.chart_payload,
+                }
+            )
+    return jsonify({"message": "Cache entry not found"}), 404
 
 
 @bp.post("/experiments/clear")

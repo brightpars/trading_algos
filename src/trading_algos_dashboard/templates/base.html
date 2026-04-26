@@ -21,6 +21,7 @@
           <a class="nav-link" href="{{ url_for('experiments.history') }}">Experiments</a>
           <a class="nav-link" href="{{ url_for('evaluations.index') }}">Evaluations</a>
           <a class="nav-link" href="{{ url_for('reports.list_reports') }}">Reports</a>
+          <a class="nav-link" href="{{ url_for('administration.cache_management') }}">Cache</a>
           <a class="nav-link" href="{{ url_for('administration.administration_home') }}">Administration</a>
         </div>
       </div>
@@ -40,6 +41,7 @@
     <script src="{{ url_for('static', filename='js/experiment_form.js') }}"></script>
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/home.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cache_management.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/algorithm_catalog.js') }}"></script>
     <script src="{{ url_for('static', filename='js/administration_algorithm_catalog.js') }}"></script>

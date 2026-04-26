@@ -111,6 +111,23 @@ class InMemoryMarketDataCache:
         with self._lock:
             return {"entry_count": len(self._entries)}
 
+    def list_entries(self) -> list[CachedMarketData]:
+        with self._lock:
+            return list(self._entries.values())
+
+    def delete(self, *, symbol: str, start: datetime, end: datetime) -> bool:
+        key = self.make_key(symbol=symbol, start=start, end=end)
+        with self._lock:
+            deleted = self._entries.pop(key, None) is not None
+        if deleted:
+            logger.info(
+                "market_data_cache: delete; layer=memory symbol=%s start=%s end=%s",
+                key.symbol,
+                key.start.isoformat(sep=" "),
+                key.end.isoformat(sep=" "),
+            )
+        return deleted
+
     def _prune_if_needed(self) -> None:
         if self.max_entries < 1:
             self.max_entries = 1
@@ -195,6 +212,56 @@ class MongoMarketDataCache:
 
     def clear(self) -> int:
         return int(self.repository.clear())
+
+    def list_entries(self) -> list[CachedMarketData]:
+        self._prune_expired_entries()
+        entries: list[CachedMarketData] = []
+        for document in self.repository.list_entries():
+            candles = document.get("candles")
+            stored_at = document.get("stored_at")
+            symbol = document.get("symbol")
+            start = document.get("start")
+            end = document.get("end")
+            if (
+                not isinstance(candles, list)
+                or not isinstance(stored_at, datetime)
+                or not isinstance(symbol, str)
+                or not isinstance(start, datetime)
+                or not isinstance(end, datetime)
+            ):
+                continue
+            entries.append(
+                CachedMarketData(
+                    key=MarketDataCacheKey(
+                        symbol=symbol.strip().upper(),
+                        start=start,
+                        end=end,
+                    ),
+                    candles=tuple(
+                        dict(row) for row in candles if isinstance(row, Mapping)
+                    ),
+                    stored_at=stored_at,
+                    candle_count=int(document.get("candle_count", len(candles))),
+                    source_kind="shared_cache",
+                )
+            )
+        return entries
+
+    def delete(self, *, symbol: str, start: datetime, end: datetime) -> bool:
+        existing = self.repository.get_entry(symbol=symbol, start=start, end=end)
+        if not isinstance(existing, dict):
+            return False
+        cache_key = existing.get("cache_key")
+        if not isinstance(cache_key, str):
+            return False
+        self.repository.delete_entry_by_cache_key(cache_key)
+        logger.info(
+            "market_data_cache: delete; layer=shared symbol=%s start=%s end=%s",
+            symbol.strip().upper(),
+            start.isoformat(sep=" "),
+            end.isoformat(sep=" "),
+        )
+        return True
 
     def try_claim_fill(
         self,
@@ -287,6 +354,25 @@ class LayeredMarketDataCache:
         if self.shared_cache is None:
             return 0
         return self.shared_cache.clear()
+
+    def list_memory_entries(self) -> list[CachedMarketData]:
+        return self.memory_cache.list_entries()
+
+    def list_shared_entries(self) -> list[CachedMarketData]:
+        if self.shared_cache is None:
+            return []
+        return self.shared_cache.list_entries()
+
+    def delete(self, *, symbol: str, start: datetime, end: datetime) -> dict[str, bool]:
+        deleted_memory = self.memory_cache.delete(symbol=symbol, start=start, end=end)
+        deleted_shared = False
+        if self.shared_cache is not None:
+            deleted_shared = self.shared_cache.delete(
+                symbol=symbol,
+                start=start,
+                end=end,
+            )
+        return {"memory": deleted_memory, "shared": deleted_shared}
 
     def get(
         self, *, symbol: str, start: datetime, end: datetime

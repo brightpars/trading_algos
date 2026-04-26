@@ -1,3 +1,4 @@
+from datetime import datetime
 from io import BytesIO
 from inspect import getsourcefile
 from pathlib import Path
@@ -183,9 +184,7 @@ def test_experiment_runtime_settings_page_renders(monkeypatch):
     assert b'name="ip"' in response.data
     assert b'name="port"' in response.data
     assert b"Market data cache" in response.data
-    assert b'name="memory_max_entries"' in response.data
-    assert b'name="shared_max_entries"' in response.data
-    assert b'name="shared_ttl_hours"' in response.data
+    assert b"Open cache management" in response.data
 
 
 def test_experiment_runtime_settings_page_updates_global_limit(monkeypatch):
@@ -293,6 +292,7 @@ def test_experiment_runtime_settings_page_updates_cache_settings(monkeypatch):
     assert settings["memory_max_entries"] == 12
     assert settings["shared_max_entries"] == 34
     assert settings["shared_ttl_hours"] == 48
+    assert b"Cache management" in response.data
 
 
 def test_experiment_runtime_settings_page_clears_memory_cache(monkeypatch):
@@ -315,6 +315,7 @@ def test_experiment_runtime_settings_page_clears_memory_cache(monkeypatch):
     assert response.status_code == 200
     assert b"memory cache cleared" in response.data
     assert cache.stats()["memory_entry_count"] == 0
+    assert b"Cache management" in response.data
 
 
 def test_experiment_runtime_settings_page_clears_shared_cache(monkeypatch):
@@ -335,6 +336,112 @@ def test_experiment_runtime_settings_page_clears_shared_cache(monkeypatch):
     assert response.status_code == 200
     assert b"shared cache cleared" in response.data
     assert cache.stats()["shared_entry_count"] == 0
+    assert b"Cache management" in response.data
+
+
+def test_cache_management_page_renders_entries_and_metadata(monkeypatch):
+    app = _build_app(monkeypatch)
+    cache = app.extensions["market_data_cache"]
+    start = datetime.fromisoformat("2024-01-01T09:30")
+    end = datetime.fromisoformat("2024-01-01T09:31")
+    candles = [{"ts": "2024-01-01 09:30:00", "Close": 10.5}]
+    cache.memory_cache.put(symbol="AAPL", start=start, end=end, candles=candles)
+    cache.shared_cache.put(symbol="AAPL", start=start, end=end, candles=candles)
+
+    response = app.test_client().get("/administration/cache")
+
+    assert response.status_code == 200
+    assert b"Cache management" in response.data
+    assert b"AAPL" in response.data
+    assert b"Memory" in response.data
+    assert b"DB" in response.data
+    assert b"DB TTL:" in response.data
+    assert b"View chart" in response.data
+    assert b"Delete" in response.data
+
+
+def test_cache_management_page_fills_cache_entry(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    def _fill_entry(*, symbol, start, end):
+        return (
+            app.extensions[
+                "cache_management_service"
+            ].fill_entry.__self__.list_entries()
+            or []
+        )
+
+    monkeypatch.setattr(
+        app.extensions["cache_management_service"],
+        "fill_entry",
+        lambda *, symbol, start, end: type(
+            "Entry",
+            (),
+            {
+                "symbol": symbol.upper(),
+                "start": start,
+                "end": end,
+                "candle_count": 2,
+            },
+        )(),
+    )
+
+    response = app.test_client().post(
+        "/administration/market-data-cache/fill",
+        data={
+            "symbol": "aapl",
+            "start": "2024-01-01T09:30",
+            "end": "2024-01-01T09:31",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"cache entry filled; symbol=AAPL candle_count=2" in response.data
+
+
+def test_cache_management_page_deletes_cache_entry(monkeypatch):
+    app = _build_app(monkeypatch)
+    cache = app.extensions["market_data_cache"]
+    start = datetime.fromisoformat("2024-01-01T09:30")
+    end = datetime.fromisoformat("2024-01-01T09:31")
+    candles = [{"ts": "2024-01-01 09:30:00", "Close": 10.5}]
+    cache.memory_cache.put(symbol="AAPL", start=start, end=end, candles=candles)
+    cache.shared_cache.put(symbol="AAPL", start=start, end=end, candles=candles)
+
+    response = app.test_client().post(
+        "/administration/market-data-cache/delete",
+        data={
+            "symbol": "AAPL",
+            "start": "2024-01-01T09:30",
+            "end": "2024-01-01T09:31",
+        },
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"cache entry deleted; symbol=AAPL memory=True shared=True" in response.data
+    assert cache.stats()["memory_entry_count"] == 0
+    assert cache.stats()["shared_entry_count"] == 0
+
+
+def test_cache_management_chart_route_returns_chart_payload(monkeypatch):
+    app = _build_app(monkeypatch)
+    cache = app.extensions["market_data_cache"]
+    start = datetime.fromisoformat("2024-01-01T09:30")
+    end = datetime.fromisoformat("2024-01-01T09:31")
+    candles = [{"ts": "2024-01-01 09:30:00", "Close": 10.5}]
+    cache.memory_cache.put(symbol="AAPL", start=start, end=end, candles=candles)
+    cache.shared_cache.put(symbol="AAPL", start=start, end=end, candles=candles)
+
+    response = app.test_client().get(
+        "/administration/market-data-cache/chart?symbol=AAPL&start=2024-01-01T09:30&end=2024-01-01T09:31"
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["symbol"] == "AAPL"
+    assert payload["chart"]["data"][0]["x"] == ["2024-01-01 09:30:00"]
 
 
 def test_import_algorithm_catalog_route_runs_import(monkeypatch):
