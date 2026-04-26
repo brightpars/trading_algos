@@ -116,6 +116,21 @@ def _backtrace_payload() -> tuple[Mapping[str, object] | None, Any]:
     return payload, None
 
 
+def _backtrace_batch_payload() -> tuple[Mapping[str, object] | None, Any]:
+    payload = _get_json_object()
+    if payload is None:
+        return None, (
+            jsonify(
+                {
+                    "error": "invalid_request",
+                    "message": "Request body must be a JSON object.",
+                }
+            ),
+            400,
+        )
+    return payload, None
+
+
 @bp.get("/algorithms")
 def algorithms():
     return jsonify(
@@ -229,6 +244,26 @@ def create_backtrace():
         return error_response
     try:
         run = current_app.extensions["backtrace_client_service"].submit_run(payload)
+    except ValueError as exc:
+        return (
+            jsonify(
+                {
+                    "error": "validation_error",
+                    "message": str(exc),
+                }
+            ),
+            400,
+        )
+    return jsonify(run), 201
+
+
+@bp.post("/backtraces/batch")
+def create_backtrace_batch():
+    payload, error_response = _backtrace_batch_payload()
+    if error_response is not None:
+        return error_response
+    try:
+        run = current_app.extensions["backtrace_client_service"].submit_batch(payload)
     except ValueError as exc:
         return (
             jsonify(

@@ -20,10 +20,24 @@ class _RuntimeServiceStub:
     def __init__(self, result: dict[str, Any]) -> None:
         self.result = result
         self.calls: list[Any] = []
+        self.batch_result: dict[str, Any] = {
+            "status": "completed",
+            "item_count": 1,
+            "success_count": 1,
+            "failure_count": 0,
+            "items": [result],
+            "started_at": "2025-01-01T10:00:00+00:00",
+            "finished_at": "2025-01-01T10:00:01+00:00",
+        }
+        self.batch_calls: list[Any] = []
 
     def run_backtrace(self, request: Any) -> dict[str, Any]:
         self.calls.append(request)
         return self.result
+
+    def run_backtrace_batch(self, request: Any) -> dict[str, Any]:
+        self.batch_calls.append(request)
+        return self.batch_result
 
 
 def _build_server(
@@ -65,6 +79,7 @@ def test_register_all_functions_registers_run_backtrace() -> None:
         "run_all_engines",
         "stop_all_engines",
         "run_backtrace",
+        "run_backtrace_batch",
     ]
 
 
@@ -127,3 +142,38 @@ def test_run_backtrace_returns_stable_dict_payload_for_invalid_input() -> None:
         "started_at",
         "finished_at",
     }
+
+
+def test_run_backtrace_batch_delegates_to_runtime_service_and_returns_dict() -> None:
+    reject_calls: list[str] = []
+    runtime_service = _RuntimeServiceStub(
+        {
+            "status": "completed",
+            "run_id": "run-1",
+            "request_id": "req-1",
+            "algorithm_key": "demo_algo",
+            "symbol": "AAPL",
+            "input_summary": {"candle_count": 1},
+            "signal_summary": {"buy_count": 0, "sell_count": 0},
+            "evaluation_summary": {},
+            "report": {},
+            "chart_payload": {},
+            "execution_steps": [],
+            "error": None,
+            "started_at": "2025-01-01T10:00:00+00:00",
+            "finished_at": "2025-01-01T10:00:01+00:00",
+        }
+    )
+    server = _build_server(runtime_service=runtime_service, reject_calls=reject_calls)
+    request = {
+        "items": [
+            {"algorithm_key": "demo_algo", "symbol": "AAPL", "candles": _candles()}
+        ]
+    }
+
+    result = server.run_backtrace_batch(request)
+
+    assert reject_calls == ["called"]
+    assert runtime_service.batch_calls == [request]
+    assert result == runtime_service.batch_result
+    assert isinstance(result, dict)

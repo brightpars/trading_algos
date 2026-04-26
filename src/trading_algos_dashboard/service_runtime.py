@@ -79,12 +79,18 @@ class DashboardEnginesControlServer(Base_XML_RPC_Server):
         result = self._runtime_service.run_backtrace(request)
         return dict(result)
 
+    def run_backtrace_batch(self, request: Any) -> dict[str, Any]:
+        self.reject_if_shutting_down()
+        result = self._runtime_service.run_backtrace_batch(request)
+        return dict(result)
+
     def register_all_functions(self) -> None:
         self.server.register_function(self.start_decision_maker)
         self.server.register_function(self.run_alertgen_and_sensors)
         self.server.register_function(self.run_all_engines)
         self.server.register_function(self.stop_all_engines)
         self.server.register_function(self.run_backtrace)
+        self.server.register_function(self.run_backtrace_batch)
 
 
 def _build_config() -> ServiceRuntimeConfig:

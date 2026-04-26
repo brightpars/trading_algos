@@ -9,6 +9,9 @@ from uuid import uuid4
 from trading_algos.alertgen import get_alert_algorithm_spec_by_key
 from trading_algos.alertgen.core.validation import normalize_alertgen_sensor_config
 from trading_algos_dashboard.services.backtrace_models import (
+    BacktraceBatchResult,
+    BacktraceBatchResultDict,
+    BatchResultStatus,
     BacktraceCandle,
     BacktraceDataSource,
     BacktraceInputMode,
@@ -134,6 +137,29 @@ class EnginesControlRuntimeService:
         ).to_transport_dict()
         self._mark_run_completed(request=normalized_request, result=result)
         return result
+
+    def run_backtrace_batch(self, request: dict[str, Any]) -> BacktraceBatchResultDict:
+        started_at = self._utc_now()
+        items = self._normalize_batch_request_items(request)
+        results = [self.run_backtrace(item) for item in items]
+        success_count = sum(1 for item in results if item["status"] == "completed")
+        failure_count = len(results) - success_count
+        status: BatchResultStatus
+        if failure_count == 0:
+            status = "completed"
+        elif success_count == 0:
+            status = "failed"
+        else:
+            status = "partial_failure"
+        return BacktraceBatchResult(
+            status=status,
+            item_count=len(results),
+            success_count=success_count,
+            failure_count=failure_count,
+            items=[self._result_from_transport_dict(result) for result in results],
+            started_at=started_at,
+            finished_at=self._utc_now(),
+        ).to_transport_dict()
 
     def _create_run_record(
         self,
@@ -308,6 +334,43 @@ class EnginesControlRuntimeService:
                 request.get("report_base_path")
             ),
             metadata=metadata,
+        )
+
+    def _normalize_batch_request_items(
+        self, request: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        if not isinstance(request, dict):
+            raise ValueError("Backtrace batch request must be a JSON object")
+        raw_items = request.get("items")
+        if not isinstance(raw_items, list):
+            raise ValueError("Backtrace batch request field items must be a list")
+        if not raw_items:
+            raise ValueError("Backtrace batch request field items must not be empty")
+        normalized_items: list[dict[str, Any]] = []
+        for index, item in enumerate(raw_items):
+            if not isinstance(item, dict):
+                raise ValueError(f"Backtrace batch item #{index} must be a JSON object")
+            normalized_items.append(dict(item))
+        return normalized_items
+
+    def _result_from_transport_dict(
+        self, result: BacktraceResultDict
+    ) -> BacktraceResult:
+        return BacktraceResult(
+            status=result["status"],
+            run_id=result["run_id"],
+            request_id=result["request_id"],
+            algorithm_key=result["algorithm_key"],
+            symbol=result["symbol"],
+            input_summary=dict(result["input_summary"]),
+            signal_summary=dict(result["signal_summary"]),
+            evaluation_summary=dict(result["evaluation_summary"]),
+            report=dict(result["report"]),
+            chart_payload=dict(result["chart_payload"]),
+            execution_steps=[dict(step) for step in result["execution_steps"]],
+            error=result["error"],
+            started_at=result["started_at"],
+            finished_at=result["finished_at"],
         )
 
     def _validate_required_fields(self, request: dict[str, Any]) -> None:

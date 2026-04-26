@@ -560,3 +560,73 @@ def test_backtrace_detail_api_returns_run(monkeypatch):
     assert payload["run_id"] == run_id
     assert payload["request"]["metadata"] == {"source": "api-test", "label": "demo"}
     assert payload["full_result"]["signal_summary"]["total_rows"] == 3
+
+
+def test_backtrace_batch_submit_api_returns_aggregated_success(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    second_payload = _backtrace_request_payload()
+    second_payload["symbol"] = "MSFT"
+    second_payload["request_id"] = "req-2"
+
+    response = app.test_client().post(
+        "/api/backtraces/batch",
+        json={
+            "items": [
+                _backtrace_request_payload(),
+                second_payload,
+            ]
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.get_json()
+    assert payload["status"] == "completed"
+    assert payload["item_count"] == 2
+    assert payload["success_count"] == 2
+    assert payload["failure_count"] == 0
+    assert len(payload["items"]) == 2
+    assert payload["items"][0]["full_result"]["status"] == "completed"
+    assert payload["items"][1]["symbol"] == "MSFT"
+
+
+def test_backtrace_batch_submit_api_returns_mixed_item_results(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/api/backtraces/batch",
+        json={
+            "items": [
+                _backtrace_request_payload(),
+                {
+                    "algorithm_key": "does_not_exist",
+                    "symbol": "MSFT",
+                    "candles": _backtrace_request_payload()["candles"],
+                    "request_id": "req-bad",
+                },
+            ]
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.get_json()
+    assert payload["status"] == "partial_failure"
+    assert payload["item_count"] == 2
+    assert payload["success_count"] == 1
+    assert payload["failure_count"] == 1
+    assert len(payload["items"]) == 2
+    assert payload["items"][0]["status"] == "completed"
+    assert payload["items"][1]["status"] == "failed"
+    assert (
+        payload["items"][1]["full_result"]["error"]
+        == "sensor_config alg_key=does_not_exist is unsupported"
+    )
+    assert set(payload.keys()) == {
+        "status",
+        "item_count",
+        "success_count",
+        "failure_count",
+        "items",
+        "started_at",
+        "finished_at",
+    }

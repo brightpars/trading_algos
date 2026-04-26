@@ -6,6 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 
 RequiredCandleField = Literal["ts", "Open", "High", "Low", "Close"]
 ResultStatus = Literal["completed", "failed"]
+BatchResultStatus = Literal["completed", "partial_failure", "failed"]
 BacktraceInputMode = Literal["inline_candles", "data_source"]
 
 
@@ -37,6 +38,10 @@ class BacktraceRequestDict(TypedDict):
     metadata: NotRequired[dict[str, Any]]
 
 
+class BacktraceBatchRequestDict(TypedDict):
+    items: list[BacktraceRequestDict]
+
+
 class BacktraceResultDict(TypedDict):
     status: ResultStatus
     run_id: str
@@ -50,6 +55,16 @@ class BacktraceResultDict(TypedDict):
     chart_payload: dict[str, Any]
     execution_steps: list[dict[str, Any]]
     error: str | None
+    started_at: str
+    finished_at: str
+
+
+class BacktraceBatchResultDict(TypedDict):
+    status: BatchResultStatus
+    item_count: int
+    success_count: int
+    failure_count: int
+    items: list[BacktraceResultDict]
     started_at: str
     finished_at: str
 
@@ -154,6 +169,28 @@ class BacktraceResult:
             "chart_payload": dict(self.chart_payload),
             "execution_steps": [dict(step) for step in self.execution_steps],
             "error": self.error,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+        }
+
+
+@dataclass(frozen=True)
+class BacktraceBatchResult:
+    status: BatchResultStatus
+    item_count: int
+    success_count: int
+    failure_count: int
+    items: list[BacktraceResult]
+    started_at: str
+    finished_at: str
+
+    def to_transport_dict(self) -> BacktraceBatchResultDict:
+        return {
+            "status": self.status,
+            "item_count": self.item_count,
+            "success_count": self.success_count,
+            "failure_count": self.failure_count,
+            "items": [item.to_transport_dict() for item in self.items],
             "started_at": self.started_at,
             "finished_at": self.finished_at,
         }

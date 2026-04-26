@@ -404,3 +404,78 @@ def test_run_backtrace_fails_when_data_source_mode_missing_time_range() -> None:
         result["error"]
         == "Backtrace request field end_at must be a non-empty ISO datetime string"
     )
+
+
+def test_run_backtrace_batch_returns_completed_for_multiple_successes() -> None:
+    service = EnginesControlRuntimeService()
+
+    result = service.run_backtrace_batch(
+        {
+            "items": [
+                {
+                    "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "symbol": "AAPL",
+                    "candles": _candles() * 2,
+                    "request_id": "req-1",
+                },
+                {
+                    "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "symbol": "MSFT",
+                    "candles": _candles() * 3,
+                    "request_id": "req-2",
+                },
+            ]
+        }
+    )
+
+    assert result["status"] == "completed"
+    assert result["item_count"] == 2
+    assert result["success_count"] == 2
+    assert result["failure_count"] == 0
+    assert len(result["items"]) == 2
+    assert [item["request_id"] for item in result["items"]] == ["req-1", "req-2"]
+    assert all(item["status"] == "completed" for item in result["items"])
+    assert set(result.keys()) == {
+        "status",
+        "item_count",
+        "success_count",
+        "failure_count",
+        "items",
+        "started_at",
+        "finished_at",
+    }
+
+
+def test_run_backtrace_batch_isolates_failures_per_item() -> None:
+    service = EnginesControlRuntimeService()
+
+    result = service.run_backtrace_batch(
+        {
+            "items": [
+                {
+                    "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "symbol": "AAPL",
+                    "candles": _candles() * 2,
+                    "request_id": "req-ok",
+                },
+                {
+                    "algorithm_key": "does_not_exist",
+                    "symbol": "MSFT",
+                    "candles": _candles() * 2,
+                    "request_id": "req-bad",
+                },
+            ]
+        }
+    )
+
+    assert result["status"] == "partial_failure"
+    assert result["item_count"] == 2
+    assert result["success_count"] == 1
+    assert result["failure_count"] == 1
+    assert result["items"][0]["status"] == "completed"
+    assert result["items"][1]["status"] == "failed"
+    assert result["items"][1]["algorithm_key"] == "does_not_exist"
+    assert (
+        result["items"][1]["error"]
+        == "sensor_config alg_key=does_not_exist is unsupported"
+    )
