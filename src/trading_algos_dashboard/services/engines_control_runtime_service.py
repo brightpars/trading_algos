@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from uuid import uuid4
 
+from trading_algos.alertgen import get_alert_algorithm_spec_by_key
+from trading_algos.alertgen.core.validation import normalize_alertgen_sensor_config
 from trading_algos_dashboard.services.backtrace_models import (
     BacktraceCandle,
     BacktraceRequest,
     BacktraceResult,
     BacktraceResultDict,
     RequiredCandleField,
+)
+from trading_algos_dashboard.services.algorithm_runner_service import (
+    run_alert_algorithm,
 )
 
 
@@ -33,6 +40,7 @@ class EnginesControlRuntimeService:
         request_id = request.get("request_id") if isinstance(request, dict) else None
         try:
             normalized_request = self._normalize_request(request)
+            execution_result = self._execute_backtrace(normalized_request)
         except ValueError as exc:
             finished_at = self._utc_now()
             return BacktraceResult(
@@ -44,14 +52,37 @@ class EnginesControlRuntimeService:
                 ),
                 symbol=self._normalize_string_field_if_present(request, "symbol"),
                 input_summary=self._failed_input_summary(request),
-                result_payload={},
+                signal_summary={},
+                evaluation_summary={},
+                report={},
+                chart_payload={},
+                execution_steps=[],
+                error=str(exc),
+                started_at=started_at,
+                finished_at=finished_at,
+            ).to_transport_dict()
+        except Exception as exc:
+            finished_at = self._utc_now()
+            return BacktraceResult(
+                status="failed",
+                run_id=run_id,
+                request_id=self._safe_optional_string(request_id),
+                algorithm_key=self._normalize_string_field_if_present(
+                    request, "algorithm_key"
+                ),
+                symbol=self._normalize_string_field_if_present(request, "symbol"),
+                input_summary=self._failed_input_summary(request),
+                signal_summary={},
+                evaluation_summary={},
+                report={},
+                chart_payload={},
+                execution_steps=[],
                 error=str(exc),
                 started_at=started_at,
                 finished_at=finished_at,
             ).to_transport_dict()
 
         finished_at = self._utc_now()
-        result_payload = self._build_placeholder_result_payload(normalized_request)
         return BacktraceResult(
             status="completed",
             run_id=run_id,
@@ -59,11 +90,67 @@ class EnginesControlRuntimeService:
             algorithm_key=normalized_request.algorithm_key,
             symbol=normalized_request.symbol,
             input_summary=self._build_input_summary(normalized_request),
-            result_payload=result_payload,
+            signal_summary=dict(execution_result["signal_summary"]),
+            evaluation_summary=dict(execution_result["evaluation_summary"]),
+            report=dict(execution_result["report"]),
+            chart_payload=dict(execution_result["chart_payload"]),
+            execution_steps=list(execution_result["execution_steps"]),
             error=None,
             started_at=started_at,
             finished_at=finished_at,
         ).to_transport_dict()
+
+    def _execute_backtrace(self, request: BacktraceRequest) -> dict[str, Any]:
+        report_base_path = request.report_base_path
+        if report_base_path is not None:
+            return self._run_alert_algorithm(
+                request=request,
+                report_base_path=report_base_path,
+            )
+
+        with TemporaryDirectory(prefix="engines-control-backtrace-") as temp_dir:
+            return self._run_alert_algorithm(
+                request=request,
+                report_base_path=temp_dir,
+            )
+
+    def _run_alert_algorithm(
+        self, *, request: BacktraceRequest, report_base_path: str
+    ) -> dict[str, Any]:
+        algorithm_spec = get_alert_algorithm_spec_by_key(request.algorithm_key)
+        sensor_config = normalize_alertgen_sensor_config(
+            {
+                "symbol": request.symbol,
+                "alg_key": request.algorithm_key,
+                "alg_param": {
+                    **dict(algorithm_spec.default_param),
+                    **dict(request.algorithm_params),
+                },
+                "buy": request.buy,
+                "sell": request.sell,
+            }
+        )
+        execution_result = run_alert_algorithm(
+            sensor_config=sensor_config,
+            report_base_path=report_base_path,
+            candles=[dict(candle.to_transport_dict()) for candle in request.candles],
+        )
+        report = self._normalize_transport_value(execution_result["report"])
+        return {
+            "signal_summary": self._normalize_transport_value(
+                execution_result["signal_summary"]
+            ),
+            "evaluation_summary": self._normalize_transport_value(
+                report.get("evaluation_summary", {})
+            ),
+            "report": report,
+            "chart_payload": self._normalize_transport_value(
+                execution_result["chart_payload"]
+            ),
+            "execution_steps": self._normalize_execution_steps(
+                execution_result.get("execution_steps", [])
+            ),
+        }
 
     def _normalize_request(self, request: dict[str, Any]) -> BacktraceRequest:
         if not isinstance(request, dict):
@@ -186,23 +273,6 @@ class EnginesControlRuntimeService:
             "metadata_keys": sorted(request.metadata.keys()),
         }
 
-    def _build_placeholder_result_payload(
-        self, request: BacktraceRequest
-    ) -> dict[str, Any]:
-        return {
-            "execution_mode": "local_stub",
-            "buy_enabled": request.buy,
-            "sell_enabled": request.sell,
-            "candles_processed": len(request.candles),
-            "signals": [],
-            "artifacts": {},
-            "summary": {
-                "message": "Backtrace execution is not wired yet",
-                "algorithm_params": dict(request.algorithm_params),
-                "metadata": dict(request.metadata),
-            },
-        }
-
     def _failed_input_summary(self, request: Any) -> dict[str, Any]:
         if not isinstance(request, dict):
             return {"request_type": type(request).__name__}
@@ -226,3 +296,29 @@ class EnginesControlRuntimeService:
 
     def _utc_now(self) -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    def _normalize_execution_steps(self, steps: Any) -> list[dict[str, Any]]:
+        if not isinstance(steps, list):
+            return []
+        normalized_steps: list[dict[str, Any]] = []
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            normalized_steps.append(self._normalize_transport_value(step))
+        return normalized_steps
+
+    def _normalize_transport_value(self, value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        if isinstance(value, dict):
+            return {
+                str(key): self._normalize_transport_value(nested_value)
+                for key, nested_value in value.items()
+            }
+        if isinstance(value, list):
+            return [self._normalize_transport_value(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._normalize_transport_value(item) for item in value]
+        if isinstance(value, Path):
+            return str(value)
+        return value

@@ -36,7 +36,11 @@ class BacktraceResultDict(TypedDict):
     algorithm_key: str
     symbol: str
     input_summary: dict[str, Any]
-    result_payload: dict[str, Any]
+    signal_summary: dict[str, Any]
+    evaluation_summary: dict[str, Any]
+    report: dict[str, Any]
+    chart_payload: dict[str, Any]
+    execution_steps: list[dict[str, Any]]
     error: str | None
     started_at: str
     finished_at: str
@@ -101,7 +105,11 @@ class BacktraceResult:
     algorithm_key: str
     symbol: str
     input_summary: dict[str, Any]
-    result_payload: dict[str, Any]
+    signal_summary: dict[str, Any]
+    evaluation_summary: dict[str, Any]
+    report: dict[str, Any]
+    chart_payload: dict[str, Any]
+    execution_steps: list[dict[str, Any]]
     error: str | None
     started_at: str
     finished_at: str
@@ -114,7 +122,11 @@ class BacktraceResult:
             "algorithm_key": self.algorithm_key,
             "symbol": self.symbol,
             "input_summary": dict(self.input_summary),
-            "result_payload": dict(self.result_payload),
+            "signal_summary": dict(self.signal_summary),
+            "evaluation_summary": dict(self.evaluation_summary),
+            "report": dict(self.report),
+            "chart_payload": dict(self.chart_payload),
+            "execution_steps": [dict(step) for step in self.execution_steps],
             "error": self.error,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
