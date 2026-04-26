@@ -94,6 +94,9 @@ from trading_algos_dashboard.services.market_data_cache_settings_service import 
 )
 from trading_algos_dashboard.services.report_service import ReportService
 from trading_algos_dashboard.services.server_control_service import ServerControlService
+from trading_algos_dashboard.services.backtrace_client_service import (
+    BacktraceClientService,
+)
 from trading_algos_dashboard.services.engines_control_runtime_service import (
     EnginesControlRuntimeService,
 )
@@ -219,6 +222,10 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     engines_control_runtime_service = EnginesControlRuntimeService(
         backtrace_session_repository=backtrace_session_repository,
     )
+    backtrace_client_service = BacktraceClientService(
+        runtime_service=engines_control_runtime_service,
+        backtrace_session_repository=backtrace_session_repository,
+    )
 
     app.extensions["mongo"] = mongo
     app.extensions["experiment_repository"] = experiment_repository
@@ -271,6 +278,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["configuration_builder_service"] = configuration_builder_service
     app.extensions["server_control_service"] = server_control_service
     app.extensions["engines_control_runtime_service"] = engines_control_runtime_service
+    app.extensions["backtrace_client_service"] = backtrace_client_service
 
     app.register_blueprint(home_bp)
     app.register_blueprint(algorithms_bp)

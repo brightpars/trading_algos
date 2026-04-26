@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime, timezone
+from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request
 
@@ -98,6 +99,21 @@ def _get_json_object() -> Mapping[str, object] | None:
     if isinstance(payload, dict):
         return payload
     return None
+
+
+def _backtrace_payload() -> tuple[Mapping[str, object] | None, Any]:
+    payload = _get_json_object()
+    if payload is None:
+        return None, (
+            jsonify(
+                {
+                    "error": "invalid_request",
+                    "message": "Request body must be a JSON object.",
+                }
+            ),
+            400,
+        )
+    return payload, None
 
 
 @bp.get("/algorithms")
@@ -201,6 +217,40 @@ def configuration(draft_id: str):
     payload = current_app.extensions["configuration_builder_service"].get_draft_detail(
         draft_id
     )
+    if payload is None:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(payload)
+
+
+@bp.post("/backtraces")
+def create_backtrace():
+    payload, error_response = _backtrace_payload()
+    if error_response is not None:
+        return error_response
+    try:
+        run = current_app.extensions["backtrace_client_service"].submit_run(payload)
+    except ValueError as exc:
+        return (
+            jsonify(
+                {
+                    "error": "validation_error",
+                    "message": str(exc),
+                }
+            ),
+            400,
+        )
+    return jsonify(run), 201
+
+
+@bp.get("/backtraces")
+def list_backtraces():
+    payload = current_app.extensions["backtrace_client_service"].list_runs()
+    return jsonify(payload)
+
+
+@bp.get("/backtraces/<run_id>")
+def backtrace_detail(run_id: str):
+    payload = current_app.extensions["backtrace_client_service"].get_run(run_id)
     if payload is None:
         return jsonify({"error": "not found"}), 404
     return jsonify(payload)

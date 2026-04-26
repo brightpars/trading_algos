@@ -388,3 +388,114 @@ def test_experiment_queue_api_returns_running_and_queued_items(monkeypatch):
     assert payload["queue_summary"]["running_count"] == 1
     assert payload["queue_summary"]["max_concurrent_experiments"] == 2
     assert payload["queue_summary"]["queued_count"] == 1
+
+
+def _backtrace_request_payload() -> dict[str, object]:
+    return {
+        "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+        "algorithm_params": {"window": 2},
+        "symbol": "AAPL",
+        "candles": [
+            {
+                "ts": "2025-01-01T10:00:00Z",
+                "Open": 100.0,
+                "High": 101.0,
+                "Low": 99.0,
+                "Close": 100.5,
+                "Volume": 1000,
+            },
+            {
+                "ts": "2025-01-01T10:01:00Z",
+                "Open": 100.5,
+                "High": 101.5,
+                "Low": 100.0,
+                "Close": 101.0,
+                "Volume": 1200,
+            },
+            {
+                "ts": "2025-01-01T10:02:00Z",
+                "Open": 101.0,
+                "High": 102.0,
+                "Low": 100.5,
+                "Close": 101.8,
+                "Volume": 1400,
+            },
+        ],
+        "metadata": {"source": "api-test", "label": "demo"},
+    }
+
+
+def test_backtrace_submit_api_returns_created_run(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/api/backtraces",
+        json=_backtrace_request_payload(),
+    )
+
+    assert response.status_code == 201
+    payload = response.get_json()
+    assert payload["status"] == "completed"
+    assert payload["algorithm_key"] == _backtrace_request_payload()["algorithm_key"]
+    assert payload["symbol"] == "AAPL"
+    assert payload["metadata"] == {"source": "api-test", "label": "demo"}
+    assert payload["request"]["algorithm_params"] == {"window": 2}
+    assert payload["full_result"]["status"] == "completed"
+
+
+def test_backtrace_submit_api_returns_validation_error(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/api/backtraces",
+        json={
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload == {
+        "error": "validation_error",
+        "message": "Backtrace request is missing required field: candles",
+    }
+
+
+def test_backtrace_list_api_returns_recent_runs(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+
+    first_response = client.post("/api/backtraces", json=_backtrace_request_payload())
+    second_payload = _backtrace_request_payload()
+    second_payload["metadata"] = {"source": "api-test", "label": "newer"}
+    second_response = client.post("/api/backtraces", json=second_payload)
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+
+    response = client.get("/api/backtraces")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["count"] == 2
+    assert len(payload["items"]) == 2
+    assert payload["items"][0]["run_id"] == second_response.get_json()["run_id"]
+    assert payload["items"][0]["metadata"] == {"source": "api-test", "label": "newer"}
+    assert payload["items"][0]["result_summary"]["status"] == "completed"
+
+
+def test_backtrace_detail_api_returns_run(monkeypatch):
+    app = _build_app(monkeypatch)
+    client = app.test_client()
+
+    create_response = client.post("/api/backtraces", json=_backtrace_request_payload())
+    run_id = create_response.get_json()["run_id"]
+
+    response = client.get(f"/api/backtraces/{run_id}")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["run_id"] == run_id
+    assert payload["request"]["metadata"] == {"source": "api-test", "label": "demo"}
+    assert payload["full_result"]["signal_summary"]["total_rows"] == 3
