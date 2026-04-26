@@ -1,6 +1,9 @@
 from trading_algos_dashboard.repositories.experiment_repository import (
     ExperimentRepository,
 )
+from trading_algos_dashboard.repositories.backtrace_session_repository import (
+    BacktraceSessionRepository,
+)
 from trading_algos_dashboard.repositories.algorithm_catalog_import_run_repository import (
     AlgorithmCatalogImportRunRepository,
 )
@@ -22,6 +25,7 @@ __all__ = [
     "AlgorithmCatalogImportRunRepository",
     "AlgorithmCatalogLinkRepository",
     "AlgorithmCatalogRepository",
+    "BacktraceSessionRepository",
     "ExperimentRepository",
     "ExperimentSchedulerLeaseRepository",
     "MarketDataCacheRepository",

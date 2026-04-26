@@ -3,6 +3,28 @@ from trading_algos_dashboard.services.engines_control_runtime_service import (
 )
 
 
+class _BacktraceSessionRepositoryStub:
+    def __init__(self) -> None:
+        self.sessions: dict[str, dict[str, object]] = {}
+
+    def create_session(self, document: dict[str, object]) -> dict[str, object]:
+        payload = dict(document)
+        self.sessions[str(payload["run_id"])] = payload
+        return payload
+
+    def update_session(self, run_id: str, values: dict[str, object]) -> None:
+        self.sessions[run_id].update(values)
+
+    def get_run(self, run_id: str) -> dict[str, object] | None:
+        payload = self.sessions.get(run_id)
+        if payload is None:
+            return None
+        return dict(payload)
+
+    def list_recent_runs(self, *, limit: int = 20) -> list[dict[str, object]]:
+        return list(self.sessions.values())[:limit]
+
+
 def _candles() -> list[dict[str, object]]:
     return [
         {
@@ -201,3 +223,64 @@ def test_run_backtrace_handles_short_input_history_consistently() -> None:
     assert any(
         chart["chart_id"] == "core_indicators" for chart in result["report"]["charts"]
     )
+
+
+def test_run_backtrace_persists_success_result() -> None:
+    repository = _BacktraceSessionRepositoryStub()
+    service = EnginesControlRuntimeService(backtrace_session_repository=repository)
+
+    result = service.run_backtrace(
+        {
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+            "candles": _candles() * 3,
+            "request_id": "req-123",
+        }
+    )
+
+    persisted = repository.get_run(result["run_id"])
+
+    assert persisted is not None
+    assert persisted["run_id"] == result["run_id"]
+    assert persisted["request_id"] == "req-123"
+    assert persisted["status"] == "completed"
+    assert persisted["algorithm_key"] == result["algorithm_key"]
+    assert persisted["symbol"] == result["symbol"]
+    assert persisted["input_summary"] == result["input_summary"]
+    assert persisted["result_summary"] == {
+        "status": "completed",
+        "total_rows": 6,
+        "buy_count": result["signal_summary"].get("buy_count"),
+        "sell_count": result["signal_summary"].get("sell_count"),
+        "execution_step_count": len(result["execution_steps"]),
+        "has_report": True,
+        "has_chart_payload": True,
+    }
+    assert persisted["full_result"] == result
+    assert persisted["error"] is None
+    assert persisted["finished_at"] == result["finished_at"]
+
+
+def test_run_backtrace_persists_failure_result() -> None:
+    repository = _BacktraceSessionRepositoryStub()
+    service = EnginesControlRuntimeService(backtrace_session_repository=repository)
+
+    result = service.run_backtrace(
+        {
+            "symbol": "AAPL",
+            "candles": _candles(),
+        }
+    )
+
+    persisted = repository.get_run(result["run_id"])
+
+    assert result["status"] == "failed"
+    assert persisted is not None
+    assert persisted["status"] == "failed"
+    assert persisted["algorithm_key"] == ""
+    assert persisted["symbol"] == "AAPL"
+    assert persisted["input_summary"] == result["input_summary"]
+    assert persisted["result_summary"] == {}
+    assert persisted["full_result"] == result
+    assert persisted["error"] == result["error"]
+    assert persisted["finished_at"] == result["finished_at"]

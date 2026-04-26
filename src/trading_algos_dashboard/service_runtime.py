@@ -12,6 +12,9 @@ from trading_servers import DataServer
 from trading_servers import FakeDateTimeServer
 from trading_servers.xmlrpc_server import Base_XML_RPC_Server
 
+from trading_algos_dashboard.repositories.backtrace_session_repository import (
+    BacktraceSessionRepository,
+)
 from trading_algos_dashboard.services.engines_control_runtime_service import (
     EnginesControlRuntimeService,
 )
@@ -133,12 +136,18 @@ def _build_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
             log_requests_to_terminal=False,
         )
     if config.name == "engines_control":
+        mongo_uri, mongo_db_name = _mongo_runtime_settings()
         return DashboardEnginesControlServer(
             user_id=config.user_id,
             ip=config.host,
             port=config.port,
             server_name=config.name,
             log_requests_to_terminal=False,
+            runtime_service=EnginesControlRuntimeService(
+                backtrace_session_repository=BacktraceSessionRepository(
+                    MongoClient(mongo_uri)[mongo_db_name]
+                )
+            ),
         )
     raise ValueError(f"Unsupported service runtime: {config.name}")
 

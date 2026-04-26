@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Protocol
 from uuid import uuid4
 
 from trading_algos.alertgen import get_alert_algorithm_spec_by_key
@@ -20,6 +20,12 @@ from trading_algos_dashboard.services.algorithm_runner_service import (
 )
 
 
+class BacktraceSessionStore(Protocol):
+    def create_session(self, document: dict[str, Any]) -> dict[str, Any]: ...
+
+    def update_session(self, run_id: str, values: dict[str, Any]) -> None: ...
+
+
 class EnginesControlRuntimeService:
     _REQUIRED_REQUEST_FIELDS: tuple[str, ...] = (
         "algorithm_key",
@@ -34,16 +40,29 @@ class EnginesControlRuntimeService:
         "Close",
     )
 
+    def __init__(
+        self,
+        *,
+        backtrace_session_repository: BacktraceSessionStore | None = None,
+    ) -> None:
+        self._backtrace_session_repository = backtrace_session_repository
+
     def run_backtrace(self, request: dict[str, Any]) -> BacktraceResultDict:
         started_at = self._utc_now()
         run_id = self._new_run_id()
         request_id = request.get("request_id") if isinstance(request, dict) else None
+        self._create_run_record(
+            run_id=run_id,
+            request=request,
+            request_id=request_id,
+            created_at=started_at,
+        )
         try:
             normalized_request = self._normalize_request(request)
             execution_result = self._execute_backtrace(normalized_request)
         except ValueError as exc:
             finished_at = self._utc_now()
-            return BacktraceResult(
+            result = BacktraceResult(
                 status="failed",
                 run_id=run_id,
                 request_id=self._safe_optional_string(request_id),
@@ -61,9 +80,11 @@ class EnginesControlRuntimeService:
                 started_at=started_at,
                 finished_at=finished_at,
             ).to_transport_dict()
+            self._mark_run_failed(result)
+            return result
         except Exception as exc:
             finished_at = self._utc_now()
-            return BacktraceResult(
+            result = BacktraceResult(
                 status="failed",
                 run_id=run_id,
                 request_id=self._safe_optional_string(request_id),
@@ -81,9 +102,11 @@ class EnginesControlRuntimeService:
                 started_at=started_at,
                 finished_at=finished_at,
             ).to_transport_dict()
+            self._mark_run_failed(result)
+            return result
 
         finished_at = self._utc_now()
-        return BacktraceResult(
+        result = BacktraceResult(
             status="completed",
             run_id=run_id,
             request_id=normalized_request.request_id,
@@ -99,6 +122,87 @@ class EnginesControlRuntimeService:
             started_at=started_at,
             finished_at=finished_at,
         ).to_transport_dict()
+        self._mark_run_completed(request=normalized_request, result=result)
+        return result
+
+    def _create_run_record(
+        self,
+        *,
+        run_id: str,
+        request: Any,
+        request_id: Any,
+        created_at: str,
+    ) -> None:
+        if self._backtrace_session_repository is None:
+            return
+        self._backtrace_session_repository.create_session(
+            {
+                "run_id": run_id,
+                "request_id": self._safe_optional_string(request_id),
+                "status": "running",
+                "algorithm_key": self._normalize_string_field_if_present(
+                    request, "algorithm_key"
+                ),
+                "symbol": self._normalize_string_field_if_present(request, "symbol"),
+                "request": self._normalize_transport_value(request),
+                "input_summary": self._failed_input_summary(request),
+                "result_summary": {},
+                "full_result": None,
+                "error": None,
+                "created_at": created_at,
+                "started_at": created_at,
+                "finished_at": None,
+            }
+        )
+
+    def _mark_run_completed(
+        self, *, request: BacktraceRequest, result: BacktraceResultDict
+    ) -> None:
+        if self._backtrace_session_repository is None:
+            return
+        self._backtrace_session_repository.update_session(
+            result["run_id"],
+            {
+                "status": "completed",
+                "algorithm_key": request.algorithm_key,
+                "symbol": request.symbol,
+                "request": self._normalize_transport_value(request.to_transport_dict()),
+                "input_summary": dict(result["input_summary"]),
+                "result_summary": self._build_result_summary(result),
+                "full_result": self._normalize_transport_value(result),
+                "error": None,
+                "finished_at": result["finished_at"],
+            },
+        )
+
+    def _mark_run_failed(self, result: BacktraceResultDict) -> None:
+        if self._backtrace_session_repository is None:
+            return
+        self._backtrace_session_repository.update_session(
+            result["run_id"],
+            {
+                "status": "failed",
+                "algorithm_key": result["algorithm_key"],
+                "symbol": result["symbol"],
+                "input_summary": dict(result["input_summary"]),
+                "result_summary": {},
+                "full_result": self._normalize_transport_value(result),
+                "error": result["error"],
+                "finished_at": result["finished_at"],
+            },
+        )
+
+    def _build_result_summary(self, result: BacktraceResultDict) -> dict[str, Any]:
+        signal_summary = result["signal_summary"]
+        return {
+            "status": result["status"],
+            "total_rows": signal_summary.get("total_rows"),
+            "buy_count": signal_summary.get("buy_count"),
+            "sell_count": signal_summary.get("sell_count"),
+            "execution_step_count": len(result["execution_steps"]),
+            "has_report": bool(result["report"]),
+            "has_chart_payload": bool(result["chart_payload"]),
+        }
 
     def _execute_backtrace(self, request: BacktraceRequest) -> dict[str, Any]:
         report_base_path = request.report_base_path

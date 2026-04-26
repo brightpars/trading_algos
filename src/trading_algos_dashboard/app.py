@@ -34,6 +34,9 @@ from trading_algos_dashboard.repositories.algorithm_catalog_repository import (
     AlgorithmCatalogRepository,
 )
 from trading_algos_dashboard.repositories.result_repository import ResultRepository
+from trading_algos_dashboard.repositories.backtrace_session_repository import (
+    BacktraceSessionRepository,
+)
 from trading_algos_dashboard.repositories.market_data_cache_repository import (
     MarketDataCacheRepository,
 )
@@ -91,6 +94,9 @@ from trading_algos_dashboard.services.market_data_cache_settings_service import 
 )
 from trading_algos_dashboard.services.report_service import ReportService
 from trading_algos_dashboard.services.server_control_service import ServerControlService
+from trading_algos_dashboard.services.engines_control_runtime_service import (
+    EnginesControlRuntimeService,
+)
 
 
 def create_app(config: DashboardConfig | None = None) -> Flask:
@@ -114,6 +120,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
 
     experiment_repository = ExperimentRepository(mongo.db)
     result_repository = ResultRepository(mongo.db)
+    backtrace_session_repository = BacktraceSessionRepository(mongo.db)
     configuration_draft_repository = ConfigurationDraftRepository(mongo.db)
     configuration_revision_repository = ConfigurationRevisionRepository(mongo.db)
     data_source_settings_repository = DataSourceSettingsRepository(mongo.db)
@@ -209,10 +216,14 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     server_control_service = ServerControlService(
         repository=server_control_settings_repository,
     )
+    engines_control_runtime_service = EnginesControlRuntimeService(
+        backtrace_session_repository=backtrace_session_repository,
+    )
 
     app.extensions["mongo"] = mongo
     app.extensions["experiment_repository"] = experiment_repository
     app.extensions["result_repository"] = result_repository
+    app.extensions["backtrace_session_repository"] = backtrace_session_repository
     app.extensions["configuration_draft_repository"] = configuration_draft_repository
     app.extensions["configuration_revision_repository"] = (
         configuration_revision_repository
@@ -259,6 +270,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["evaluation_service"] = evaluation_service
     app.extensions["configuration_builder_service"] = configuration_builder_service
     app.extensions["server_control_service"] = server_control_service
+    app.extensions["engines_control_runtime_service"] = engines_control_runtime_service
 
     app.register_blueprint(home_bp)
     app.register_blueprint(algorithms_bp)
