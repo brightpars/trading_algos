@@ -4,6 +4,7 @@ import os
 import subprocess
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from trading_algos_dashboard.repositories.server_control_settings_repository import (
@@ -20,6 +21,7 @@ SERVICE_DEFINITIONS: tuple[dict[str, Any], ...] = (
         "start_command_env": "TRADING_ALGOS_DASHBOARD_CENTRAL_START_CMD",
         "workdir_env": "TRADING_ALGOS_DASHBOARD_CENTRAL_WORKDIR",
         "host_env": "TRADING_ALGOS_DASHBOARD_CENTRAL_HOST",
+        "default_start_command": "./.venv/bin/python -m trading_algos_dashboard.service_runtime central",
     },
     {
         "name": "data",
@@ -30,6 +32,7 @@ SERVICE_DEFINITIONS: tuple[dict[str, Any], ...] = (
         "start_command_env": "TRADING_ALGOS_DASHBOARD_DATA_START_CMD",
         "workdir_env": "TRADING_ALGOS_DASHBOARD_DATA_WORKDIR",
         "host_env": "TRADING_ALGOS_DASHBOARD_DATA_HOST",
+        "default_start_command": "./.venv/bin/python -m trading_algos_dashboard.service_runtime data",
     },
     {
         "name": "fake_datetime",
@@ -40,6 +43,7 @@ SERVICE_DEFINITIONS: tuple[dict[str, Any], ...] = (
         "start_command_env": "TRADING_ALGOS_DASHBOARD_FAKE_DATETIME_START_CMD",
         "workdir_env": "TRADING_ALGOS_DASHBOARD_FAKE_DATETIME_WORKDIR",
         "host_env": "TRADING_ALGOS_DASHBOARD_FAKE_DATETIME_HOST",
+        "default_start_command": "./.venv/bin/python -m trading_algos_dashboard.service_runtime fake_datetime",
     },
     {
         "name": "broker",
@@ -50,6 +54,7 @@ SERVICE_DEFINITIONS: tuple[dict[str, Any], ...] = (
         "start_command_env": "TRADING_ALGOS_DASHBOARD_BROKER_START_CMD",
         "workdir_env": "TRADING_ALGOS_DASHBOARD_BROKER_WORKDIR",
         "host_env": "TRADING_ALGOS_DASHBOARD_BROKER_HOST",
+        "default_start_command": "",
     },
     {
         "name": "engines_control",
@@ -60,8 +65,11 @@ SERVICE_DEFINITIONS: tuple[dict[str, Any], ...] = (
         "start_command_env": "TRADING_ALGOS_DASHBOARD_ENGINES_CONTROL_START_CMD",
         "workdir_env": "TRADING_ALGOS_DASHBOARD_ENGINES_CONTROL_WORKDIR",
         "host_env": "TRADING_ALGOS_DASHBOARD_ENGINES_CONTROL_HOST",
+        "default_start_command": "./.venv/bin/python -m trading_algos_dashboard.service_runtime engines_control",
     },
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 _START_TIMEOUT_SECONDS = 5.0
 _STOP_TIMEOUT_SECONDS = 5.0
@@ -112,6 +120,23 @@ class ServerControlService:
         if env_value:
             return env_value
         return str(definition["default_ip"])
+
+    def _start_command_details(
+        self, definition: dict[str, Any]
+    ) -> tuple[str | None, str]:
+        env_value = os.environ.get(str(definition["start_command_env"]), "").strip()
+        if env_value:
+            return env_value, "env override"
+        default_command = str(definition.get("default_start_command", "")).strip()
+        if default_command:
+            return default_command, "dashboard default"
+        return None, "No dashboard start command is configured for this service."
+
+    def _service_startability(self, definition: dict[str, Any]) -> tuple[bool, str]:
+        command, source_or_reason = self._start_command_details(definition)
+        if command is None:
+            return False, source_or_reason
+        return True, source_or_reason
 
     def get_port_settings(self) -> dict[str, Any]:
         settings = self.repository.get_settings() or {}
@@ -182,6 +207,7 @@ class ServerControlService:
         servers: list[dict[str, Any]] = []
         for definition in SERVICE_DEFINITIONS:
             state = self._server_runtime_state(str(definition["name"]))
+            startable, start_reason = self._service_startability(definition)
             servers.append(
                 {
                     "name": definition["name"],
@@ -193,16 +219,17 @@ class ServerControlService:
                         str(definition["name"]), state
                     ),
                     "controllable": bool(definition["controllable"]),
+                    "startable": startable,
+                    "start_reason": start_reason,
                 }
             )
         return servers
 
     def _start_command(self, definition: dict[str, Any]) -> str:
-        command = os.environ.get(str(definition["start_command_env"]), "").strip()
-        if not command:
+        command, source_or_reason = self._start_command_details(definition)
+        if command is None:
             raise RuntimeError(
-                f"No start command configured for {definition['label']}; "
-                f"set {definition['start_command_env']}"
+                f"Start unavailable for {definition['label']}: {source_or_reason}"
             )
         return command
 
@@ -217,7 +244,14 @@ class ServerControlService:
                 "SERVICE_USER_ID": str(self.user_id),
             }
         )
-        workdir = os.environ.get(str(definition["workdir_env"]), "").strip() or None
+        workdir = os.environ.get(str(definition["workdir_env"]), "").strip() or str(
+            _REPO_ROOT
+        )
+        environment["PYTHONPATH"] = (
+            f"{_REPO_ROOT / 'src'}:{environment['PYTHONPATH']}"
+            if environment.get("PYTHONPATH")
+            else str(_REPO_ROOT / "src")
+        )
         subprocess.Popen(
             ["/bin/bash", "-lc", self._start_command(definition)],
             cwd=workdir,

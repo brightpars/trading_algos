@@ -54,7 +54,7 @@ class _AlgorithmCatalogServiceStub:
         raise ValueError(f"Algorithm is not runnable: {alg_key}")
 
 
-def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm():
+def test_submit_all_algorithms_for_symbol_skips_non_executable_defaults_by_default():
     experiment_service = _ExperimentServiceStub()
     service = BulkExperimentService(
         experiment_service=experiment_service,
@@ -70,9 +70,10 @@ def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm()
         notes="bulk notes",
     )
 
-    assert result.created_count == 3
-    assert result.skipped_count == 0
-    assert len(experiment_service.calls) == 3
+    assert result.created_count == 2
+    assert result.skipped_count == 1
+    assert result.skipped_algorithms == ["delta_neutral_volatility_trading"]
+    assert len(experiment_service.calls) == 2
     assert experiment_service.calls[0]["algorithms"] == [
         {
             "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
@@ -85,6 +86,28 @@ def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm()
             "alg_param": {"window": 2},
         }
     ]
+
+
+def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm_when_skip_disabled():
+    experiment_service = _ExperimentServiceStub()
+    service = BulkExperimentService(
+        experiment_service=experiment_service,
+        algorithm_catalog_service=_AlgorithmCatalogServiceStub(),
+    )
+
+    result = service.submit_all_algorithms_for_symbol(
+        symbol="AAPL",
+        start_date="2024-01-01",
+        start_time="09:30",
+        end_date="2024-01-31",
+        end_time="16:00",
+        notes="bulk notes",
+        skip_non_executable_defaults=False,
+    )
+
+    assert result.created_count == 3
+    assert result.skipped_count == 0
+    assert len(experiment_service.calls) == 3
     assert experiment_service.calls[2]["algorithms"] == [
         {
             "alg_key": "delta_neutral_volatility_trading",
@@ -147,6 +170,7 @@ def test_submit_all_algorithms_for_symbol_includes_alg_key_in_validation_error()
             start_time="09:30",
             end_date="2024-01-31",
             end_time="16:00",
+            skip_non_executable_defaults=False,
         )
     except ValueError as exc:
         assert str(exc) == (

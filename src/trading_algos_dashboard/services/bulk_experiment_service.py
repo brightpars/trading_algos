@@ -41,7 +41,7 @@ class BulkExperimentService:
         end_date: str,
         end_time: str,
         notes: str = "",
-        skip_non_executable_defaults: bool = False,
+        skip_non_executable_defaults: bool = True,
     ) -> BulkExperimentSubmissionResult:
         runnable_algorithms = (
             self.algorithm_catalog_service.list_runnable_algorithm_implementations()

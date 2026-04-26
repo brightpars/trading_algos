@@ -4,7 +4,7 @@
 <div class="d-flex justify-content-between align-items-start gap-3 mb-4 flex-wrap">
   <div>
     <h1>Services</h1>
-    <p class="text-muted mb-0">Monitor Smarttrade server status, manage ports, and start or stop supported services from the dashboard.</p>
+    <p class="text-muted mb-0">Monitor dashboard service status, manage ports, and start or stop supported local services.</p>
   </div>
   <a class="btn btn-outline-secondary" href="{{ url_for('administration.administration_home') }}">Back to Administration</a>
 </div>
@@ -12,7 +12,7 @@
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h2 class="h4">Ports</h2>
-    <p class="text-muted">Initial values are seeded from the Smarttrade services page defaults.</p>
+    <p class="text-muted">Initial values use dashboard default service ports.</p>
     <form method="post" action="{{ url_for('administration.save_service_ports') }}" class="row g-3">
       {% for server in servers %}
       <div class="col-12 col-md-6 col-xl-4">
@@ -32,7 +32,7 @@
       <div class="col-12">
         <div class="form-text mb-2">
           {% if port_settings.is_default %}
-          Using default Smarttrade-aligned ports.
+          Using default dashboard service ports.
           {% else %}
           Using saved custom ports.
           {% endif %}
@@ -45,12 +45,12 @@
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <h2 class="h4">Server status</h2>
+    <h2 class="h4">Service status</h2>
     <div class="table-responsive">
       <table class="table align-middle mb-0">
         <thead>
           <tr>
-            <th>Server</th>
+            <th>Service</th>
             <th>IP</th>
             <th>Port</th>
             <th>State</th>
@@ -79,6 +79,7 @@
             <td><span class="small text-muted">{{ server.details or '-' }}</span></td>
             <td>
               {% if server.controllable %}
+              {% if server.startable %}
               <div class="d-flex gap-2 flex-wrap">
                 <form method="post" action="{{ url_for('administration.control_service', server_name=server.name, action='start') }}">
                   <button class="btn btn-sm btn-outline-success" type="submit">Start</button>
@@ -87,6 +88,10 @@
                   <button class="btn btn-sm btn-outline-danger" type="submit">Stop</button>
                 </form>
               </div>
+              <div class="small text-muted mt-2">Start command source: {{ server.start_reason }}</div>
+              {% else %}
+              <div class="small text-muted">Start unavailable: {{ server.start_reason }}</div>
+              {% endif %}
               {% else %}
               <span class="small text-muted">Broker is status-only on this page.</span>
               {% endif %}

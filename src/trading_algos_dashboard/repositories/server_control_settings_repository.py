@@ -6,6 +6,7 @@ from typing import Any
 from trading_algos_dashboard.repositories.mongo_base import MongoRepository
 
 _SETTINGS_ID = "dashboard_service_control"
+_LEGACY_SETTINGS_IDS = ("smarttrade_server_control",)
 
 
 class ServerControlSettingsRepository(MongoRepository):
@@ -13,7 +14,16 @@ class ServerControlSettingsRepository(MongoRepository):
         super().__init__(db, "dashboard_server_control_settings")
 
     def get_settings(self) -> dict[str, Any] | None:
-        return self._without_id(self.collection.find_one({"settings_id": _SETTINGS_ID}))
+        document = self.collection.find_one({"settings_id": _SETTINGS_ID})
+        if document is not None:
+            return self._without_id(document)
+        for legacy_settings_id in _LEGACY_SETTINGS_IDS:
+            legacy_document = self.collection.find_one(
+                {"settings_id": legacy_settings_id}
+            )
+            if legacy_document is not None:
+                return self._without_id(legacy_document)
+        return None
 
     def save_settings(self, *, ports: dict[str, int]) -> dict[str, Any]:
         payload = {

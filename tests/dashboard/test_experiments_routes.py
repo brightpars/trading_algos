@@ -856,7 +856,7 @@ def test_create_experiment_returns_503_when_data_source_dependencies_are_missing
         "create_experiment",
         lambda **_kwargs: (_ for _ in ()).throw(
             DataSourceUnavailableError(
-                "Smarttrade data service is unavailable. "
+                "Market data service is unavailable. "
                 "Please make sure the data server is running. "
                 "Tried to connect to 127.0.0.1:7003."
             )
@@ -877,7 +877,7 @@ def test_create_experiment_returns_503_when_data_source_dependencies_are_missing
     )
 
     assert response.status_code == 503
-    assert b"Smarttrade data service is unavailable." in response.data
+    assert b"Market data service is unavailable." in response.data
     assert b"Tried to connect to 127.0.0.1:7003." in response.data
     assert b"New experiment" in response.data
     assert b'value="AAPL"' in response.data
