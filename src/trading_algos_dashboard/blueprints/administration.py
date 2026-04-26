@@ -74,6 +74,17 @@ def cache_management():
     )
 
 
+@bp.get("/services")
+def services():
+    server_control_service = current_app.extensions["server_control_service"]
+    port_settings = server_control_service.get_port_settings()
+    return render_template(
+        "administration/services.html",
+        servers=server_control_service.list_servers(),
+        port_settings=port_settings,
+    )
+
+
 @bp.post("/experiment-runtime-settings")
 def save_experiment_runtime_settings():
     runtime_settings_service = current_app.extensions[
@@ -147,6 +158,55 @@ def check_data_source_settings():
         ), 503
     finally:
         service.endpoint_resolver = original_resolver
+
+
+@bp.post("/services/ports")
+def save_service_ports():
+    server_control_service = current_app.extensions["server_control_service"]
+    try:
+        server_control_service.save_ports(
+            {
+                "central": request.form.get("central_port", ""),
+                "data": request.form.get("data_port", ""),
+                "fake_datetime": request.form.get("fake_datetime_port", ""),
+                "broker": request.form.get("broker_port", ""),
+                "engines_control": request.form.get("engines_control_port", ""),
+            }
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    else:
+        flash("administration: service ports updated", "success")
+    return redirect(url_for("administration.services"))
+
+
+@bp.post("/services/<server_name>/<action>")
+def control_service(server_name: str, action: str):
+    server_control_service = current_app.extensions["server_control_service"]
+    try:
+        result = server_control_service.perform_action(
+            server_name=server_name,
+            action=action,
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+    except Exception as exc:
+        flash(f"Service control failed: {exc}", "danger")
+    else:
+        if result.succeeded:
+            flash(
+                "administration: service action completed; "
+                f"server={result.server_name} action={result.action} state={result.state}",
+                "success",
+            )
+        else:
+            flash(
+                "administration: service action failed; "
+                f"server={result.server_name} action={result.action} "
+                f"expected_state={result.expected_state} actual_state={result.state}",
+                "danger",
+            )
+    return redirect(url_for("administration.services"))
 
 
 @bp.post("/market-data-cache-settings")

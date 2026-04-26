@@ -49,6 +49,9 @@ from trading_algos_dashboard.repositories.experiment_runtime_settings_repository
 from trading_algos_dashboard.repositories.experiment_scheduler_lease_repository import (
     ExperimentSchedulerLeaseRepository,
 )
+from trading_algos_dashboard.repositories.server_control_settings_repository import (
+    ServerControlSettingsRepository,
+)
 from trading_algos_dashboard.services.algorithm_catalog_service import (
     AlgorithmCatalogService,
 )
@@ -93,6 +96,7 @@ from trading_algos_dashboard.services.market_data_cache_settings_service import 
     MarketDataCacheSettingsService,
 )
 from trading_algos_dashboard.services.report_service import ReportService
+from trading_algos_dashboard.services.server_control_service import ServerControlService
 
 
 def create_app(config: DashboardConfig | None = None) -> Flask:
@@ -129,6 +133,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         mongo.db
     )
     experiment_scheduler_lease_repository = ExperimentSchedulerLeaseRepository(mongo.db)
+    server_control_settings_repository = ServerControlSettingsRepository(mongo.db)
     algorithm_catalog_import_run_repository = AlgorithmCatalogImportRunRepository(
         mongo.db
     )
@@ -219,6 +224,11 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         token=cfg.smarttrade_api_token,
         timeout_secs=cfg.smarttrade_api_timeout_secs,
     )
+    server_control_service = ServerControlService(
+        smarttrade_path=cfg.smarttrade_path,
+        user_id=cfg.smarttrade_user_id,
+        repository=server_control_settings_repository,
+    )
 
     app.extensions["mongo"] = mongo
     app.extensions["experiment_repository"] = experiment_repository
@@ -239,6 +249,9 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     )
     app.extensions["experiment_scheduler_lease_repository"] = (
         experiment_scheduler_lease_repository
+    )
+    app.extensions["server_control_settings_repository"] = (
+        server_control_settings_repository
     )
     app.extensions["algorithm_catalog_import_run_repository"] = (
         algorithm_catalog_import_run_repository
@@ -267,6 +280,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["evaluation_service"] = evaluation_service
     app.extensions["configuration_builder_service"] = configuration_builder_service
     app.extensions["configuration_publish_service"] = configuration_publish_service
+    app.extensions["server_control_service"] = server_control_service
 
     app.register_blueprint(home_bp)
     app.register_blueprint(algorithms_bp)
