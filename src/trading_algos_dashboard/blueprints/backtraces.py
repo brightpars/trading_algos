@@ -31,6 +31,12 @@ def _service() -> Any:
     return current_app.extensions["backtrace_dashboard_service"]
 
 
+def _runnable_algorithms() -> list[dict[str, object]]:
+    return current_app.extensions[
+        "algorithm_catalog_service"
+    ].list_runnable_algorithm_implementations()
+
+
 def _render_new_backtrace(
     *,
     status_code: int = 200,
@@ -41,7 +47,11 @@ def _render_new_backtrace(
         form_data=form_data,
     )
     return Response(
-        render_template("backtraces/new.html", form_data=effective_form_data),
+        render_template(
+            "backtraces/new.html",
+            form_data=effective_form_data,
+            runnable_algorithms=_runnable_algorithms(),
+        ),
         status=status_code,
     )
 
@@ -116,7 +126,6 @@ def create_backtrace() -> Response:
         "symbol": request.form.get("symbol", ""),
         "algorithm_params_json": request.form.get("algorithm_params_json", "{}"),
         "candles_json": request.form.get("candles_json", "[]"),
-        "data_source_kind": request.form.get("data_source_kind", "market_data_service"),
         "start_at": request.form.get("start_at", ""),
         "end_at": request.form.get("end_at", ""),
         "metadata_json": request.form.get("metadata_json", "{}"),

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from json import JSONDecodeError
 from typing import Any
 
@@ -17,7 +18,6 @@ class BacktraceDashboardService:
             "symbol": "",
             "algorithm_params_json": "{}",
             "candles_json": "[]",
-            "data_source_kind": "market_data_service",
             "start_at": "",
             "end_at": "",
             "metadata_json": "{}",
@@ -36,6 +36,12 @@ class BacktraceDashboardService:
             )
         if form_data is not None:
             payload.update({str(key): str(value) for key, value in form_data.items()})
+        payload["start_at"] = self._normalize_datetime_local_form_value(
+            payload.get("start_at", "")
+        )
+        payload["end_at"] = self._normalize_datetime_local_form_value(
+            payload.get("end_at", "")
+        )
         return payload
 
     def submit_run(self, form_data: Mapping[str, str]) -> dict[str, Any]:
@@ -73,14 +79,43 @@ class BacktraceDashboardService:
             )
             return payload
         if input_mode == "data_source":
-            data_source_kind = str(
-                form_data.get("data_source_kind", "market_data_service")
-            ).strip()
-            payload["data_source"] = {"kind": data_source_kind}
-            payload["start_at"] = str(form_data.get("start_at", "")).strip()
-            payload["end_at"] = str(form_data.get("end_at", "")).strip()
+            payload["data_source"] = {"kind": "market_data_service"}
+            payload["start_at"] = self._serialize_datetime_local_to_utc_isoformat(
+                form_data.get("start_at", ""),
+                field_label="Start at",
+            )
+            payload["end_at"] = self._serialize_datetime_local_to_utc_isoformat(
+                form_data.get("end_at", ""),
+                field_label="End at",
+            )
             return payload
         raise ValueError("Input mode must be inline_candles or data_source.")
+
+    @staticmethod
+    def _normalize_datetime_local_form_value(raw_value: object) -> str:
+        normalized = str(raw_value or "").strip()
+        if normalized == "":
+            return ""
+        try:
+            parsed = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+        except ValueError:
+            return normalized
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(UTC).replace(tzinfo=None)
+        return parsed.strftime("%Y-%m-%dT%H:%M")
+
+    @staticmethod
+    def _serialize_datetime_local_to_utc_isoformat(
+        raw_value: object, *, field_label: str
+    ) -> str:
+        normalized = str(raw_value or "").strip()
+        if normalized == "":
+            return ""
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError as exc:
+            raise ValueError(f"{field_label} must be a valid date/time value.") from exc
+        return parsed.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     @staticmethod
     def _parse_json_object(raw_value: object, *, field_label: str) -> dict[str, Any]:

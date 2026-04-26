@@ -141,9 +141,18 @@ def test_new_backtrace_page_renders(monkeypatch):
     assert response.status_code == 200
     assert b"Manual backtrace" in response.data
     assert b'name="input_mode"' in response.data
-    assert b'name="algorithm_key"' in response.data
+    assert (
+        b'<select id="algorithm_key" class="form-select" name="algorithm_key" required>'
+        in response.data
+    )
+    assert b"Select a runnable algorithm" in response.data
     assert b'name="candles_json"' in response.data
     assert b'name="start_at"' in response.data
+    assert b'type="datetime-local" name="start_at"' in response.data
+    assert b'type="datetime-local" name="end_at"' in response.data
+    assert b'name="data_source_kind"' not in response.data
+    assert b"Auto-loaded from the selected algorithm" in response.data
+    assert b"data-default-param='{" in response.data
     assert b"View recent runs" in response.data
 
 
@@ -218,7 +227,10 @@ def test_backtrace_validation_error_renders_on_form(monkeypatch):
 
     assert response.status_code == 400
     assert b"Candles JSON must decode to a JSON array." in response.data
-    assert b'name="algorithm_key"' in response.data
+    assert (
+        b'<select id="algorithm_key" class="form-select" name="algorithm_key" required>'
+        in response.data
+    )
     assert b"AAPL" in response.data
 
 
@@ -270,9 +282,8 @@ def test_backtrace_submit_flow_supports_data_source_mode(monkeypatch):
             "symbol": "AAPL",
             "algorithm_params_json": '{"window": 2}',
             "candles_json": "[]",
-            "data_source_kind": "market_data_service",
-            "start_at": "2025-01-01T10:00:00Z",
-            "end_at": "2025-01-01T10:02:00Z",
+            "start_at": "2025-01-01T10:00",
+            "end_at": "2025-01-01T10:02",
             "metadata_json": '{"source": "dashboard-test", "label": "demo"}',
         },
         follow_redirects=False,
@@ -286,6 +297,68 @@ def test_backtrace_submit_flow_supports_data_source_mode(monkeypatch):
     assert run["request"]["data_source"] == {"kind": "market_data_service"}
     assert run["request"]["start_at"] == "2025-01-01T10:00:00Z"
     assert run["request"]["end_at"] == "2025-01-01T10:02:00Z"
+
+
+def test_new_backtrace_page_defaults_to_inline_fields(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().get("/backtraces/new")
+
+    assert response.status_code == 200
+    assert (
+        b'<div class="col-12 " data-backtrace-inline-fields>' in response.data
+        or b'<div class="col-12" data-backtrace-inline-fields>' in response.data
+    )
+    assert (
+        b"data-backtrace-data-source-fields" in response.data
+        and b"d-none" in response.data
+    )
+
+
+def test_backtrace_validation_error_keeps_data_source_fields_visible(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/backtraces",
+        data={
+            "input_mode": "data_source",
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+            "algorithm_params_json": "{",
+            "start_at": "2025-01-01T10:00",
+            "end_at": "2025-01-01T10:02",
+            "metadata_json": '{"source": "dashboard-test"}',
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 400
+    assert b"Params JSON must be valid JSON." in response.data
+    assert b"data-backtrace-data-source-fields" in response.data
+    assert b'name="start_at" value="2025-01-01T10:00"' in response.data
+    assert b'name="end_at" value="2025-01-01T10:02"' in response.data
+
+
+def test_backtrace_form_renders_current_params_as_default_value(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/backtraces",
+        data={
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+            "algorithm_params_json": "{",
+            "candles_json": "[]",
+            "metadata_json": '{"source": "dashboard-test"}',
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 400
+    assert (
+        b'data-default-value="{"' in response.data
+        or b"data-default-value='{" in response.data
+    )
 
 
 def test_backtrace_submit_flow_rejects_invalid_input_mode(monkeypatch):

@@ -20,7 +20,12 @@
   </div>
   <div class="col-md-6">
     <label class="form-label" for="algorithm_key">Algorithm key</label>
-    <input id="algorithm_key" class="form-control" name="algorithm_key" value="{{ form_data.algorithm_key }}" required>
+    <select id="algorithm_key" class="form-select" name="algorithm_key" required>
+      <option value="">Select a runnable algorithm</option>
+      {% for algorithm in runnable_algorithms %}
+      <option value="{{ algorithm.key }}" data-default-param='{{ algorithm.default_param|tojson }}' {% if form_data.algorithm_key == algorithm.key %}selected{% endif %}>{{ algorithm.name }} ({{ algorithm.key }})</option>
+      {% endfor %}
+    </select>
   </div>
   <div class="col-md-6">
     <label class="form-label" for="symbol">Symbol</label>
@@ -28,28 +33,23 @@
   </div>
   <div class="col-12">
     <label class="form-label" for="algorithm_params_json">Params JSON</label>
-    <textarea id="algorithm_params_json" class="form-control font-monospace" rows="6" name="algorithm_params_json">{{ form_data.algorithm_params_json }}</textarea>
-    <div class="form-text">Example: {"window": 20}</div>
+    <textarea id="algorithm_params_json" class="form-control font-monospace" rows="6" name="algorithm_params_json" data-default-value='{{ form_data.algorithm_params_json|e }}'>{{ form_data.algorithm_params_json }}</textarea>
+    <div class="form-text">Auto-loaded from the selected algorithm; you can still edit it before submission.</div>
   </div>
-  <div class="col-12">
+  <div class="col-12 {% if form_data.input_mode != 'inline_candles' %}d-none{% endif %}" data-backtrace-inline-fields>
     <label class="form-label" for="candles_json">Candles JSON</label>
     <textarea id="candles_json" class="form-control font-monospace" rows="14" name="candles_json">{{ form_data.candles_json }}</textarea>
     <div class="form-text">Use for inline mode. Provide an array of candle objects with ts, Open, High, Low, and Close.</div>
   </div>
-  <div class="col-md-4">
-    <label class="form-label" for="data_source_kind">Data source kind</label>
-    <input id="data_source_kind" class="form-control" name="data_source_kind" value="{{ form_data.data_source_kind }}">
-    <div class="form-text">Use for data-source mode. Current supported value: market_data_service.</div>
-  </div>
-  <div class="col-md-4">
+  <div class="col-md-6 {% if form_data.input_mode != 'data_source' %}d-none{% endif %}" data-backtrace-data-source-fields>
     <label class="form-label" for="start_at">Start at</label>
-    <input id="start_at" class="form-control" name="start_at" value="{{ form_data.start_at }}" placeholder="2025-01-01T10:00:00Z">
-    <div class="form-text">ISO datetime for data-source mode.</div>
+    <input id="start_at" class="form-control" type="datetime-local" name="start_at" value="{{ form_data.start_at }}">
+    <div class="form-text">Choose the local start date and time for data-source mode.</div>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-6 {% if form_data.input_mode != 'data_source' %}d-none{% endif %}" data-backtrace-data-source-fields>
     <label class="form-label" for="end_at">End at</label>
-    <input id="end_at" class="form-control" name="end_at" value="{{ form_data.end_at }}" placeholder="2025-01-01T10:30:00Z">
-    <div class="form-text">ISO datetime for data-source mode.</div>
+    <input id="end_at" class="form-control" type="datetime-local" name="end_at" value="{{ form_data.end_at }}">
+    <div class="form-text">Choose the local end date and time for data-source mode.</div>
   </div>
   <div class="col-12">
     <label class="form-label" for="metadata_json">Metadata JSON</label>
@@ -60,4 +60,58 @@
     <button class="btn btn-primary" type="submit">Run backtrace</button>
   </div>
 </form>
+<script>
+  (() => {
+    const inputModeSelect = document.getElementById('input_mode');
+    const algorithmSelect = document.getElementById('algorithm_key');
+    const paramsTextarea = document.getElementById('algorithm_params_json');
+    if (!inputModeSelect) {
+      return;
+    }
+
+    const inlineFields = document.querySelectorAll('[data-backtrace-inline-fields]');
+    const dataSourceFields = document.querySelectorAll('[data-backtrace-data-source-fields]');
+
+    const syncVisibility = () => {
+      const isInline = inputModeSelect.value === 'inline_candles';
+      inlineFields.forEach((element) => {
+        element.classList.toggle('d-none', !isInline);
+      });
+      dataSourceFields.forEach((element) => {
+        element.classList.toggle('d-none', isInline);
+      });
+    };
+
+    const syncAlgorithmDefaults = () => {
+      if (!algorithmSelect || !paramsTextarea) {
+        return;
+      }
+      const selectedOption = algorithmSelect.options[algorithmSelect.selectedIndex];
+      if (!selectedOption) {
+        return;
+      }
+      const defaultParam = selectedOption.dataset.defaultParam;
+      if (!defaultParam) {
+        return;
+      }
+      const currentValue = paramsTextarea.value.trim();
+      const initialValue = (paramsTextarea.dataset.defaultValue || '').trim();
+      if (currentValue !== '' && currentValue !== initialValue) {
+        return;
+      }
+      try {
+        paramsTextarea.value = JSON.stringify(JSON.parse(defaultParam), null, 2);
+        paramsTextarea.dataset.defaultValue = paramsTextarea.value;
+      } catch (_error) {
+        paramsTextarea.value = defaultParam;
+        paramsTextarea.dataset.defaultValue = defaultParam;
+      }
+    };
+
+    inputModeSelect.addEventListener('change', syncVisibility);
+    algorithmSelect?.addEventListener('change', syncAlgorithmDefaults);
+    syncVisibility();
+    syncAlgorithmDefaults();
+  })();
+</script>
 {% endblock %}
