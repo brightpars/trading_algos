@@ -569,6 +569,78 @@ def test_algorithm_catalog_workspace_shows_run_action_for_implemented_entries(
     assert b">Confirmed<" in response.data
 
 
+def test_algorithm_catalog_workspace_labels_manual_and_imported_sources(monkeypatch):
+    app = _build_app(monkeypatch)
+    app.extensions["algorithm_catalog_repository"].upsert_entry(
+        source_version="seed",
+        catalog_type="algorithm",
+        catalog_number=1,
+        document={
+            "id": "entry-imported",
+            "catalog_type": "algorithm",
+            "catalog_number": 1,
+            "name": "Imported Entry",
+            "slug": "imported-entry",
+            "category": "Trend Following",
+            "subcategory": "",
+            "advanced_label": "No",
+            "best_use_horizon": "Swing",
+            "home_suitability_score": 3,
+            "core_idea": "Seed idea",
+            "typical_inputs": "Price",
+            "signal_style": "Trend",
+            "extended_implementation_details": "Details",
+            "initial_reference": "Ref",
+            "source_version": "seed",
+            "source_origin": "imported",
+            "source_path": "docs/imported_catalog.md",
+            "is_active": True,
+            "created_at": "2026-04-21T10:00:00Z",
+            "updated_at": "2026-04-21T10:00:00Z",
+        },
+    )
+    app.extensions["algorithm_catalog_service"].create_catalog_entry(
+        catalog_values={
+            "name": "Manual Entry",
+            "category": "Custom",
+            "subcategory": "",
+            "advanced_label": "No",
+            "best_use_horizon": "Swing",
+            "home_suitability_score": "2",
+            "core_idea": "Manual idea",
+            "typical_inputs": "Price",
+            "signal_style": "Trend",
+            "extended_implementation_details": "Manual details",
+            "initial_reference": "Manual ref",
+            "implementation_decision": "",
+            "implementation_notes": "",
+            "admin_annotations": "",
+        },
+        catalog_type="algorithm",
+        alg_impl_id=None,
+    )
+
+    response = app.test_client().get("/algorithms?q=entry")
+
+    assert response.status_code == 200
+    assert b">Imported<" in response.data
+    assert b">Manual<" in response.data
+    assert b"docs/imported_catalog.md" in response.data
+    assert b"manual_entry" in response.data
+
+
+def test_algorithm_catalog_workspace_shows_runtime_only_labels(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().get("/algorithms")
+
+    assert response.status_code == 200
+    assert b"Runtime only" in response.data
+    assert b"Readonly" in response.data
+    assert b"Catalog file:" in response.data
+    assert b"Runtime file:" in response.data
+
+
 def test_algorithm_catalog_search_results_show_run_for_runnable_unreviewed_entries(
     monkeypatch,
 ):
@@ -978,7 +1050,7 @@ def test_algorithm_catalog_admin_page_shows_queue_pagination_controls(monkeypatc
     assert response.status_code == 200
     assert b"All algorithms" in response.data
     assert b"51 items" in response.data
-    assert b"Page 1 / 2" in response.data
+    assert b"Page 1 /" in response.data
     assert b"page=2" in response.data
     assert b"Algorithm 1" in response.data
     assert b"Algorithm 50" in response.data

@@ -37,7 +37,7 @@ class AlgorithmCatalogService:
         return [_spec_to_dict(spec) for spec in list_alert_algorithm_specs()]
 
     def list_catalog_entries(self) -> list[dict[str, Any]]:
-        entries = self.catalog_repository.list_active_entries()
+        entries = self._list_merged_catalog_entries()
         return [self._build_catalog_summary(entry) for entry in entries]
 
     def list_catalog_entries_filtered(
@@ -80,7 +80,7 @@ class AlgorithmCatalogService:
     ) -> AdminCatalogPage:
         items = [
             self._build_catalog_detail(entry)
-            for entry in self.catalog_repository.list_active_entries()
+            for entry in self._list_merged_catalog_entries()
         ]
         items = self._filter_catalog_items(
             items,
@@ -330,7 +330,7 @@ class AlgorithmCatalogService:
         return sorted(
             {
                 str(entry.get(key, ""))
-                for entry in self.catalog_repository.list_active_entries()
+                for entry in self._list_merged_catalog_entries()
                 if str(entry.get(key, ""))
             }
         )
@@ -341,6 +341,8 @@ class AlgorithmCatalogService:
             entry = self.catalog_repository.get_entry_by_slug(entry_id_or_slug)
         if entry is None:
             entry = self._find_catalog_entry_by_alg_impl_id(entry_id_or_slug)
+        if entry is None:
+            entry = self._build_runtime_only_entry_by_alg_impl_id(entry_id_or_slug)
         if entry is None:
             raise ValueError(f"Unknown algorithm catalog entry: {entry_id_or_slug}")
         return self._build_catalog_detail(entry)
@@ -555,11 +557,95 @@ class AlgorithmCatalogService:
                 return entry
         return None
 
+    def _list_merged_catalog_entries(self) -> list[dict[str, Any]]:
+        entries = [
+            dict(entry) for entry in self.catalog_repository.list_active_entries()
+        ]
+        linked_algorithm_ids = {
+            str(entry.get("implementation_id", "")).strip()
+            for entry in entries
+            if str(entry.get("implementation_id", "")).strip()
+        }
+        for spec in self.list_algorithm_implementations():
+            spec_key = str(spec.get("key", "")).strip()
+            if not spec_key or spec_key in linked_algorithm_ids:
+                continue
+            entries.append(self._build_runtime_only_entry(spec))
+        return entries
+
+    def _build_runtime_only_entry_by_alg_impl_id(
+        self, alg_impl_id: str
+    ) -> dict[str, Any] | None:
+        normalized_id = str(alg_impl_id).strip()
+        if not normalized_id:
+            return None
+        if self._find_catalog_entry_by_alg_impl_id(normalized_id) is not None:
+            return None
+        try:
+            spec = self.get_algorithm_implementation(normalized_id)
+        except ValueError:
+            return None
+        return self._build_runtime_only_entry(spec)
+
+    def _build_runtime_only_entry(self, spec: dict[str, Any]) -> dict[str, Any]:
+        alg_impl_id = str(spec.get("key", "")).strip()
+        name = str(spec.get("name", alg_impl_id)).strip() or alg_impl_id
+        return {
+            "id": f"runtime-only::{alg_impl_id}",
+            "slug": f"runtime-only-{_slugify(alg_impl_id)}",
+            "catalog_type": "algorithm",
+            "catalog_number": "—",
+            "name": name,
+            "category": str(spec.get("category", "")).strip(),
+            "subcategory": str(spec.get("subcategory", "")).strip(),
+            "advanced_label": "Runtime only",
+            "best_use_horizon": "",
+            "home_suitability_score": 0,
+            "core_idea": str(spec.get("description", "")).strip(),
+            "typical_inputs": ", ".join(
+                str(item) for item in spec.get("input_domains", [])
+            ),
+            "signal_style": str(spec.get("runtime_kind", "")).strip(),
+            "extended_implementation_details": str(spec.get("description", "")).strip(),
+            "initial_reference": str(spec.get("catalog_ref", "")).strip(),
+            "source_version": "runtime_only",
+            "source_origin": "runtime_only",
+            "source_filename": "not present in catalog",
+            "source_path": "",
+            "source_row_hash": "",
+            "is_active": True,
+            "implementation_id": alg_impl_id,
+            "implementation_catalog_ref": str(spec.get("catalog_ref", "")).strip(),
+            "implementation_source": "runtime_only",
+            "implementation_confidence": 1.0,
+            "implementation_mapping_notes": (
+                "algorithm_catalog: runtime implementation has no catalog entry"
+            ),
+            "implementation_mapping_reason": "runtime-only implementation",
+            "implementation_builder_name": str(spec.get("builder_name", "")).strip(),
+            "implementation_builder_module": str(
+                spec.get("builder_module", "")
+            ).strip(),
+            "implementation_source_file": str(
+                spec.get("builder_source_file", "")
+            ).strip(),
+            "review_state": "",
+            "implementation_decision": "",
+            "implementation_notes": "",
+            "admin_annotations": "",
+            "created_at": "",
+            "updated_at": "",
+            "is_readonly": True,
+        }
+
     def _build_catalog_summary(self, entry: dict[str, Any]) -> dict[str, Any]:
         alg_impl_id = str(entry.get("implementation_id", "")).strip()
         alg_impl_spec = _safe_get_alg_impl_spec(alg_impl_id)
         implementation_status = _compute_implementation_status(entry, alg_impl_spec)
         execution_status = _execution_status(implementation_status)
+        source_origin = str(entry.get("source_origin", "")).strip()
+        source_path = str(entry.get("source_path", "")).strip()
+        source_filename = str(entry.get("source_filename", "")).strip()
         return {
             "id": entry["id"],
             "slug": entry["slug"],
@@ -577,6 +663,16 @@ class AlgorithmCatalogService:
             "execution_label": _execution_label(execution_status),
             "is_runnable": execution_status == "runnable",
             "alg_impl_id": alg_impl_id or None,
+            "origin_label": _origin_label(source_origin),
+            "source_origin": source_origin,
+            "source_file_label": _source_file_label(
+                source_origin, source_path, source_filename
+            ),
+            "source_file_value": source_path or source_filename,
+            "runtime_source_file": str(
+                entry.get("implementation_source_file", "")
+            ).strip(),
+            "is_readonly": bool(entry.get("is_readonly", False)),
             "alg_impl_status": None
             if alg_impl_spec is None
             else alg_impl_spec["status"],
@@ -610,11 +706,12 @@ class AlgorithmCatalogService:
             "initial_reference": entry.get("initial_reference", ""),
             "source_version": entry.get("source_version", ""),
             "source_origin": entry.get("source_origin", ""),
+            "source_filename": entry.get("source_filename", ""),
+            "source_path": entry.get("source_path", ""),
             "implementation_decision": entry.get("implementation_decision", ""),
             "implementation_notes": entry.get("implementation_notes", ""),
             "admin_annotations": entry.get("admin_annotations", ""),
             "last_import_timestamp": entry.get("updated_at", ""),
-            "origin_label": _origin_label(str(entry.get("source_origin", ""))),
             "link_source_label": _link_source_label(
                 str(entry.get("implementation_source", ""))
             ),
@@ -712,6 +809,8 @@ def _compute_implementation_status(
 ) -> str:
     if not str(entry.get("implementation_id", "")).strip():
         return "not_implemented"
+    if str(entry.get("source_origin", "")) == "runtime_only":
+        return "implementation_needs_review"
     if str(entry.get("review_state", "")) == "deferred":
         return "deferred"
     if str(entry.get("review_state", "")) == "rejected":
@@ -761,6 +860,7 @@ def _link_source_label(match_type: str | None) -> str:
         "curated_alias": "Curated alias",
         "suggested": "Suggested",
         "runtime_declared": "Implementation declared",
+        "runtime_only": "Runtime only",
     }.get(match_type or "", "Unlinked")
 
 
@@ -768,7 +868,22 @@ def _origin_label(source_origin: str) -> str:
     return {
         "manual": "Manual",
         "imported": "Imported",
+        "runtime_only": "Runtime only",
     }.get(source_origin, "Unknown")
+
+
+def _source_file_label(
+    source_origin: str, source_path: str, source_filename: str
+) -> str:
+    if source_origin == "imported":
+        return "Catalog file"
+    if source_origin == "manual":
+        return "Catalog file"
+    if source_origin == "runtime_only":
+        return "Catalog file"
+    if source_path or source_filename:
+        return "Catalog file"
+    return "Source file"
 
 
 def _review_state_label(review_state: str) -> str:

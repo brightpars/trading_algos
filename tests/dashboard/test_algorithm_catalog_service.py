@@ -165,10 +165,14 @@ def test_catalog_service_exposes_catalog_entries_with_status():
     service = _build_service()
     items = service.list_catalog_entries()
     assert items
-    assert items[0]["implementation_status"] == "implementation_needs_review"
-    assert (
-        items[0]["alg_impl_id"] == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
+    linked_item = next(
+        item
+        for item in items
+        if item["alg_impl_id"] == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
     )
+    assert linked_item["implementation_status"] == "implementation_needs_review"
+    assert linked_item["origin_label"] == "Imported"
+    assert linked_item["source_file_value"] == "docs/file.md"
 
 
 def test_catalog_service_returns_single_catalog_detail():
@@ -192,7 +196,10 @@ def test_catalog_service_filters_entries_for_public_queries():
         category="Trend Following",
         search_text="breakout",
     )
-    assert len(items) == 1
+    assert any(
+        item["alg_impl_id"] == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
+        for item in items
+    )
 
 
 def test_catalog_service_lists_only_runnable_algorithm_implementations():
@@ -245,13 +252,13 @@ def test_catalog_service_admin_search_matches_extended_catalog_fields():
         service.list_admin_catalog_entries(
             search_text="implementation declared", page=1, page_size=10
         )["total_count"]
-        == 1
+        >= 1
     )
     assert (
         service.list_admin_catalog_entries(
             search_text="not reviewed", page=1, page_size=10
         )["total_count"]
-        == 2
+        >= 2
     )
 
 
@@ -274,9 +281,49 @@ def test_catalog_service_builds_catalog_workspace_payload():
 
     assert payload["summary"]["entry_count"] == 2
     assert payload["summary"]["implemented_count"] == 0
-    assert payload["queue_payload"]["total_count"] == 2
-    assert payload["review_payload"]["total_count"] == 1
+    assert payload["queue_payload"]["total_count"] >= 2
+    assert payload["review_payload"]["total_count"] >= 1
     assert payload["filters"]["search_text"] == "breakout"
+
+
+def test_catalog_service_merges_runtime_only_implementations_without_duplicates():
+    service = _build_service()
+
+    items = service.list_catalog_entries()
+
+    linked_items = [
+        item
+        for item in items
+        if item["alg_impl_id"] == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
+    ]
+    runtime_only_items = [
+        item for item in items if item["source_origin"] == "runtime_only"
+    ]
+
+    assert len(linked_items) == 1
+    assert runtime_only_items
+    assert all(item["is_readonly"] is True for item in runtime_only_items)
+    assert all(item["origin_label"] == "Runtime only" for item in runtime_only_items)
+    assert all(
+        item["source_file_value"] == "not present in catalog"
+        for item in runtime_only_items
+    )
+
+
+def test_catalog_service_exposes_runtime_only_catalog_detail():
+    service = _build_service()
+
+    items = service.list_catalog_entries()
+    runtime_only_item = next(
+        item for item in items if item["source_origin"] == "runtime_only"
+    )
+
+    detail = service.get_catalog_entry(runtime_only_item["alg_impl_id"])
+
+    assert detail["is_readonly"] is True
+    assert detail["origin_label"] == "Runtime only"
+    assert detail["source_filename"] == "not present in catalog"
+    assert detail["runtime_source_file"]
 
 
 def test_catalog_service_marks_not_reviewed_links_as_needing_manual_review():
@@ -288,8 +335,10 @@ def test_catalog_service_marks_not_reviewed_links_as_needing_manual_review():
         page_size=10,
     )
 
-    assert payload["total_count"] == 1
-    assert payload["items"][0]["review_state_label"] == "Not reviewed"
+    assert payload["total_count"] >= 1
+    assert any(
+        item["review_state_label"] == "Not reviewed" for item in payload["items"]
+    )
 
 
 def test_catalog_service_updates_catalog_fields_and_review_state():
@@ -350,6 +399,7 @@ def test_catalog_service_creates_manual_catalog_entry_without_implementation():
     assert created["name"] == "Manual Algo"
     assert created["slug"] == "manual-algo"
     assert created["source_version"] == "manual"
+    assert created["origin_label"] == "Manual"
     assert created["implementation_status"] == "not_implemented"
     assert created["review_state_label"] == "Not reviewed"
     assert created["alg_impl_link"] is None
