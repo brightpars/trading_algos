@@ -69,7 +69,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const deepClone = (value) => JSON.parse(JSON.stringify(value));
 
-  const defaultAlgorithmKey = () => state.catalog[0]?.key || "close_high_channel_breakout";
+  const defaultAlgorithmKey = () => state.catalog[0]?.key || "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation";
 
   const createAlgorithmNode = (algKey = defaultAlgorithmKey()) => {
     const entry = getCatalogEntry(algKey);

@@ -103,9 +103,9 @@ const state = {
 {
   node_id: "node-1",
   node_type: "algorithm",
-  name: "Close/High Channel Breakout",
+  name: "OLD Close/High Channel Breakout NEW Channel Breakout With Confirmation",
   description: "",
-  alg_key: "close_high_channel_breakout",
+  alg_key: "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
   alg_param: { window: 20 },
   buy_enabled: true,
   sell_enabled: true,

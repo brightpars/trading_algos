@@ -19,7 +19,9 @@ class RollingChannelBreakoutAlertAlgorithm(BaseAlertAlgorithm):
     def __init__(
         self, symbol, report_base_path, date_str="", evaluate_window_len=5, wlen=20
     ):
-        self.alg_name = f"rolling_channel_breakout_wlen={wlen}"
+        self.alg_name = (
+            f"OLD_rolling_channel_breakout_NEW_breakout_donchian_channel_wlen={wlen}"
+        )
         super().__init__(
             self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )
@@ -117,7 +119,10 @@ class CloseHighChannelBreakoutAlertAlgorithm(RollingChannelBreakoutAlertAlgorith
     def __init__(
         self, symbol, report_base_path, date_str="", evaluate_window_len=5, wlen=20
     ):
-        self.alg_name = f"close_high_channel_breakout_wlen={wlen}"
+        self.alg_name = (
+            "OLD_close_high_channel_breakout_NEW_"
+            f"channel_breakout_with_confirmation_wlen={wlen}"
+        )
         BaseAlertAlgorithm.__init__(
             self, self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )

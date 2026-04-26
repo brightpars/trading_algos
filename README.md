@@ -52,7 +52,7 @@ See `docs/algorithm_authoring_guide.md` for the expected authoring flow.
 
 `alertgen` now supports a string-based algorithm identifier via `alg_key`.
 
-- Use `"alg_key": "close_high_channel_breakout"`.
+- Use `"alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"`.
 - Use dict-shaped `alg_param`, for example `{"window": 20}`.
 
 Numeric `alg_code` identifiers have been removed from the config contract and registry lookup flow.
@@ -97,7 +97,7 @@ configuration = {
         {
             "node_id": "alg-1",
             "node_type": "algorithm",
-            "alg_key": "close_high_channel_breakout",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
             "alg_param": {"window": 20},
             "buy_enabled": True,
             "sell_enabled": True,
@@ -128,7 +128,7 @@ configuration = {
         {
             "node_id": "alg-1",
             "node_type": "algorithm",
-            "alg_key": "close_high_channel_breakout",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
             "alg_param": {"window": 20},
             "buy_enabled": True,
             "sell_enabled": True,
@@ -136,7 +136,7 @@ configuration = {
         {
             "node_id": "alg-2",
             "node_type": "algorithm",
-            "alg_key": "low_anchored_boundary_breakout",
+            "alg_key": "low_anchored_OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "alg_param": {"period": 5},
             "buy_enabled": True,
             "sell_enabled": True,

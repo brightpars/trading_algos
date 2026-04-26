@@ -913,7 +913,7 @@ def test_alert_algorithm_catalog_exposes_registered_specs():
         "basket_statistical_arbitrage",
         "funding_basis_arbitrage",
         "hard_boolean_gating_and_or_majority",
-        "aggregate_channel_dual_window",
+        "OLD_aggregate_channel_dual_window_NEW_weighted_linear_score_blend",
     }
     assert expected_keys.issubset(set(keys))
     assert any(spec.tags for spec in specs)
@@ -1651,7 +1651,7 @@ def test_factory_creates_registered_algorithm(tmp_path):
     algorithm, alg_param = create_alertgen_algorithm(
         sensor_config={
             "symbol": "AAPL",
-            "alg_key": "close_high_channel_breakout",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
             "alg_param": {"window": 7},
             "buy": True,
             "sell": True,
@@ -1659,7 +1659,10 @@ def test_factory_creates_registered_algorithm(tmp_path):
         report_base_path=str(tmp_path),
     )
 
-    assert algorithm.alg_name == "close_high_channel_breakout_wlen=7"
+    assert (
+        algorithm.alg_name
+        == "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation_wlen=7"
+    )
     assert algorithm.algorithm_metadata()["evaluate_window_len"] == 5
     assert alg_param == {"window": 7}
 
@@ -1667,9 +1670,15 @@ def test_factory_creates_registered_algorithm(tmp_path):
 @pytest.mark.parametrize(
     ("alg_key", "alg_param"),
     [
-        ("boundary_breakout", {"period": 5}),
-        ("double_red_confirmation", {"period": 5}),
-        ("low_anchored_boundary_breakout", {"period": 5}),
+        ("OLD_boundary_breakout_NEW_breakout_donchian_channel", {"period": 5}),
+        (
+            "OLD_double_red_confirmation_NEW_channel_breakout_with_confirmation",
+            {"period": 5},
+        ),
+        (
+            "OLD_low_anchored_boundary_breakout_NEW_breakout_donchian_channel",
+            {"period": 5},
+        ),
         (
             "ichimoku_trend_strategy",
             {
@@ -2004,8 +2013,11 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "confirmation_bars": 1,
             },
         ),
-        ("rolling_channel_breakout", {"window": 3}),
-        ("close_high_channel_breakout", {"window": 3}),
+        ("OLD_rolling_channel_breakout_NEW_breakout_donchian_channel", {"window": 3}),
+        (
+            "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            {"window": 3},
+        ),
         (
             "hard_boolean_gating_and_or_majority",
             {
@@ -2186,9 +2198,12 @@ def test_factory_creates_registered_algorithm(tmp_path):
                 "minimum_universe_size": 2,
             },
         ),
-        ("aggregate_boundary_and_channel", {"window": 3}),
         (
-            "aggregate_channel_dual_window",
+            "OLD_aggregate_boundary_and_channel_NEW_hard_boolean_gating_and_or_majority",
+            {"window": 3},
+        ),
+        (
+            "OLD_aggregate_channel_dual_window_NEW_weighted_linear_score_blend",
             {"buy_window": 2, "sell_window": 3},
         ),
     ],
@@ -2260,9 +2275,12 @@ def test_registered_algorithms_follow_basic_contract(tmp_path, alg_key, alg_para
             "supertrend",
             {"window": 2, "multiplier": 2.0, "confirmation_bars": 1},
         ),
-        ("boundary_breakout", {"period": 5}),
-        ("rolling_channel_breakout", {"window": 2}),
-        ("close_high_channel_breakout", {"window": 2}),
+        ("OLD_boundary_breakout_NEW_breakout_donchian_channel", {"period": 5}),
+        ("OLD_rolling_channel_breakout_NEW_breakout_donchian_channel", {"window": 2}),
+        (
+            "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            {"window": 2},
+        ),
     ],
 )
 def test_algorithms_handle_flat_candles_without_crashing(tmp_path, alg_key, alg_param):
@@ -2694,7 +2712,7 @@ def test_validation_rejects_invalid_dual_window_param_shape():
         normalize_alertgen_sensor_config(
             {
                 "symbol": "AAPL",
-                "alg_key": "aggregate_channel_dual_window",
+                "alg_key": "OLD_aggregate_channel_dual_window_NEW_weighted_linear_score_blend",
                 "alg_param": {"buy_window": 1},
                 "buy": True,
                 "sell": True,
@@ -2791,7 +2809,7 @@ def test_algorithm_exposes_typed_current_decision(tmp_path):
     algorithm, _ = create_alertgen_algorithm(
         sensor_config={
             "symbol": "AAPL",
-            "alg_key": "close_high_channel_breakout",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
             "alg_param": {"window": 2},
             "buy": True,
             "sell": True,
@@ -2819,7 +2837,7 @@ def test_algorithm_evaluate_populates_metrics_via_evaluation_module(tmp_path):
     algorithm, _ = create_alertgen_algorithm(
         sensor_config={
             "symbol": "AAPL",
-            "alg_key": "close_high_channel_breakout",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
             "alg_param": {"window": 2},
             "buy": True,
             "sell": True,
@@ -2867,14 +2885,17 @@ def test_validation_accepts_alg_key_without_alg_code():
     normalized = normalize_alertgen_sensor_config(
         {
             "symbol": "AAPL",
-            "alg_key": "close_high_channel_breakout",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
             "alg_param": {"window": 2},
             "buy": True,
             "sell": True,
         }
     )
 
-    assert normalized["alg_key"] == "close_high_channel_breakout"
+    assert (
+        normalized["alg_key"]
+        == "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"
+    )
     assert normalized["alg_param"] == {"window": 2}
 
 
@@ -2884,7 +2905,10 @@ def test_default_alertgen_sensor_config_prefers_alg_key_only():
     sensor = get_default_alertgen_sensor_config()
     sensor_config = sensor["sensor_config"]
 
-    assert sensor_config["alg_key"] == "aggregate_boundary_and_channel"
+    assert (
+        sensor_config["alg_key"]
+        == "OLD_aggregate_boundary_and_channel_NEW_hard_boolean_gating_and_or_majority"
+    )
     assert "alg_code" not in sensor_config
     assert sensor_config["symbol"] == "SYMBOL"
 

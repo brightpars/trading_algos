@@ -258,7 +258,7 @@ def test_bulk_experiment_creates_one_queued_experiment_per_symbol(
         "/experiments/bulk",
         data={
             "bulk_mode": "single_algorithm_for_symbols",
-            "alg_key": "boundary_breakout",
+            "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "symbols_text": "AAPL\nMSFT\nAAPL",
             "start_date": "2024-01-01",
             "start_time": "09:30",
@@ -278,7 +278,8 @@ def test_bulk_experiment_creates_one_queued_experiment_per_symbol(
         "MSFT",
     ]
     assert all(
-        experiment["selected_algorithms"][0]["alg_key"] == "boundary_breakout"
+        experiment["selected_algorithms"][0]["alg_key"]
+        == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
         for experiment in experiments
     )
 
@@ -297,7 +298,7 @@ def test_bulk_experiment_returns_400_and_preserves_form_state_for_invalid_symbol
         "/experiments/bulk",
         data={
             "bulk_mode": "single_algorithm_for_symbols",
-            "alg_key": "boundary_breakout",
+            "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "symbols_text": " , \n  ",
             "start_date": "2024-01-01",
             "start_time": "09:30",
@@ -311,7 +312,7 @@ def test_bulk_experiment_returns_400_and_preserves_form_state_for_invalid_symbol
     assert response.status_code == 400
     assert b"At least one symbol is required." in response.data
     assert b"bad bulk" in response.data
-    assert b"boundary_breakout" in response.data
+    assert b"OLD_boundary_breakout_NEW_breakout_donchian_channel" in response.data
 
 
 def test_create_experiment_does_not_update_runtime_concurrency_setting(
@@ -342,7 +343,7 @@ def test_create_experiment_does_not_update_runtime_concurrency_setting(
             "end_date": "2024-01-31",
             "end_time": "16:00",
             "algorithms_json": (
-                '[{"alg_key":"close_high_channel_breakout","alg_param":{"window":2}}]'
+                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
             ),
             "notes": "runtime setting",
         },
@@ -373,7 +374,7 @@ def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypa
                 {
                     "node_id": "alg1",
                     "node_type": "algorithm",
-                    "alg_key": "close_high_channel_breakout",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                     "alg_param": {"window": 2},
                     "buy_enabled": True,
                     "sell_enabled": True,
@@ -390,7 +391,10 @@ def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypa
     assert b"Selected configuration" in response.data
     assert b"Combo Breakout" in response.data
     assert draft_id.encode() in response.data
-    assert b"close_high_channel_breakout" in response.data
+    assert (
+        b"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"
+        in response.data
+    )
 
 
 def test_new_experiment_page_prefills_selected_algorithm_from_query(monkeypatch):
@@ -401,11 +405,16 @@ def test_new_experiment_page_prefills_selected_algorithm_from_query(monkeypatch)
         DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
     )
 
-    response = app.test_client().get("/experiments/new?alg_key=boundary_breakout")
+    response = app.test_client().get(
+        "/experiments/new?alg_key=OLD_boundary_breakout_NEW_breakout_donchian_channel"
+    )
 
     assert response.status_code == 200
-    assert b"boundary_breakout" in response.data
-    assert b"&#34;alg_key&#34;: &#34;boundary_breakout&#34;" in response.data
+    assert b"OLD_boundary_breakout_NEW_breakout_donchian_channel" in response.data
+    assert (
+        b"&#34;alg_key&#34;: &#34;OLD_boundary_breakout_NEW_breakout_donchian_channel&#34;"
+        in response.data
+    )
 
 
 def test_experiment_history_allows_deleting_one_experiment(monkeypatch):
@@ -483,7 +492,7 @@ def test_configuration_detail_offers_run_link(monkeypatch):
                 {
                     "node_id": "alg1",
                     "node_type": "algorithm",
-                    "alg_key": "close_high_channel_breakout",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                     "alg_param": {"window": 2},
                     "buy_enabled": True,
                     "sell_enabled": True,
@@ -751,7 +760,7 @@ def test_new_experiment_page_deduplicates_recent_configuration_run_presets(monke
             {
                 "node_id": "alg1",
                 "node_type": "algorithm",
-                "alg_key": "close_high_channel_breakout",
+                "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                 "alg_param": {"window": 2},
             }
         ],
@@ -813,7 +822,7 @@ def test_new_experiment_page_treats_configuration_runs_with_different_time_range
             {
                 "node_id": "alg1",
                 "node_type": "algorithm",
-                "alg_key": "close_high_channel_breakout",
+                "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                 "alg_param": {"window": 2},
             }
         ],
@@ -944,7 +953,7 @@ def test_create_experiment_returns_400_for_malformed_algorithm_entries(monkeypat
             "start_time": "09:30",
             "end_date": "2024-01-31",
             "end_time": "16:00",
-            "algorithms_json": '["close_high_channel_breakout"]',
+            "algorithms_json": '["OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"]',
             "notes": "bad payload",
         },
     )
@@ -1032,7 +1041,7 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
             "end_date": "2024-01-31",
             "end_time": "16:00",
             "algorithms_json": (
-                '[{"alg_key":"close_high_channel_breakout","alg_param":{"window":2}}]'
+                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
             ),
             "notes": "good payload",
         },
@@ -1048,7 +1057,10 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
     assert stored_experiments[0]["status"] == "completed"
     assert stored_experiments[0]["queue_enqueued_at"] is not None
     assert stored_experiments[0]["selected_algorithms"] == [
-        {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+        {
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "alg_param": {"window": 2},
+        }
     ]
     assert stored_experiments[0]["dataset_source"] == {
         "kind": "smarttrade_dataserver",
@@ -1101,7 +1113,7 @@ def test_create_experiment_redirects_to_queued_detail_page_when_dispatch_is_idle
             "end_date": "2024-01-31",
             "end_time": "16:00",
             "algorithms_json": (
-                '[{"alg_key":"close_high_channel_breakout","alg_param":{"window":2}}]'
+                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
             ),
             "notes": "good payload",
         },
@@ -1162,11 +1174,13 @@ def test_experiment_detail_shows_runtime_metadata(monkeypatch):
                 },
                 {
                     "step": "run_algorithm",
-                    "label": "Run close_high_channel_breakout",
+                    "label": "Run OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                     "started_at": datetime(2024, 2, 3, 12, 1, tzinfo=timezone.utc),
                     "finished_at": datetime(2024, 2, 3, 12, 5, tzinfo=timezone.utc),
                     "duration_seconds": 240.0,
-                    "metadata": {"alg_key": "close_high_channel_breakout"},
+                    "metadata": {
+                        "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"
+                    },
                 },
             ],
         }
@@ -1180,7 +1194,10 @@ def test_experiment_detail_shows_runtime_metadata(monkeypatch):
     assert b"Duration (seconds):" in response.data
     assert b"Step durations" in response.data
     assert b"Read candles" in response.data
-    assert b"Run close_high_channel_breakout" in response.data
+    assert (
+        b"Run OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"
+        in response.data
+    )
     assert b"60.00s" in response.data
     assert b"240.00s" in response.data
     assert b"Git revision:" in response.data
@@ -1310,13 +1327,16 @@ def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
                 "end": "2024-02-03 16:00:00",
             },
             "selected_algorithms": [
-                {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+                {
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                }
             ],
             "input_kind": "single_algorithm",
             "input_snapshot": {
                 "algorithms": [
                     {
-                        "alg_key": "close_high_channel_breakout",
+                        "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                         "alg_param": {"window": 2},
                     }
                 ]
@@ -1345,7 +1365,10 @@ def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
     assert b"data-status-api-url=" in response.data
     assert b"started_at_epoch_ms" in response.data
     assert b"00:00:00" in response.data
-    assert b"close_high_channel_breakout" in response.data
+    assert (
+        b"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"
+        in response.data
+    )
     assert b"Step durations" in response.data
     assert b"Read candles" in response.data
     assert b"Stop experiment" in response.data
@@ -1375,13 +1398,16 @@ def test_queued_experiment_detail_shows_queue_panel(monkeypatch):
                 "end": "2024-02-03 16:00:00",
             },
             "selected_algorithms": [
-                {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+                {
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                }
             ],
             "input_kind": "single_algorithm",
             "input_snapshot": {
                 "algorithms": [
                     {
-                        "alg_key": "close_high_channel_breakout",
+                        "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                         "alg_param": {"window": 2},
                     }
                 ]
@@ -1549,7 +1575,10 @@ def test_cancel_experiment_marks_cancelled_immediately(monkeypatch, tmp_path):
         end_date="2024-01-01",
         end_time="09:30",
         algorithms=[
-            {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+            {
+                "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                "alg_param": {"window": 2},
+            }
         ],
         notes="cancel me",
     )
@@ -1646,7 +1675,7 @@ def test_create_experiment_returns_400_when_data_fetch_fault_occurs(
             "end_date": "2024-01-01",
             "end_time": "09:30",
             "algorithms_json": (
-                '[{"alg_key":"close_high_channel_breakout","alg_param":{"window":2}}]'
+                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
             ),
             "notes": "fault payload",
         },
@@ -1710,7 +1739,7 @@ def test_create_experiment_returns_400_when_no_market_data_is_available(
             "end_date": "2024-01-01",
             "end_time": "09:30",
             "algorithms_json": (
-                '[{"alg_key":"close_high_channel_breakout","alg_param":{"window":2}}]'
+                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
             ),
             "notes": "no data payload",
         },
@@ -1816,7 +1845,10 @@ def test_recent_preset_does_not_double_encode_algorithms_json(monkeypatch):
                 "end": "2024-02-03 16:00:00",
             },
             "selected_algorithms": [
-                {"alg_key": "boundary_breakout", "alg_param": {"period": 5}}
+                {
+                    "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+                    "alg_param": {"period": 5},
+                }
             ],
             "notes": "boundary payload",
         }
@@ -1828,6 +1860,6 @@ def test_recent_preset_does_not_double_encode_algorithms_json(monkeypatch):
     assert response.status_code == 200
     assert b'data-algorithms-json="[{' not in response.data
     assert (
-        b"data-algorithms-json='[{&#34;alg_key&#34;: &#34;boundary_breakout&#34;, &#34;alg_param&#34;: {&#34;period&#34;: 5}}]'"
+        b"data-algorithms-json='[{&#34;alg_key&#34;: &#34;OLD_boundary_breakout_NEW_breakout_donchian_channel&#34;, &#34;alg_param&#34;: {&#34;period&#34;: 5}}]'"
         in response.data
     )

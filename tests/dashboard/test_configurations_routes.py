@@ -102,7 +102,7 @@ def _sample_configuration_payload():
             {
                 "node_id": "alg1",
                 "node_type": "algorithm",
-                "alg_key": "close_high_channel_breakout",
+                "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                 "alg_param": {"window": 2},
                 "buy_enabled": True,
                 "sell_enabled": True,
@@ -110,7 +110,7 @@ def _sample_configuration_payload():
             {
                 "node_id": "alg2",
                 "node_type": "algorithm",
-                "alg_key": "boundary_breakout",
+                "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
                 "alg_param": {"period": 5},
                 "buy_enabled": True,
                 "sell_enabled": True,
@@ -279,7 +279,7 @@ def test_configuration_detail_shows_revision_change_summary(monkeypatch):
         {
             "node_id": "alg3",
             "node_type": "algorithm",
-            "alg_key": "boundary_breakout",
+            "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "alg_param": {"period": 7},
             "buy_enabled": True,
             "sell_enabled": True,

@@ -86,8 +86,8 @@ def register_composite_alert_algorithms() -> None:
     register_reinforcement_learning_alert_algorithms()
     specs = [
         AlertAlgorithmSpec(
-            key="aggregate_boundary_and_channel",
-            name="Aggregate Boundary and Channel",
+            key="OLD_aggregate_boundary_and_channel_NEW_hard_boolean_gating_and_or_majority",
+            name="OLD Aggregate Boundary And Channel NEW Hard Boolean Gating And Or Majority",
             catalog_ref="algorithm:93",
             builder=_build_aggregate_boundary_and_channel,
             default_param={"window": 30},
@@ -111,8 +111,8 @@ def register_composite_alert_algorithms() -> None:
             composition_roles=("ensemble_member",),
         ),
         AlertAlgorithmSpec(
-            key="aggregate_channel_dual_window",
-            name="Aggregate Channel Dual Window",
+            key="OLD_aggregate_channel_dual_window_NEW_weighted_linear_score_blend",
+            name="OLD Aggregate Channel Dual Window NEW Weighted Linear Score Blend",
             catalog_ref="algorithm:93",
             builder=_build_aggregate_channel_dual_window,
             default_param={"buy_window": 20, "sell_window": 30},
