@@ -75,6 +75,7 @@ from trading_algos_dashboard.services.cache_management_service import (
     CacheManagementService,
 )
 from trading_algos_dashboard.services.evaluation_service import EvaluationService
+from trading_algos_dashboard.services.engine_run_service import EngineRunService
 from trading_algos_dashboard.services.experiment_runtime_settings_service import (
     ExperimentRuntimeSettingsService,
 )
@@ -165,25 +166,8 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         market_data_cache=market_data_cache,
         data_source_service=data_source_service,
     )
-    experiment_service = ExperimentService(
-        experiment_repository=experiment_repository,
-        result_repository=result_repository,
-        data_source_service=data_source_service,
-        report_base_path=cfg.report_base_path,
-        max_concurrent_experiments=cfg.experiment_max_concurrent_runs,
-        max_concurrent_experiments_provider=lambda: (
-            experiment_runtime_settings_service.get_effective_settings()[
-                "max_concurrent_experiments"
-            ]
-        ),
-        scheduler_lease_manager=experiment_scheduler_lease_service,
-    )
     algorithm_catalog_service = AlgorithmCatalogService(
         catalog_repository=algorithm_catalog_repository,
-    )
-    bulk_experiment_service = BulkExperimentService(
-        experiment_service=experiment_service,
-        algorithm_catalog_service=algorithm_catalog_service,
     )
     administration_service = AdministrationService(
         experiment_repository=experiment_repository,
@@ -208,6 +192,33 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     )
     server_control_service = ServerControlService(
         repository=server_control_settings_repository,
+    )
+    engine_run_service = EngineRunService(
+        server_control_service=server_control_service,
+        fake_datetime_endpoint_resolver=lambda: (
+            server_control_service.get_service_endpoint("fake_datetime")
+        ),
+        engines_control_endpoint_resolver=lambda: (
+            server_control_service.get_service_endpoint("engines_control")
+        ),
+    )
+    experiment_service = ExperimentService(
+        experiment_repository=experiment_repository,
+        result_repository=result_repository,
+        data_source_service=data_source_service,
+        engine_run_service=engine_run_service,
+        report_base_path=cfg.report_base_path,
+        max_concurrent_experiments=cfg.experiment_max_concurrent_runs,
+        max_concurrent_experiments_provider=lambda: (
+            experiment_runtime_settings_service.get_effective_settings()[
+                "max_concurrent_experiments"
+            ]
+        ),
+        scheduler_lease_manager=experiment_scheduler_lease_service,
+    )
+    bulk_experiment_service = BulkExperimentService(
+        experiment_service=experiment_service,
+        algorithm_catalog_service=algorithm_catalog_service,
     )
 
     app.extensions["mongo"] = mongo
@@ -259,6 +270,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["evaluation_service"] = evaluation_service
     app.extensions["configuration_builder_service"] = configuration_builder_service
     app.extensions["server_control_service"] = server_control_service
+    app.extensions["engine_run_service"] = engine_run_service
 
     app.register_blueprint(home_bp)
     app.register_blueprint(algorithms_bp)

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import multiprocessing
 import os
 import signal
 import subprocess
@@ -24,6 +23,12 @@ from trading_algos_dashboard.services.configuration_run_service import (
 from trading_algos_dashboard.services.data_source_service import (
     parse_date_range,
 )
+from trading_algos_dashboard.services.engine_run_service import (
+    EngineRunRequest,
+)
+from trading_algos_dashboard.services.single_algorithm_configuration import (
+    extract_single_algorithm_from_configuration_payload,
+)
 
 
 class ExperimentService:
@@ -33,6 +38,7 @@ class ExperimentService:
         experiment_repository: Any,
         result_repository: Any,
         data_source_service: Any,
+        engine_run_service: Any | None = None,
         report_base_path: str,
         max_concurrent_experiments: int = 1,
         max_concurrent_experiments_provider: Callable[[], int] | None = None,
@@ -44,6 +50,7 @@ class ExperimentService:
         self.experiment_repository = experiment_repository
         self.result_repository = result_repository
         self.data_source_service = data_source_service
+        self.engine_run_service = engine_run_service
         self.report_base_path = report_base_path
         self.max_concurrent_experiments = max_concurrent_experiments
         self.max_concurrent_experiments_provider = max_concurrent_experiments_provider
@@ -58,6 +65,16 @@ class ExperimentService:
         def join(self) -> None:
             return None
 
+    class _ThreadTaskHandle:
+        def __init__(self, job: Callable[[], None]) -> None:
+            self._thread = threading.Thread(target=job, daemon=True)
+
+        def start(self) -> None:
+            self._thread.start()
+
+        def join(self) -> None:
+            self._thread.join()
+
     def create_experiment(
         self,
         *,
@@ -68,18 +85,37 @@ class ExperimentService:
         end_time: str,
         algorithms: list[dict[str, Any]],
         configuration_payload: dict[str, Any] | None = None,
+        engine_chain_payload: dict[str, Any] | None = None,
         notes: str = "",
     ) -> str:
         experiment_id = f"exp_{uuid4().hex[:12]}"
         created_at = datetime.now(timezone.utc)
 
-        if configuration_payload is None and (
-            not isinstance(algorithms, list) or len(algorithms) == 0
+        if (
+            configuration_payload is None
+            and engine_chain_payload is None
+            and (not isinstance(algorithms, list) or len(algorithms) == 0)
         ):
             raise ValueError("Algorithms must be a non-empty JSON array of objects")
 
         normalized_algorithms = []
-        if configuration_payload is None:
+        if configuration_payload is not None:
+            extracted_algorithm = extract_single_algorithm_from_configuration_payload(
+                configuration_payload
+            )
+            if extracted_algorithm is not None:
+                normalized_algorithms.append(
+                    normalize_alertgen_sensor_config(
+                        {
+                            "symbol": symbol,
+                            "alg_key": extracted_algorithm["alg_key"],
+                            "alg_param": extracted_algorithm["alg_param"],
+                            "buy": extracted_algorithm["buy"],
+                            "sell": extracted_algorithm["sell"],
+                        }
+                    )
+                )
+        elif engine_chain_payload is None:
             for index, algorithm in enumerate(algorithms, start=1):
                 algorithm_config = self._require_algorithm_config(
                     algorithm, index=index
@@ -95,6 +131,13 @@ class ExperimentService:
                         }
                     )
                 )
+
+        normalized_engine_chain = None
+        if engine_chain_payload is not None:
+            normalized_engine_chain = self._normalize_engine_chain_payload(
+                symbol=symbol,
+                payload=engine_chain_payload,
+            )
 
         start_dt, end_dt = parse_date_range(
             start_date,
@@ -121,20 +164,15 @@ class ExperimentService:
                 "dataset_source": None,
                 "time_range": {"start": start_dt, "end": end_dt},
                 "candle_count": None,
-                "input_kind": "configuration"
-                if configuration_payload is not None
-                else "single_algorithm",
-                "input_snapshot": configuration_payload
-                if configuration_payload is not None
-                else {
-                    "algorithms": [
-                        {
-                            "alg_key": alg["alg_key"],
-                            "alg_param": alg["alg_param"],
-                        }
-                        for alg in normalized_algorithms
-                    ]
-                },
+                "input_kind": self._resolve_input_kind(
+                    configuration_payload=configuration_payload,
+                    engine_chain_payload=normalized_engine_chain,
+                ),
+                "input_snapshot": self._build_input_snapshot(
+                    configuration_payload=configuration_payload,
+                    normalized_algorithms=normalized_algorithms,
+                    engine_chain_payload=normalized_engine_chain,
+                ),
                 "selected_algorithms": [
                     {
                         "alg_key": alg["alg_key"],
@@ -197,6 +235,7 @@ class ExperimentService:
         report_dir = Path(str(experiment["report_base_path"]))
         normalized_algorithms = self._normalized_algorithms_from_experiment(experiment)
         configuration_payload = self._configuration_payload_from_experiment(experiment)
+        engine_chain_payload = self._engine_chain_payload_from_experiment(experiment)
         created_at = self._normalize_runtime_datetime(experiment.get("created_at"))
         if created_at is None:
             created_at = started_at
@@ -211,6 +250,7 @@ class ExperimentService:
                 end_dt=end_dt,
                 normalized_algorithms=normalized_algorithms,
                 configuration_payload=configuration_payload,
+                engine_chain_payload=engine_chain_payload,
                 report_dir=report_dir,
             )
         )
@@ -242,15 +282,24 @@ class ExperimentService:
         end_dt: datetime,
         normalized_algorithms: list[dict[str, Any]],
         configuration_payload: dict[str, Any] | None,
+        engine_chain_payload: dict[str, Any] | None,
         report_dir: Path,
     ) -> None:
         execution_steps: list[dict[str, Any]] = []
+        dataset_source: dict[str, Any] | None = None
         try:
             self.experiment_repository.update_experiment(
                 experiment_id,
                 {"process_pid": os.getpid(), "updated_at": datetime.now(timezone.utc)},
             )
             dataset_source = self.data_source_service.get_market_data_server_details()
+            self.experiment_repository.update_experiment(
+                experiment_id,
+                {
+                    "dataset_source": dataset_source,
+                    "updated_at": datetime.now(timezone.utc),
+                },
+            )
             read_started_at = datetime.now(timezone.utc)
             read_started_at_perf = perf_counter()
             fetch_result = self.data_source_service.fetch_candles(
@@ -260,6 +309,8 @@ class ExperimentService:
             )
             candles = fetch_result.candles
             read_finished_at = datetime.now(timezone.utc)
+            if dataset_source is None:
+                raise RuntimeError("Market data server details were not available")
             dataset_source["cache"] = {
                 **dict(dataset_source.get("cache") or {}),
                 "source_kind": fetch_result.source_kind,
@@ -294,7 +345,39 @@ class ExperimentService:
                 },
             )
 
-            if configuration_payload is not None:
+            if engine_chain_payload is not None:
+                if self.engine_run_service is None:
+                    raise RuntimeError("Engine run service is not configured")
+                result = self.engine_run_service.run_chain(
+                    EngineRunRequest(
+                        symbol=symbol,
+                        start_dt=start_dt,
+                        end_dt=end_dt,
+                        speed_factor=int(engine_chain_payload["speed_factor"]),
+                        candles=[dict(candle) for candle in candles],
+                        alertgens=list(engine_chain_payload["alertgens"]),
+                        decmaker=dict(engine_chain_payload["decmaker"]),
+                        report_dir=str(report_dir),
+                    )
+                )
+                execution_steps.extend(self._result_execution_steps(result))
+                self.experiment_repository.update_experiment(
+                    experiment_id,
+                    {
+                        "execution_steps": execution_steps,
+                        "updated_at": datetime.now(timezone.utc),
+                    },
+                )
+                self.result_repository.insert_result(
+                    self._normalize_runtime_document(
+                        {
+                            "experiment_id": experiment_id,
+                            "created_at": created_at,
+                            **result,
+                        }
+                    )
+                )
+            elif configuration_payload is not None:
                 result = run_configuration_payload(
                     payload=configuration_payload,
                     symbol=symbol,
@@ -351,6 +434,7 @@ class ExperimentService:
                     "status": "failed",
                     "finished_at": finished_at,
                     "duration_seconds": (finished_at - started_at).total_seconds(),
+                    "dataset_source": dataset_source,
                     "execution_steps": execution_steps,
                     "error_message": str(exc),
                     "cancelled_at": None,
@@ -391,6 +475,11 @@ class ExperimentService:
         if started_at is None:
             started_at = datetime.now(timezone.utc)
 
+        if (
+            experiment.get("input_kind") == "engine_chain"
+            and self.engine_run_service is not None
+        ):
+            self.engine_run_service.stop_chain()
         self._terminate_active_run(experiment_id, experiment)
         self._mark_cancelled(experiment_id=experiment_id, started_at=started_at)
         self.dispatch_available_experiments()
@@ -523,10 +612,10 @@ class ExperimentService:
         return normalized
 
     @staticmethod
-    def _launch_background_task(job: Callable[[], None]) -> multiprocessing.Process:
-        process = multiprocessing.Process(target=job, daemon=True)
-        process.start()
-        return process
+    def _launch_background_task(job: Callable[[], None]) -> _ThreadTaskHandle:
+        handle = ExperimentService._ThreadTaskHandle(job)
+        handle.start()
+        return handle
 
     @staticmethod
     def _repo_revision() -> str | None:
@@ -681,8 +770,107 @@ class ExperimentService:
             return None
         input_snapshot = experiment.get("input_snapshot")
         if isinstance(input_snapshot, dict):
+            if extract_single_algorithm_from_configuration_payload(input_snapshot):
+                return None
             return input_snapshot
         return None
+
+    @staticmethod
+    def _engine_chain_payload_from_experiment(
+        experiment: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        if experiment.get("input_kind") != "engine_chain":
+            return None
+        input_snapshot = experiment.get("input_snapshot")
+        if isinstance(input_snapshot, dict):
+            return input_snapshot
+        return None
+
+    def _normalize_engine_chain_payload(
+        self,
+        *,
+        symbol: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        alertgens = payload.get("alertgens")
+        if not isinstance(alertgens, list) or len(alertgens) == 0:
+            raise ValueError("Engine chain requires at least one alertgen.")
+        decmaker = payload.get("decmaker")
+        if not isinstance(decmaker, dict):
+            raise ValueError("Engine chain requires one decmaker config.")
+        speed_factor = int(payload.get("speed_factor", 1))
+        if speed_factor < 1:
+            raise ValueError("Speed factor must be at least 1.")
+        normalized_alertgens: list[dict[str, Any]] = []
+        for index, algorithm in enumerate(alertgens, start=1):
+            algorithm_config = self._require_algorithm_config(algorithm, index=index)
+            normalized_alertgens.append(
+                normalize_alertgen_sensor_config(
+                    {
+                        "symbol": symbol,
+                        "alg_key": algorithm_config["alg_key"],
+                        "alg_param": algorithm_config["alg_param"],
+                        "buy": algorithm_config.get("buy", True),
+                        "sell": algorithm_config.get("sell", True),
+                    }
+                )
+            )
+        decmaker_key = str(decmaker.get("decmaker_key", "")).strip()
+        if not decmaker_key:
+            raise ValueError("Engine chain decmaker is missing decmaker_key.")
+        decmaker_param = decmaker.get("decmaker_param")
+        if not isinstance(decmaker_param, dict):
+            raise ValueError("Engine chain decmaker requires a decmaker_param object.")
+        return {
+            "speed_factor": speed_factor,
+            "alertgens": [
+                {
+                    "symbol": symbol,
+                    "alg_key": alertgen["alg_key"],
+                    "alg_param": alertgen["alg_param"],
+                    "buy": alertgen.get("buy", True),
+                    "sell": alertgen.get("sell", True),
+                }
+                for alertgen in normalized_alertgens
+            ],
+            "decmaker": {
+                "decmaker_key": decmaker_key,
+                "decmaker_param": decmaker_param,
+            },
+        }
+
+    @staticmethod
+    def _resolve_input_kind(
+        *,
+        configuration_payload: dict[str, Any] | None,
+        engine_chain_payload: dict[str, Any] | None,
+    ) -> str:
+        if engine_chain_payload is not None:
+            return "engine_chain"
+        if configuration_payload is not None:
+            return "configuration"
+        return "single_algorithm"
+
+    @staticmethod
+    def _build_input_snapshot(
+        *,
+        configuration_payload: dict[str, Any] | None,
+        normalized_algorithms: list[dict[str, Any]],
+        engine_chain_payload: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        if engine_chain_payload is not None:
+            return engine_chain_payload
+        if configuration_payload is not None:
+            return configuration_payload
+        return {
+            "algorithms": [
+                {
+                    "alg_key": alg["alg_key"],
+                    "alg_param": alg["alg_param"],
+                }
+                for alg in normalized_algorithms
+            ]
+        }
 
     def _require_time_range(
         self, experiment: dict[str, Any]

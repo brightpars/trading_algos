@@ -10,6 +10,9 @@ from trading_algos_dashboard.repositories.experiment_repository import (
     ExperimentRepository,
 )
 from trading_algos_dashboard.repositories.result_repository import ResultRepository
+from trading_algos_dashboard.services.data_source_service import (
+    MarketDataUnavailableError,
+)
 from trading_algos_dashboard.services.data_source_service import MarketDataFetchResult
 from trading_algos_dashboard.services.experiment_service import ExperimentService
 
@@ -211,6 +214,63 @@ class _CacheAwareDataSourceService:
         )
 
 
+class _EngineRunServiceStub:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.stop_calls = 0
+
+    def run_chain(self, request: Any) -> dict[str, Any]:
+        self.calls.append(
+            {
+                "symbol": request.symbol,
+                "speed_factor": request.speed_factor,
+                "alertgens": request.alertgens,
+                "decmaker": request.decmaker,
+                "candles": request.candles,
+            }
+        )
+        return {
+            "input_kind": "engine_chain",
+            "alg_name": f"Engine chain for {request.symbol}",
+            "execution_steps": [
+                {
+                    "step": "run_engine_chain",
+                    "label": "Run engine chain",
+                    "started_at": datetime.now(timezone.utc),
+                    "finished_at": datetime.now(timezone.utc),
+                    "duration_seconds": 0.0,
+                    "metadata": {"symbol": request.symbol},
+                }
+            ],
+            "latest_decision": {
+                "trend": "buy",
+                "confidence": 0.9,
+                "buy_signal": True,
+                "sell_signal": False,
+                "buy_range_signal": False,
+                "sell_range_signal": False,
+                "no_signal": False,
+                "annotations": {},
+            },
+            "signal_summary": {"alertgen_count": len(request.alertgens)},
+            "report": {
+                "algorithm_summary": {
+                    "algorithm_name": f"Engine chain for {request.symbol}"
+                },
+                "summary_cards": [],
+                "evaluation_summary": {"headline_metrics": {}},
+                "charts": [],
+                "tables": [],
+                "analysis_blocks": [],
+                "diagnostics": {},
+            },
+            "node_results": [],
+        }
+
+    def stop_chain(self) -> None:
+        self.stop_calls += 1
+
+
 def _build_service(
     *, tmp_path: Path, task_handles: list[_DeferredTaskHandle]
 ) -> ExperimentService:
@@ -398,6 +458,7 @@ def test_run_experiment_job_records_datasource_cache_metadata(monkeypatch, tmp_p
             }
         ],
         configuration_payload=None,
+        engine_chain_payload=None,
         report_dir=Path(tmp_path),
     )
 
@@ -409,6 +470,58 @@ def test_run_experiment_job_records_datasource_cache_metadata(monkeypatch, tmp_p
     assert experiment["execution_steps"][0]["step"] == "read_candles"
     assert experiment["execution_steps"][0]["metadata"]["cache_hit"] is True
     assert experiment["execution_steps"][0]["metadata"]["source_kind"] == "cache"
+
+
+def test_run_experiment_job_persists_dataset_source_on_market_data_failure(tmp_path):
+    experiment_repository = _ExperimentRepositoryStub()
+    result_repository = _ResultRepositoryStub()
+
+    class _FailingDataSourceService:
+        def get_market_data_server_details(self) -> dict[str, Any]:
+            return {
+                "kind": "xmlrpc_dataserver",
+                "ip": "127.0.0.1",
+                "port": 6010,
+                "endpoint": "127.0.0.1:6010",
+            }
+
+        def fetch_candles(
+            self, *, symbol: str, start: datetime, end: datetime
+        ) -> MarketDataFetchResult:
+            raise MarketDataUnavailableError("no candles available")
+
+    service = ExperimentService(
+        experiment_repository=cast(Any, experiment_repository),
+        result_repository=cast(Any, result_repository),
+        data_source_service=cast(Any, _FailingDataSourceService()),
+        report_base_path=str(tmp_path),
+    )
+    experiment_repository.create_experiment({"experiment_id": "exp_failed"})
+
+    service._run_experiment_job(
+        experiment_id="exp_failed",
+        created_at=datetime.now(timezone.utc),
+        started_at=datetime.now(timezone.utc),
+        symbol="AAPL",
+        start_dt=datetime.fromisoformat("2024-01-01T09:30"),
+        end_dt=datetime.fromisoformat("2024-01-01T09:30"),
+        normalized_algorithms=[],
+        configuration_payload=None,
+        engine_chain_payload=None,
+        report_dir=Path(tmp_path),
+    )
+
+    experiment = experiment_repository.get_experiment("exp_failed")
+
+    assert experiment is not None
+    assert experiment["status"] == "failed"
+    assert experiment["dataset_source"] == {
+        "kind": "xmlrpc_dataserver",
+        "ip": "127.0.0.1",
+        "port": 6010,
+        "endpoint": "127.0.0.1:6010",
+    }
+    assert experiment["error_message"] == "no candles available"
 
 
 def test_run_experiment_job_normalizes_xmlrpc_datetime_values_in_persisted_payloads(
@@ -486,6 +599,7 @@ def test_run_experiment_job_normalizes_xmlrpc_datetime_values_in_persisted_paylo
             }
         ],
         configuration_payload=None,
+        engine_chain_payload=None,
         report_dir=Path(tmp_path),
     )
 
@@ -657,3 +771,126 @@ def test_dispatch_available_experiments_releases_lease_after_dispatch(tmp_path):
     assert launched == ["exp_a"]
     assert lease_manager.acquire_calls == 1
     assert lease_manager.release_calls == 1
+
+
+def test_create_experiment_persists_engine_chain_input_kind(tmp_path):
+    repository = _ExperimentRepositoryStub()
+    service = ExperimentService(
+        experiment_repository=cast(Any, repository),
+        result_repository=cast(Any, _ResultRepositoryStub()),
+        data_source_service=cast(Any, _FakeDataSourceService()),
+        engine_run_service=cast(Any, _EngineRunServiceStub()),
+        report_base_path=str(tmp_path),
+    )
+    service.dispatch_available_experiments = lambda: []
+
+    experiment_id = service.create_experiment(
+        symbol="AAPL",
+        start_date="2024-01-01",
+        start_time="09:30",
+        end_date="2024-01-01",
+        end_time="16:00",
+        algorithms=[],
+        engine_chain_payload={
+            "speed_factor": 30,
+            "alertgens": [
+                {
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                }
+            ],
+            "decmaker": {
+                "decmaker_key": "alg1",
+                "decmaker_param": {
+                    "confidence_threshold_buy": 0.6,
+                    "confidence_threshold_sell": 0.6,
+                    "max_percent_higher_price_buy": 0.0,
+                    "max_percent_lower_price_sell": 0.0,
+                },
+            },
+        },
+    )
+
+    stored = repository.get_experiment(experiment_id)
+    assert stored is not None
+    assert stored["input_kind"] == "engine_chain"
+    assert stored["input_snapshot"]["speed_factor"] == 30
+    assert stored["input_snapshot"]["decmaker"]["decmaker_key"] == "alg1"
+
+
+def test_run_experiment_job_uses_engine_run_service_for_engine_chain(tmp_path):
+    experiment_repository = _ExperimentRepositoryStub()
+    result_repository = _ResultRepositoryStub()
+    engine_run_service = _EngineRunServiceStub()
+    service = ExperimentService(
+        experiment_repository=cast(Any, experiment_repository),
+        result_repository=cast(Any, result_repository),
+        data_source_service=cast(Any, _FakeDataSourceService()),
+        engine_run_service=cast(Any, engine_run_service),
+        report_base_path=str(tmp_path),
+    )
+    experiment_repository.create_experiment({"experiment_id": "exp_engine_chain"})
+
+    service._run_experiment_job(
+        experiment_id="exp_engine_chain",
+        created_at=datetime.now(timezone.utc),
+        started_at=datetime.now(timezone.utc),
+        symbol="AAPL",
+        start_dt=datetime.fromisoformat("2024-01-01T09:30"),
+        end_dt=datetime.fromisoformat("2024-01-01T09:30"),
+        normalized_algorithms=[],
+        configuration_payload=None,
+        engine_chain_payload={
+            "speed_factor": 20,
+            "alertgens": [
+                {
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                    "buy": True,
+                    "sell": True,
+                }
+            ],
+            "decmaker": {
+                "decmaker_key": "alg1",
+                "decmaker_param": {
+                    "confidence_threshold_buy": 0.6,
+                    "confidence_threshold_sell": 0.6,
+                    "max_percent_higher_price_buy": 0.0,
+                    "max_percent_lower_price_sell": 0.0,
+                },
+            },
+        },
+        report_dir=Path(tmp_path),
+    )
+
+    stored = experiment_repository.get_experiment("exp_engine_chain")
+    assert stored is not None
+    assert stored["status"] == "completed"
+    assert engine_run_service.calls
+    assert engine_run_service.calls[0]["speed_factor"] == 20
+    assert len(result_repository.results) == 1
+
+
+def test_request_cancel_stops_engine_chain_runtime(tmp_path):
+    repository = _ExperimentRepositoryStub()
+    engine_run_service = _EngineRunServiceStub()
+    service = ExperimentService(
+        experiment_repository=cast(Any, repository),
+        result_repository=cast(Any, _ResultRepositoryStub()),
+        data_source_service=cast(Any, _FakeDataSourceService()),
+        engine_run_service=cast(Any, engine_run_service),
+        report_base_path=str(tmp_path),
+    )
+    started_at = datetime.now(timezone.utc)
+    repository.create_experiment(
+        {
+            "experiment_id": "exp_running_engine",
+            "status": "running",
+            "input_kind": "engine_chain",
+            "started_at": started_at,
+        }
+    )
+    service.dispatch_available_experiments = lambda: []
+
+    assert service.request_cancel("exp_running_engine") is True
+    assert engine_run_service.stop_calls == 1

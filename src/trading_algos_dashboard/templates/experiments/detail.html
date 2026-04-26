@@ -115,6 +115,10 @@
       {% if experiment.input_kind == 'configuration' %}
       <p class="mb-2"><strong>Configuration:</strong> <code>{{ experiment.input_snapshot.config_key or experiment.input_snapshot.name or 'Declarative configuration' }}</code></p>
       <pre class="small bg-light p-3 rounded mb-0">{{ experiment.input_snapshot }}</pre>
+      {% elif experiment.input_kind == 'engine_chain' %}
+      <p class="mb-2"><strong>Engine chain:</strong> <code>{{ experiment.input_snapshot.decmaker.decmaker_key }}</code> with {{ experiment.input_snapshot.alertgens|length }} alertgen(s)</p>
+      <div class="mb-2"><strong>Speed factor:</strong> {{ experiment.input_snapshot.speed_factor }}</div>
+      <pre class="small bg-light p-3 rounded mb-0">{{ experiment.input_snapshot }}</pre>
       {% else %}
       <ul class="mb-0">
         {% for algorithm in experiment.selected_algorithms %}

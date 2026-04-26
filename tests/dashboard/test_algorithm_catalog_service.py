@@ -222,6 +222,27 @@ def test_catalog_service_rejects_non_runnable_algorithm_lookup():
         raise AssertionError("Expected ValueError for unknown runnable algorithm")
 
 
+def test_catalog_service_exposes_decmaker_implementations():
+    service = _build_service()
+
+    items = service.list_decmaker_implementations()
+
+    assert items == [
+        {
+            "key": "alg1",
+            "name": "Algorithm 1 decision maker",
+            "label": "Algorithm 1 decision maker (alg1)",
+            "default_param": {
+                "confidence_threshold_buy": 0.6,
+                "confidence_threshold_sell": 0.6,
+                "max_percent_higher_price_buy": 0.0,
+                "max_percent_lower_price_sell": 0.0,
+            },
+        }
+    ]
+    assert service.get_decmaker_implementation("alg1")["key"] == "alg1"
+
+
 def test_catalog_service_filters_entries_for_admin_queries():
     service = _build_service()
     payload = service.list_admin_catalog_entries(

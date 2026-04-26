@@ -12,6 +12,12 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def normalize_cache_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 @dataclass(frozen=True)
 class MarketDataCacheKey:
     symbol: str
@@ -43,7 +49,11 @@ class InMemoryMarketDataCache:
     def make_key(
         self, *, symbol: str, start: datetime, end: datetime
     ) -> MarketDataCacheKey:
-        return MarketDataCacheKey(symbol=symbol.strip().upper(), start=start, end=end)
+        return MarketDataCacheKey(
+            symbol=symbol.strip().upper(),
+            start=normalize_cache_datetime(start),
+            end=normalize_cache_datetime(end),
+        )
 
     def get(
         self, *, symbol: str, start: datetime, end: datetime
@@ -169,7 +179,11 @@ class MongoMarketDataCache:
         stored_at = document.get("stored_at")
         if not isinstance(candles, list) or not isinstance(stored_at, datetime):
             return None
-        key = MarketDataCacheKey(symbol=symbol.strip().upper(), start=start, end=end)
+        key = MarketDataCacheKey(
+            symbol=symbol.strip().upper(),
+            start=normalize_cache_datetime(start),
+            end=normalize_cache_datetime(end),
+        )
         return CachedMarketData(
             key=key,
             candles=tuple(dict(row) for row in candles if isinstance(row, Mapping)),
@@ -192,7 +206,11 @@ class MongoMarketDataCache:
             end=end,
             candles=[dict(row) for row in candles],
         )
-        key = MarketDataCacheKey(symbol=symbol.strip().upper(), start=start, end=end)
+        key = MarketDataCacheKey(
+            symbol=symbol.strip().upper(),
+            start=normalize_cache_datetime(start),
+            end=normalize_cache_datetime(end),
+        )
         self._prune_expired_entries()
         self._prune_if_needed()
         stored_at = payload.get("stored_at")
@@ -208,6 +226,13 @@ class MongoMarketDataCache:
 
     def stats(self) -> dict[str, int]:
         self._prune_expired_entries()
+        count_materialized_entries = getattr(
+            self.repository, "count_materialized_entries", None
+        )
+        if callable(count_materialized_entries):
+            entry_count = count_materialized_entries()
+            if isinstance(entry_count, int):
+                return {"entry_count": entry_count}
         return {"entry_count": self.repository._count_documents({})}
 
     def clear(self) -> int:
@@ -234,8 +259,8 @@ class MongoMarketDataCache:
                 CachedMarketData(
                     key=MarketDataCacheKey(
                         symbol=symbol.strip().upper(),
-                        start=start,
-                        end=end,
+                        start=normalize_cache_datetime(start),
+                        end=normalize_cache_datetime(end),
                     ),
                     candles=tuple(
                         dict(row) for row in candles if isinstance(row, Mapping)

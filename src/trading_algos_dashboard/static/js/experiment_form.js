@@ -6,13 +6,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const endDateInput = form?.querySelector("input[name='end_date']");
   const endTimeInput = form?.querySelector("input[name='end_time']");
   const notesTextarea = form?.querySelector("textarea[name='notes']");
-  const algorithmsTextarea = form?.querySelector("textarea[name='algorithms_json']");
+  const configurationTextarea = form?.querySelector(
+    "textarea[name='configuration_json']",
+  );
 
-  const textareas = document.querySelectorAll("textarea[name='algorithms_json']");
+  const textareas = document.querySelectorAll(
+    "textarea[name='configuration_json']",
+  );
   textareas.forEach((textarea) => {
     textarea.addEventListener("blur", () => {
       try {
-        JSON.parse(textarea.value || "[]");
+        JSON.parse(textarea.value || "{}");
         textarea.classList.remove("is-invalid");
       } catch (_error) {
         textarea.classList.add("is-invalid");
@@ -43,9 +47,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (notesTextarea) {
         notesTextarea.value = button.dataset.notes || "";
       }
-      if (algorithmsTextarea) {
-        algorithmsTextarea.value = button.dataset.algorithmsJson || "[]";
-        algorithmsTextarea.classList.remove("is-invalid");
+      if (configurationTextarea) {
+        configurationTextarea.value = button.dataset.configurationJson || "{}";
+        configurationTextarea.classList.remove("is-invalid");
       }
     });
   });

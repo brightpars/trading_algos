@@ -3,6 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from trading_algos_dashboard.services.single_algorithm_configuration import (
+    build_single_algorithm_configuration_payload,
+)
+
 
 @dataclass(frozen=True)
 class BulkExperimentSubmissionResult:
@@ -69,12 +73,11 @@ class BulkExperimentService:
                     start_time=start_time,
                     end_date=end_date,
                     end_time=end_time,
-                    algorithms=[
-                        {
-                            "alg_key": alg_key,
-                            "alg_param": default_param,
-                        }
-                    ],
+                    algorithms=[],
+                    configuration_payload=build_single_algorithm_configuration_payload(
+                        alg_key=alg_key,
+                        alg_param=default_param,
+                    ),
                     notes=notes,
                 )
             except ValueError as exc:
@@ -115,12 +118,11 @@ class BulkExperimentService:
                 start_time=start_time,
                 end_date=end_date,
                 end_time=end_time,
-                algorithms=[
-                    {
-                        "alg_key": algorithm["key"],
-                        "alg_param": algorithm.get("default_param", {}),
-                    }
-                ],
+                algorithms=[],
+                configuration_payload=build_single_algorithm_configuration_payload(
+                    alg_key=str(algorithm["key"]),
+                    alg_param=dict(algorithm.get("default_param", {})),
+                ),
                 notes=notes,
             )
             for symbol in normalized_symbols

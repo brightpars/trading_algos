@@ -74,18 +74,24 @@ def test_submit_all_algorithms_for_symbol_skips_non_executable_defaults_by_defau
     assert result.skipped_count == 1
     assert result.skipped_algorithms == ["delta_neutral_volatility_trading"]
     assert len(experiment_service.calls) == 2
-    assert experiment_service.calls[0]["algorithms"] == [
-        {
-            "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
-            "alg_param": {"window": 5},
-        }
-    ]
-    assert experiment_service.calls[1]["algorithms"] == [
-        {
-            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
-            "alg_param": {"window": 2},
-        }
-    ]
+    assert experiment_service.calls[0]["algorithms"] == []
+    assert experiment_service.calls[0]["configuration_payload"]["nodes"][0] == {
+        "node_id": "alg1",
+        "node_type": "algorithm",
+        "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+        "alg_param": {"window": 5},
+        "buy_enabled": True,
+        "sell_enabled": True,
+    }
+    assert experiment_service.calls[1]["algorithms"] == []
+    assert experiment_service.calls[1]["configuration_payload"]["nodes"][0] == {
+        "node_id": "alg1",
+        "node_type": "algorithm",
+        "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+        "alg_param": {"window": 2},
+        "buy_enabled": True,
+        "sell_enabled": True,
+    }
 
 
 def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm_when_skip_disabled():
@@ -108,17 +114,20 @@ def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm_w
     assert result.created_count == 3
     assert result.skipped_count == 0
     assert len(experiment_service.calls) == 3
-    assert experiment_service.calls[2]["algorithms"] == [
-        {
-            "alg_key": "delta_neutral_volatility_trading",
-            "alg_param": {
-                "rows": [],
-                "iv_rv_threshold": 0.05,
-                "min_gamma": 0.01,
-                "target_delta_band": 0.1,
-            },
-        }
-    ]
+    assert experiment_service.calls[2]["algorithms"] == []
+    assert experiment_service.calls[2]["configuration_payload"]["nodes"][0] == {
+        "node_id": "alg1",
+        "node_type": "algorithm",
+        "alg_key": "delta_neutral_volatility_trading",
+        "alg_param": {
+            "rows": [],
+            "iv_rv_threshold": 0.05,
+            "min_gamma": 0.01,
+            "target_delta_band": 0.1,
+        },
+        "buy_enabled": True,
+        "sell_enabled": True,
+    }
 
 
 def test_submit_all_algorithms_for_symbol_skips_non_executable_defaults_when_enabled() -> (
@@ -150,7 +159,7 @@ def test_submit_all_algorithms_for_symbol_includes_alg_key_in_validation_error()
 ):
     class _FailingExperimentServiceStub(_ExperimentServiceStub):
         def create_experiment(self, **kwargs: Any) -> str:
-            algorithm = kwargs["algorithms"][0]
+            algorithm = kwargs["configuration_payload"]["nodes"][0]
             if algorithm["alg_key"] == "delta_neutral_volatility_trading":
                 raise ValueError(
                     "Alert generator sensor_config alg_param rows must be a non-empty list"

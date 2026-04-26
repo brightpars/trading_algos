@@ -56,9 +56,9 @@ class MarketDataFetchResult:
 class MarketDataProxy(Protocol):
     def ping(self) -> str: ...
 
-    def get_data(self, symbol: str, ts: datetime) -> Any: ...
+    def get_data(self, symbol: str, ts: object) -> Any: ...
 
-    def get_candles(self, symbol: str, start: datetime, end: datetime) -> Any: ...
+    def get_candles(self, symbol: str, start: object, end: object) -> Any: ...
 
 
 class XmlRpcMarketDataProxy:
@@ -66,6 +66,10 @@ class XmlRpcMarketDataProxy:
         self.endpoint = f"http://{ip}:{port}"
         self.timeout_seconds = timeout_seconds
         self._proxy = ServerProxy(self.endpoint, allow_none=True)
+
+    @staticmethod
+    def _serialize_remote_datetime(value: datetime) -> str:
+        return value.strftime("%Y-%m-%d %H:%M:%S")
 
     def ping(self) -> str:
         ping_with_timeout = getattr(self._proxy, "ping_with_timeout", None)
@@ -79,11 +83,24 @@ class XmlRpcMarketDataProxy:
             return "pong"
         return "down"
 
-    def get_data(self, symbol: str, ts: datetime) -> Any:
-        return self._proxy.get_data(symbol, ts)
+    def get_data(self, symbol: str, ts: object) -> Any:
+        payload = ts
+        if isinstance(ts, datetime):
+            payload = self._serialize_remote_datetime(ts)
+        return self._proxy.get_data(symbol, cast(Any, payload))
 
-    def get_candles(self, symbol: str, start: datetime, end: datetime) -> Any:
-        return self._proxy.get_candles(symbol, start, end)
+    def get_candles(self, symbol: str, start: object, end: object) -> Any:
+        start_payload = start
+        end_payload = end
+        if isinstance(start, datetime):
+            start_payload = self._serialize_remote_datetime(start)
+        if isinstance(end, datetime):
+            end_payload = self._serialize_remote_datetime(end)
+        return self._proxy.get_candles(
+            symbol,
+            cast(Any, start_payload),
+            cast(Any, end_payload),
+        )
 
 
 class MarketDataSourceService:
@@ -182,6 +199,10 @@ class MarketDataSourceService:
         return [dict(row) for row in candles]
 
     @staticmethod
+    def _serialize_dataserver_datetime(value: datetime) -> str:
+        return value.strftime("%Y-%m-%d %H:%M:%S")
+
+    @staticmethod
     def _normalize_xmlrpc_value(value: Any) -> Any:
         if isinstance(value, XmlRpcDateTime):
             parsed = datetime.strptime(value.value, "%Y%m%dT%H:%M:%S")
@@ -236,7 +257,11 @@ class MarketDataSourceService:
         proxy = self._data_proxy()
         get_candles = getattr(proxy, "get_candles", None)
         if callable(get_candles):
-            raw_rows = get_candles(symbol, start, end)
+            raw_rows = get_candles(
+                symbol,
+                self._serialize_dataserver_datetime(start),
+                self._serialize_dataserver_datetime(end),
+            )
             if not isinstance(raw_rows, Iterable):
                 raise TypeError(
                     "dataserver get_candles returned a non-iterable payload"
@@ -259,7 +284,10 @@ class MarketDataSourceService:
         while ts <= end:
             request_count += 1
             try:
-                row = proxy.get_data(symbol, ts)
+                row = proxy.get_data(
+                    symbol,
+                    self._serialize_dataserver_datetime(ts),
+                )
             except Fault:
                 missing_count += 1
                 ts += timedelta(minutes=1)

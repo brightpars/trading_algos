@@ -6,7 +6,7 @@ from trading_algos_dashboard.repositories.data_source_settings_repository import
     DataSourceSettingsRepository,
 )
 
-DEFAULT_DATA_SERVER_IP = "127.0.0.2"
+DEFAULT_DATA_SERVER_IP = "127.0.0.1"
 DEFAULT_DATA_SERVER_PORT = 6010
 
 

@@ -25,11 +25,20 @@ from trading_algos_dashboard.services.data_source_service import (
     DataSourceUnavailableError,
     MarketDataUnavailableError,
 )
+from trading_algos_dashboard.services.single_algorithm_configuration import (
+    build_single_algorithm_configuration_payload,
+)
 
 bp = Blueprint("experiments", __name__, url_prefix="/experiments")
 
 _EXPERIMENT_FORM_COOKIE = "trading_algos_dashboard_experiment_form"
 _BULK_EXPERIMENT_FORM_COOKIE = "trading_algos_dashboard_bulk_experiment_form"
+
+
+def _as_str_any_dict(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    return {str(key): item for key, item in value.items()}
 
 
 def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str]:
@@ -39,16 +48,30 @@ def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str
     default_algorithms = "[]"
     if catalog:
         default_algorithms = json.dumps(
-            [{"alg_key": catalog[0]["key"], "alg_param": catalog[0]["default_param"]}]
+            build_single_algorithm_configuration_payload(
+                alg_key=str(catalog[0]["key"]),
+                alg_param=_as_str_any_dict(catalog[0].get("default_param")),
+            )
         )
     return {
+        "run_mode": "configuration",
         "symbol": "",
         "start_date": "",
         "start_time": "09:30",
         "end_date": "",
         "end_time": "16:00",
-        "algorithms_json": default_algorithms,
-        "configuration_json": "",
+        "configuration_json": default_algorithms,
+        "alertgens_json": default_algorithms,
+        "decmaker_key": "alg1",
+        "decmaker_param_json": json.dumps(
+            {
+                "confidence_threshold_buy": 0.6,
+                "confidence_threshold_sell": 0.6,
+                "max_percent_higher_price_buy": 0.0,
+                "max_percent_lower_price_sell": 0.0,
+            }
+        ),
+        "speed_factor": "60",
         "notes": "",
         "max_concurrent_experiments": str(
             runtime_settings["max_concurrent_experiments"]
@@ -89,7 +112,19 @@ def _serialize_recent_experiment(experiment: dict[str, object]) -> dict[str, str
         "end_date": str(time_range.get("end", ""))[:10],
         "end_time": str(time_range.get("end", ""))[11:16],
         "notes": str(experiment.get("notes", "")),
-        "algorithms_json": json.dumps(serialized_algorithms),
+        "configuration_json": json.dumps(
+            experiment.get("input_snapshot")
+            if experiment.get("input_kind") == "configuration"
+            and isinstance(experiment.get("input_snapshot"), dict)
+            else build_single_algorithm_configuration_payload(
+                alg_key=str(serialized_algorithms[0]["alg_key"]),
+                alg_param=_as_str_any_dict(
+                    serialized_algorithms[0].get("alg_param", {})
+                ),
+            )
+            if serialized_algorithms
+            else {}
+        ),
         "algorithm_count": str(len(serialized_algorithms)),
         "created_at_label": created_at_label,
     }
@@ -253,13 +288,11 @@ def _load_algorithm_preset(alg_key: str | None) -> dict[str, str] | None:
     except ValueError:
         return None
     return {
-        "algorithms_json": json.dumps(
-            [
-                {
-                    "alg_key": str(algorithm_spec["key"]),
-                    "alg_param": algorithm_spec.get("default_param", {}),
-                }
-            ]
+        "configuration_json": json.dumps(
+            build_single_algorithm_configuration_payload(
+                alg_key=str(algorithm_spec["key"]),
+                alg_param=_as_str_any_dict(algorithm_spec.get("default_param", {})),
+            )
         )
     }
 
@@ -272,6 +305,9 @@ def _render_new_experiment(
     catalog = current_app.extensions[
         "algorithm_catalog_service"
     ].list_algorithm_implementations()
+    decmakers = current_app.extensions[
+        "algorithm_catalog_service"
+    ].list_decmaker_implementations()
     runtime_settings = current_app.extensions[
         "experiment_runtime_settings_service"
     ].get_effective_settings()
@@ -283,13 +319,15 @@ def _render_new_experiment(
     selected_configuration = _load_configuration_preset(request.args.get("draft_id"))
     selected_algorithm = _load_algorithm_preset(request.args.get("alg_key"))
     if selected_configuration is not None:
+        effective_form_data["run_mode"] = "configuration"
         effective_form_data["configuration_json"] = selected_configuration[
             "configuration_json"
         ]
-        effective_form_data["algorithms_json"] = "[]"
     elif selected_algorithm is not None:
-        effective_form_data["algorithms_json"] = selected_algorithm["algorithms_json"]
-        effective_form_data["configuration_json"] = ""
+        effective_form_data["run_mode"] = "configuration"
+        effective_form_data["configuration_json"] = selected_algorithm[
+            "configuration_json"
+        ]
     if form_data is not None:
         effective_form_data.update(form_data)
 
@@ -317,6 +355,7 @@ def _render_new_experiment(
         render_template(
             "experiments/new.html",
             algorithms=catalog,
+            decmakers=decmakers,
             recent_experiments=_recent_experiment_presets(),
             selected_configuration=selected_configuration,
             form_data=effective_form_data,
@@ -449,12 +488,16 @@ def delete_experiment(experiment_id: str):
 @bp.post("")
 def create_experiment():
     submitted_form_data = {
+        "run_mode": request.form.get("run_mode", "configuration"),
         "symbol": request.form.get("symbol", ""),
         "start_date": request.form.get("start_date", ""),
         "start_time": request.form.get("start_time", ""),
         "end_date": request.form.get("end_date", ""),
         "end_time": request.form.get("end_time", ""),
-        "algorithms_json": request.form.get("algorithms_json", "[]"),
+        "alertgens_json": request.form.get("alertgens_json", "[]"),
+        "decmaker_key": request.form.get("decmaker_key", "alg1"),
+        "decmaker_param_json": request.form.get("decmaker_param_json", "{}"),
+        "speed_factor": request.form.get("speed_factor", "60"),
         "notes": request.form.get("notes", ""),
         "configuration_json": request.form.get("configuration_json", ""),
         "max_concurrent_experiments": str(
@@ -463,24 +506,36 @@ def create_experiment():
     }
     service = current_app.extensions["experiment_service"]
     try:
-        algorithms = json.loads(submitted_form_data["algorithms_json"])
         configuration_payload = None
-        if submitted_form_data["configuration_json"].strip():
+        engine_chain_payload = None
+        if submitted_form_data["run_mode"] == "configuration":
             configuration_payload = json.loads(
                 submitted_form_data["configuration_json"]
             )
+        elif submitted_form_data["run_mode"] == "engine_chain":
+            engine_chain_payload = {
+                "speed_factor": int(submitted_form_data["speed_factor"]),
+                "alertgens": json.loads(submitted_form_data["alertgens_json"]),
+                "decmaker": {
+                    "decmaker_key": submitted_form_data["decmaker_key"],
+                    "decmaker_param": json.loads(
+                        submitted_form_data["decmaker_param_json"]
+                    ),
+                },
+            }
         experiment_id = service.create_experiment(
             symbol=submitted_form_data["symbol"],
             start_date=submitted_form_data["start_date"],
             start_time=submitted_form_data["start_time"],
             end_date=submitted_form_data["end_date"],
             end_time=submitted_form_data["end_time"],
-            algorithms=algorithms,
+            algorithms=[],
             configuration_payload=configuration_payload,
+            engine_chain_payload=engine_chain_payload,
             notes=submitted_form_data["notes"],
         )
     except JSONDecodeError:
-        flash("Algorithms JSON must be valid JSON.", "danger")
+        flash("Configuration JSON must be valid JSON.", "danger")
         response = _render_new_experiment(
             status_code=400, form_data=submitted_form_data
         )

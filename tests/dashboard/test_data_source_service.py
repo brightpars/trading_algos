@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from xmlrpc.client import DateTime as XmlRpcDateTime
 from xmlrpc.client import Fault
 
@@ -7,6 +7,11 @@ from trading_algos_dashboard.services.data_source_service import (
     MarketDataFetchResult,
     MarketDataUnavailableError,
     MarketDataSourceService,
+    XmlRpcMarketDataProxy,
+)
+from trading_algos_dashboard.services.data_source_settings_service import (
+    DEFAULT_DATA_SERVER_IP,
+    DEFAULT_DATA_SERVER_PORT,
 )
 from trading_algos_dashboard.services.market_data_cache import (
     InMemoryMarketDataCache,
@@ -39,6 +44,14 @@ class _MarketDataCacheRepository:
     def _count_documents(self, _query):
         return len(self.entries)
 
+    def count_materialized_entries(self):
+        return sum(
+            1
+            for entry in self.entries.values()
+            if isinstance(entry.get("candles"), list)
+            and isinstance(entry.get("stored_at"), datetime)
+        )
+
     def try_claim_fill(
         self, *, symbol: str, start: datetime, end: datetime, owner_id: str, lease_until
     ):
@@ -63,6 +76,12 @@ class _MarketDataCacheRepository:
         key = (symbol.strip().upper(), start, end)
         entry = self.entries.get(key)
         if entry is None or entry.get("fill_owner_id") != owner_id:
+            return
+        has_candles = isinstance(entry.get("candles"), list) and bool(
+            entry.get("candles")
+        )
+        if not has_candles:
+            del self.entries[key]
             return
         entry["fill_owner_id"] = None
         entry["fill_expires_at"] = None
@@ -90,6 +109,14 @@ def test_data_source_service_uses_override_endpoint_for_label():
     )
 
     assert service._data_server_endpoint_label() == "10.1.2.3:7007"
+
+
+def test_data_source_service_default_endpoint_matches_dashboard_data_server_defaults():
+    service = MarketDataSourceService(user_id=1)
+
+    assert service._data_server_endpoint_label() == (
+        f"{DEFAULT_DATA_SERVER_IP}:{DEFAULT_DATA_SERVER_PORT}"
+    )
 
 
 def test_check_connection_returns_endpoint_from_proxy(monkeypatch):
@@ -185,6 +212,64 @@ def test_check_connection_raises_when_server_is_unavailable(monkeypatch):
         raise AssertionError("Expected DataSourceUnavailableError")
 
 
+def test_xmlrpc_market_data_proxy_serializes_get_data_timestamp_for_server_contract(
+    monkeypatch,
+):
+    recorded: dict[str, object] = {}
+
+    class _Proxy:
+        def get_data(self, symbol, ts):
+            recorded["call"] = (symbol, ts)
+            return {"symbol": symbol, "ts": ts}
+
+    monkeypatch.setattr(
+        "trading_algos_dashboard.services.data_source_service.ServerProxy",
+        lambda *_args, **_kwargs: _Proxy(),
+    )
+
+    proxy = XmlRpcMarketDataProxy(ip="127.0.0.1", port=6010, timeout_seconds=2.0)
+    result = proxy.get_data("AAPL", datetime.fromisoformat("2024-01-01T09:30"))
+
+    assert recorded["call"] == ("AAPL", "2024-01-01 09:30:00")
+    assert result == {"symbol": "AAPL", "ts": "2024-01-01 09:30:00"}
+
+
+def test_xmlrpc_market_data_proxy_serializes_get_candles_timestamps_for_server_contract(
+    monkeypatch,
+):
+    recorded: dict[str, object] = {}
+
+    class _Proxy:
+        def get_candles(self, symbol, start, end):
+            recorded["call"] = (symbol, start, end)
+            return [{"symbol": symbol, "start": start, "end": end}]
+
+    monkeypatch.setattr(
+        "trading_algos_dashboard.services.data_source_service.ServerProxy",
+        lambda *_args, **_kwargs: _Proxy(),
+    )
+
+    proxy = XmlRpcMarketDataProxy(ip="127.0.0.1", port=6010, timeout_seconds=2.0)
+    result = proxy.get_candles(
+        "AAPL",
+        datetime.fromisoformat("2024-01-01T09:30"),
+        datetime.fromisoformat("2024-01-01T09:32"),
+    )
+
+    assert recorded["call"] == (
+        "AAPL",
+        "2024-01-01 09:30:00",
+        "2024-01-01 09:32:00",
+    )
+    assert result == [
+        {
+            "symbol": "AAPL",
+            "start": "2024-01-01 09:30:00",
+            "end": "2024-01-01 09:32:00",
+        }
+    ]
+
+
 def test_fetch_candles_reads_via_proxy_minute_by_minute(monkeypatch):
     service = MarketDataSourceService(
         user_id=1,
@@ -194,12 +279,13 @@ def test_fetch_candles_reads_via_proxy_minute_by_minute(monkeypatch):
 
     class _Proxy:
         def get_data(self, _symbol, ts):
-            seen_minutes.append(ts.minute)
-            if ts.minute == 31:
+            ts_obj = datetime.fromisoformat(ts)
+            seen_minutes.append(ts_obj.minute)
+            if ts_obj.minute == 31:
                 raise Fault(1, "missing candle")
             return {
                 "_id": "mongo-id",
-                "ts": ts.isoformat(sep=" "),
+                "ts": ts,
                 "Open": 10,
                 "High": 11,
                 "Low": 9,
@@ -240,8 +326,8 @@ def test_fetch_candles_prefers_bulk_candles_proxy_method_when_available(monkeypa
 
     class _Proxy:
         def get_candles(self, _symbol, start, end):
-            assert start == datetime.fromisoformat("2024-01-01T09:30")
-            assert end == datetime.fromisoformat("2024-01-01T09:32")
+            assert start == "2024-01-01 09:30:00"
+            assert end == "2024-01-01 09:32:00"
             return [
                 {
                     "_id": "mongo-id-1",
@@ -351,9 +437,10 @@ def test_fetch_candles_logs_selected_proxy_mode(monkeypatch, caplog):
 
     class _Proxy:
         def get_data(self, _symbol, ts):
+            assert ts == "2024-01-01 09:30:00"
             return {
                 "_id": "mongo-id",
-                "ts": ts.isoformat(sep=" "),
+                "ts": ts,
                 "Open": 10,
                 "High": 11,
                 "Low": 9,
@@ -384,9 +471,10 @@ def test_fetch_candles_logs_proxy_completion(monkeypatch, caplog):
 
     class _Proxy:
         def get_data(self, _symbol, ts):
+            assert ts == "2024-01-01 09:30:00"
             return {
                 "_id": "mongo-id",
-                "ts": ts.isoformat(sep=" "),
+                "ts": ts,
                 "Open": 10,
                 "High": 11,
                 "Low": 9,
@@ -628,3 +716,49 @@ def test_fetch_candles_releases_fill_claim_after_proxy_fetch(monkeypatch):
     assert repository.get_entry(symbol="AAPL", start=start, end=end) is not None
     entry = repository.entries[("AAPL", start, end)]
     assert entry.get("fill_owner_id") is None
+
+
+def test_fetch_candles_removes_placeholder_claim_when_proxy_fetch_fails(monkeypatch):
+    repository = _MarketDataCacheRepository()
+    layered_cache = LayeredMarketDataCache(
+        memory_cache=InMemoryMarketDataCache(),
+        shared_cache=MongoMarketDataCache(repository=repository),
+    )
+    service = MarketDataSourceService(
+        user_id=1,
+        market_data_cache=layered_cache,
+    )
+    start = datetime.fromisoformat("2024-01-01T09:30")
+    end = datetime.fromisoformat("2024-01-01T09:30")
+    monkeypatch.setattr(
+        service,
+        "_fetch_candles_via_proxy",
+        lambda **_kwargs: (_ for _ in ()).throw(DataSourceUnavailableError("down")),
+    )
+
+    try:
+        service.fetch_candles(symbol="AAPL", start=start, end=end)
+    except DataSourceUnavailableError as exc:
+        assert str(exc) == "down"
+    else:
+        raise AssertionError("Expected DataSourceUnavailableError")
+
+    assert repository.get_entry(symbol="AAPL", start=start, end=end) is None
+    assert layered_cache.stats()["shared_entry_count"] == 0
+
+
+def test_shared_cache_stats_ignore_placeholder_claim_documents():
+    repository = _MarketDataCacheRepository()
+    cache = MongoMarketDataCache(repository=repository)
+    start = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    end = datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+
+    repository.try_claim_fill(
+        symbol="AAPL",
+        start=start,
+        end=end,
+        owner_id="owner-1",
+        lease_until=datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc),
+    )
+
+    assert cache.stats()["entry_count"] == 0

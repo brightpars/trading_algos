@@ -23,8 +23,15 @@ class MarketDataCacheRepository(MongoRepository):
     @staticmethod
     def build_cache_key(*, symbol: str, start: datetime, end: datetime) -> str:
         normalized_symbol = symbol.strip().upper()
+        normalized_start = MarketDataCacheRepository._normalize_utc_datetime(start)
+        normalized_end = MarketDataCacheRepository._normalize_utc_datetime(end)
+        if normalized_start is None or normalized_end is None:
+            raise ValueError("Cache key datetimes must be valid datetime instances")
         digest = hashlib.sha256(
-            f"{normalized_symbol}|{start.isoformat()}|{end.isoformat()}".encode()
+            (
+                f"{normalized_symbol}|{normalized_start.isoformat()}|"
+                f"{normalized_end.isoformat()}"
+            ).encode()
         ).hexdigest()
         return digest
 
@@ -45,6 +52,14 @@ class MarketDataCacheRepository(MongoRepository):
     def clear(self) -> int:
         return self._delete_many({})
 
+    def count_materialized_entries(self) -> int:
+        return sum(
+            1
+            for entry in self.list_entries()
+            if isinstance(entry.get("candles"), list)
+            and isinstance(entry.get("stored_at"), datetime)
+        )
+
     def put_entry(
         self,
         *,
@@ -55,17 +70,23 @@ class MarketDataCacheRepository(MongoRepository):
         stored_at: datetime | None = None,
     ) -> dict[str, Any]:
         normalized_symbol = symbol.strip().upper()
-        effective_stored_at = stored_at or datetime.now(timezone.utc)
+        normalized_start = self._normalize_utc_datetime(start)
+        normalized_end = self._normalize_utc_datetime(end)
+        if normalized_start is None or normalized_end is None:
+            raise ValueError("Cache entry datetimes must be valid datetime instances")
+        effective_stored_at = self._normalize_utc_datetime(stored_at)
+        if effective_stored_at is None:
+            effective_stored_at = datetime.now(timezone.utc)
         cache_key = self.build_cache_key(
             symbol=normalized_symbol,
-            start=start,
-            end=end,
+            start=normalized_start,
+            end=normalized_end,
         )
         payload = {
             "cache_key": cache_key,
             "symbol": normalized_symbol,
-            "start": start,
-            "end": end,
+            "start": normalized_start,
+            "end": normalized_end,
             "candles": [dict(row) for row in candles],
             "candle_count": len(candles),
             "stored_at": effective_stored_at,
@@ -115,10 +136,10 @@ class MarketDataCacheRepository(MongoRepository):
                 "$set": {
                     "cache_key": cache_key,
                     "symbol": symbol.strip().upper(),
-                    "start": start,
-                    "end": end,
+                    "start": self._normalize_utc_datetime(start),
+                    "end": self._normalize_utc_datetime(end),
                     "fill_owner_id": owner_id,
-                    "fill_expires_at": lease_until,
+                    "fill_expires_at": self._normalize_utc_datetime(lease_until),
                 }
             },
             upsert=True,
@@ -141,6 +162,12 @@ class MarketDataCacheRepository(MongoRepository):
         if not isinstance(document, Mapping):
             return
         if document.get("fill_owner_id") != owner_id:
+            return
+        has_candles = isinstance(document.get("candles"), list) and bool(
+            document.get("candles")
+        )
+        if not has_candles:
+            self.delete_entry_by_cache_key(cache_key)
             return
         self.collection.update_one(
             {"cache_key": cache_key},

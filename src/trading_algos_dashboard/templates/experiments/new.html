@@ -48,7 +48,7 @@
             data-end-date="{{ experiment.end_date }}"
             data-end-time="{{ experiment.end_time }}"
             data-notes="{{ experiment.notes }}"
-            data-algorithms-json='{{ experiment.algorithms_json|e }}'
+            data-configuration-json='{{ experiment.configuration_json|e }}'
           >
             <div class="fw-semibold">{{ experiment.symbol or "Unknown symbol" }}</div>
             <div class="small text-muted">{{ experiment.start_date }} {{ experiment.start_time }} → {{ experiment.end_date }} {{ experiment.end_time }}</div>
@@ -68,6 +68,13 @@
 </section>
 {% endif %}
 <form method="post" action="{{ url_for('experiments.create_experiment') }}" class="row g-3">
+  <div class="col-12">
+    <label class="form-label">Run mode</label>
+    <select class="form-select" name="run_mode">
+      <option value="engine_chain" {% if form_data.run_mode == 'engine_chain' %}selected{% endif %}>Engine chain (many alertgens + one decmaker)</option>
+      <option value="configuration" {% if form_data.run_mode == 'configuration' %}selected{% endif %}>Configuration</option>
+    </select>
+  </div>
   <div class="col-md-4">
     <label class="form-label">Symbol</label>
     <input class="form-control" name="symbol" value="{{ form_data.symbol }}" required>
@@ -103,9 +110,26 @@
     </div>
   </div>
   <div class="col-12">
-    <label class="form-label">Algorithms JSON</label>
-    <textarea class="form-control" rows="8" name="algorithms_json">{{ form_data.algorithms_json }}</textarea>
-    <div class="form-text">Use this for single-algorithm experiment runs. When Configuration JSON is provided, this field is ignored.</div>
+    <label class="form-label">Alertgens JSON</label>
+    <textarea class="form-control" rows="8" name="alertgens_json">{{ form_data.alertgens_json }}</textarea>
+    <div class="form-text">Use this for engine-chain runs. Provide a JSON array of alertgen engine configs.</div>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Decision maker</label>
+    <select class="form-select" name="decmaker_key">
+      {% for decmaker in decmakers %}
+      <option value="{{ decmaker.key }}" {% if form_data.decmaker_key == decmaker.key %}selected{% endif %}>{{ decmaker.label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Speed factor</label>
+    <input class="form-control" type="number" min="1" name="speed_factor" value="{{ form_data.speed_factor }}">
+    <div class="form-text">Fake-datetime speed multiplier for faster simulation.</div>
+  </div>
+  <div class="col-12">
+    <label class="form-label">Decision maker params JSON</label>
+    <textarea class="form-control" rows="6" name="decmaker_param_json">{{ form_data.decmaker_param_json }}</textarea>
   </div>
   <div class="col-12">
     <label class="form-label">Configuration JSON</label>
@@ -113,7 +137,7 @@
       <summary>Advanced configuration payload</summary>
       <textarea class="form-control mt-2" rows="8" name="configuration_json">{{ form_data.configuration_json }}</textarea>
     </details>
-    <div class="form-text">Optional declarative configuration payload. When provided, the run executes the configuration graph instead of the single-algorithm list above.</div>
+    <div class="form-text">Declarative configuration payload for configuration-based runs, including single-algorithm runs.</div>
   </div>
   <div class="col-12">
     <label class="form-label">Notes</label>

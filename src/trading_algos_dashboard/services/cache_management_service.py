@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
 
 from trading_algos_dashboard.services.chart_service import (
@@ -12,6 +12,7 @@ from trading_algos_dashboard.services.data_source_service import (
 )
 from trading_algos_dashboard.services.market_data_cache import CachedMarketData
 from trading_algos_dashboard.services.market_data_cache import LayeredMarketDataCache
+from trading_algos_dashboard.services.market_data_cache import normalize_cache_datetime
 
 
 @dataclass(frozen=True)
@@ -111,9 +112,7 @@ class CacheManagementService:
     @staticmethod
     def parse_datetime_local(value: str) -> datetime:
         parsed = datetime.fromisoformat(value)
-        if parsed.tzinfo is not None:
-            return parsed.astimezone(timezone.utc)
-        return parsed
+        return normalize_cache_datetime(parsed)
 
     @staticmethod
     def _entry_key(entry: CachedMarketData) -> tuple[str, datetime, datetime]:

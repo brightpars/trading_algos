@@ -17,6 +17,20 @@ AdminCatalogPage = dict[str, Any]
 
 
 class AlgorithmCatalogService:
+    DECMAKER_OPTIONS = [
+        {
+            "key": "alg1",
+            "name": "Algorithm 1 decision maker",
+            "label": "Algorithm 1 decision maker (alg1)",
+            "default_param": {
+                "confidence_threshold_buy": 0.6,
+                "confidence_threshold_sell": 0.6,
+                "max_percent_higher_price_buy": 0.0,
+                "max_percent_lower_price_sell": 0.0,
+            },
+        }
+    ]
+
     REVIEW_STATE_OPTIONS = [
         {"value": "not_reviewed", "label": "Not reviewed"},
         {"value": "confirmed", "label": "Confirmed"},
@@ -141,6 +155,15 @@ class AlgorithmCatalogService:
             ],
             key=lambda item: str(item.get("name", "")),
         )
+
+    def list_decmaker_implementations(self) -> list[dict[str, Any]]:
+        return [dict(item) for item in self.DECMAKER_OPTIONS]
+
+    def get_decmaker_implementation(self, decmaker_key: str) -> dict[str, Any]:
+        for item in self.DECMAKER_OPTIONS:
+            if str(item["key"]) == decmaker_key:
+                return dict(item)
+        raise ValueError(f"Unknown decmaker: {decmaker_key}")
 
     def get_runnable_algorithm_implementation(self, alg_key: str) -> dict[str, Any]:
         spec = self.get_algorithm_implementation(alg_key)

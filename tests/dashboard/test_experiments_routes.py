@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from xmlrpc.client import Fault
@@ -10,6 +11,32 @@ from trading_algos_dashboard.services.data_source_service import (
     MarketDataUnavailableError,
     MarketDataSourceService,
 )
+
+
+def _single_algorithm_configuration_payload(
+    alg_key: str = "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+    alg_param: dict[str, object] | None = None,
+) -> str:
+    return json.dumps(
+        {
+            "config_key": "single-test",
+            "version": "1",
+            "name": "Single algorithm",
+            "root_node_id": "alg1",
+            "nodes": [
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": alg_key,
+                    "alg_param": alg_param or {"window": 2},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                }
+            ],
+            "runtime_overrides": {},
+            "compatibility_metadata": {},
+        }
+    )
 
 
 class _Collection:
@@ -171,6 +198,14 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b"Scheduler concurrency" in response.data
     assert b"Open scheduler settings" in response.data
     assert b"executed up to the configured concurrency limit" in response.data
+    assert b"Engine chain (many alertgens + one decmaker)" in response.data
+    assert b">Configuration<" in response.data
+    assert b'name="alertgens_json"' in response.data
+    assert b'name="configuration_json"' in response.data
+    assert b'name="decmaker_key"' in response.data
+    assert b'name="speed_factor"' in response.data
+    assert b"Single algorithm" not in response.data
+    assert b'name="algorithms_json"' not in response.data
 
 
 def test_bulk_experiment_page_renders(monkeypatch):
@@ -337,9 +372,7 @@ def test_create_experiment_does_not_update_runtime_concurrency_setting(
             "start_time": "09:30",
             "end_date": "2024-01-31",
             "end_time": "16:00",
-            "algorithms_json": (
-                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
-            ),
+            "configuration_json": _single_algorithm_configuration_payload(),
             "notes": "runtime setting",
         },
         follow_redirects=False,
@@ -350,6 +383,50 @@ def test_create_experiment_does_not_update_runtime_concurrency_setting(
         "experiment_runtime_settings_service"
     ].get_effective_settings()
     assert settings["max_concurrent_experiments"] == 2
+
+
+def test_create_experiment_accepts_engine_chain_payload(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+        )
+    )
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
+
+    response = app.test_client().post(
+        "/experiments",
+        data={
+            "run_mode": "engine_chain",
+            "symbol": "AAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-01",
+            "end_time": "16:00",
+            "alertgens_json": (
+                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
+            ),
+            "decmaker_key": "alg1",
+            "decmaker_param_json": (
+                '{"confidence_threshold_buy":0.6,"confidence_threshold_sell":0.6,"max_percent_higher_price_buy":0.0,"max_percent_lower_price_sell":0.0}'
+            ),
+            "speed_factor": "30",
+            "notes": "engine chain run",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(experiments) == 1
+    assert experiments[0]["input_kind"] == "engine_chain"
+    assert experiments[0]["input_snapshot"]["speed_factor"] == 30
+    assert experiments[0]["input_snapshot"]["decmaker"]["decmaker_key"] == "alg1"
 
 
 def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypatch):
@@ -406,6 +483,7 @@ def test_new_experiment_page_prefills_selected_algorithm_from_query(monkeypatch)
         b"&#34;alg_key&#34;: &#34;OLD_boundary_breakout_NEW_breakout_donchian_channel&#34;"
         in response.data
     )
+    assert b'name="configuration_json"' in response.data
 
 
 def test_experiment_history_allows_deleting_one_experiment(monkeypatch):
@@ -565,7 +643,7 @@ def test_new_experiment_page_shows_recent_run_presets(monkeypatch):
     assert b'data-start-time="09:30"' in response.data
     assert b'data-end-date="2024-02-03"' in response.data
     assert b'data-end-time="16:00"' in response.data
-    assert b"data-algorithms-json=" in response.data
+    assert b"data-configuration-json=" in response.data
     assert b"alg_b" in response.data
     assert b"window" in response.data
     assert b"10" in response.data
@@ -871,7 +949,7 @@ def test_create_experiment_returns_503_when_data_source_dependencies_are_missing
             "start_time": "09:30",
             "end_date": "2024-01-31",
             "end_time": "16:00",
-            "algorithms_json": "[]",
+            "configuration_json": _single_algorithm_configuration_payload(),
             "notes": "",
         },
     )
@@ -897,7 +975,7 @@ def test_experiment_form_reuses_cookie_values_on_next_render(monkeypatch):
     client.set_cookie(
         "trading_algos_dashboard_experiment_form",
         '{"symbol": "MSFT", "start_date": "2024-02-01", "start_time": "09:30", "end_date": "2024-02-10", "end_time": "16:00", '
-        '"algorithms_json": "[{\\"alg_key\\":\\"x\\"}]", "notes": "saved note"}',
+        '"configuration_json": "{\\"config_key\\":\\"saved\\",\\"version\\":\\"1\\",\\"name\\":\\"Saved\\",\\"root_node_id\\":\\"alg1\\",\\"nodes\\":[{\\"node_id\\":\\"alg1\\",\\"node_type\\":\\"algorithm\\",\\"alg_key\\":\\"x\\",\\"alg_param\\":{},\\"buy_enabled\\":true,\\"sell_enabled\\":true}],\\"runtime_overrides\\":{},\\"compatibility_metadata\\":{}}", "notes": "saved note"}',
     )
     response = client.get("/experiments/new")
 
@@ -910,7 +988,7 @@ def test_experiment_form_reuses_cookie_values_on_next_render(monkeypatch):
     assert b"saved note" in response.data
 
 
-def test_create_experiment_returns_400_for_malformed_algorithm_entries(monkeypatch):
+def test_create_experiment_returns_400_for_malformed_configuration_json(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
@@ -924,18 +1002,18 @@ def test_create_experiment_returns_400_for_malformed_algorithm_entries(monkeypat
             "start_time": "09:30",
             "end_date": "2024-01-31",
             "end_time": "16:00",
-            "algorithms_json": '["OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"]',
+            "configuration_json": '{"config_key":',
             "notes": "bad payload",
         },
     )
 
     assert response.status_code == 400
-    assert b"Algorithm #1 must be a JSON object" in response.data
+    assert b"Configuration JSON must be valid JSON." in response.data
     assert b'value="AAPL"' in response.data
     assert b"bad payload" in response.data
 
 
-def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path):
+def test_create_experiment_accepts_valid_configuration_payload(monkeypatch, tmp_path):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
@@ -1011,9 +1089,7 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
             "start_time": "09:30",
             "end_date": "2024-01-31",
             "end_time": "16:00",
-            "algorithms_json": (
-                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
-            ),
+            "configuration_json": _single_algorithm_configuration_payload(),
             "notes": "good payload",
         },
         follow_redirects=False,
@@ -1083,9 +1159,7 @@ def test_create_experiment_redirects_to_queued_detail_page_when_dispatch_is_idle
             "start_time": "09:30",
             "end_date": "2024-01-31",
             "end_time": "16:00",
-            "algorithms_json": (
-                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
-            ),
+            "configuration_json": _single_algorithm_configuration_payload(),
             "notes": "good payload",
         },
         follow_redirects=False,
@@ -1627,9 +1701,7 @@ def test_create_experiment_returns_400_when_data_fetch_fault_occurs(
             "start_time": "09:30",
             "end_date": "2024-01-01",
             "end_time": "09:30",
-            "algorithms_json": (
-                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
-            ),
+            "configuration_json": _single_algorithm_configuration_payload(),
             "notes": "fault payload",
         },
     )
@@ -1691,9 +1763,7 @@ def test_create_experiment_returns_400_when_no_market_data_is_available(
             "start_time": "09:30",
             "end_date": "2024-01-01",
             "end_time": "09:30",
-            "algorithms_json": (
-                '[{"alg_key":"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation","alg_param":{"window":2}}]'
-            ),
+            "configuration_json": _single_algorithm_configuration_payload(),
             "notes": "no data payload",
         },
     )
@@ -1781,7 +1851,7 @@ def test_data_source_unavailable_message_includes_data_server_endpoint(monkeypat
     )
 
 
-def test_recent_preset_does_not_double_encode_algorithms_json(monkeypatch):
+def test_recent_preset_does_not_double_encode_configuration_json(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
@@ -1809,8 +1879,8 @@ def test_recent_preset_does_not_double_encode_algorithms_json(monkeypatch):
     response = client.get("/experiments/new")
 
     assert response.status_code == 200
-    assert b'data-algorithms-json="[{' not in response.data
+    assert b'data-configuration-json="{' not in response.data
     assert (
-        b"data-algorithms-json='[{&#34;alg_key&#34;: &#34;OLD_boundary_breakout_NEW_breakout_donchian_channel&#34;, &#34;alg_param&#34;: {&#34;period&#34;: 5}}]'"
+        b"data-configuration-json='{&#34;config_key&#34;: &#34;single-OLD-boundary-breakout-NEW-breakout-donchian-channel&#34;"
         in response.data
     )

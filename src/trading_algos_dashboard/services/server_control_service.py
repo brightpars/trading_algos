@@ -121,13 +121,34 @@ class ServerControlService:
             return env_value
         return str(definition["default_ip"])
 
+    def _default_start_command_for_definition(
+        self, definition: dict[str, Any]
+    ) -> str | None:
+        default_command = str(definition.get("default_start_command", "")).strip()
+        return default_command or None
+
+    def _default_workdir_for_definition(self, definition: dict[str, Any]) -> str:
+        return str(_REPO_ROOT)
+
+    def _service_environment(
+        self, definition: dict[str, Any], *, port: int
+    ) -> dict[str, str]:
+        host = self._configured_host(definition)
+        return {
+            "SERVICE_NAME": str(definition["name"]),
+            "SERVICE_LABEL": str(definition["label"]),
+            "SERVICE_HOST": host,
+            "SERVICE_PORT": str(port),
+            "SERVICE_USER_ID": str(self.user_id),
+        }
+
     def _start_command_details(
         self, definition: dict[str, Any]
     ) -> tuple[str | None, str]:
         env_value = os.environ.get(str(definition["start_command_env"]), "").strip()
         if env_value:
             return env_value, "env override"
-        default_command = str(definition.get("default_start_command", "")).strip()
+        default_command = self._default_start_command_for_definition(definition)
         if default_command:
             return default_command, "dashboard default"
         return None, "No dashboard start command is configured for this service."
@@ -146,6 +167,10 @@ class ServerControlService:
             "is_default": not stored_ports,
             "updated_at": settings.get("updated_at"),
         }
+
+    def get_service_endpoint(self, server_name: str) -> tuple[str, int]:
+        definition = self._definition_by_name(server_name)
+        return self._configured_host(definition), int(self._port_map()[server_name])
 
     def save_ports(self, submitted_ports: dict[str, Any]) -> dict[str, Any]:
         normalized_ports: dict[str, int] = {}
@@ -235,15 +260,7 @@ class ServerControlService:
 
     def _spawn_service(self, definition: dict[str, Any], *, port: int) -> None:
         environment = os.environ.copy()
-        environment.update(
-            {
-                "SERVICE_NAME": str(definition["name"]),
-                "SERVICE_LABEL": str(definition["label"]),
-                "SERVICE_HOST": self._configured_host(definition),
-                "SERVICE_PORT": str(port),
-                "SERVICE_USER_ID": str(self.user_id),
-            }
-        )
+        environment.update(self._service_environment(definition, port=port))
         workdir = os.environ.get(str(definition["workdir_env"]), "").strip() or str(
             _REPO_ROOT
         )

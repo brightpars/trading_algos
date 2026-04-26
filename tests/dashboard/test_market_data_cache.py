@@ -7,6 +7,7 @@ from trading_algos_dashboard.services.market_data_cache import (
     InMemoryMarketDataCache,
     LayeredMarketDataCache,
     MongoMarketDataCache,
+    normalize_cache_datetime,
 )
 
 
@@ -15,21 +16,36 @@ class _MarketDataCacheRepository:
         self.entries: dict[tuple[str, datetime, datetime], dict] = {}
 
     def get_entry(self, *, symbol: str, start: datetime, end: datetime):
-        return self.entries.get((symbol.strip().upper(), start, end))
+        return self.entries.get(
+            (
+                symbol.strip().upper(),
+                normalize_cache_datetime(start),
+                normalize_cache_datetime(end),
+            )
+        )
 
     def put_entry(
         self, *, symbol: str, start: datetime, end: datetime, candles, stored_at=None
     ):
+        normalized_start = normalize_cache_datetime(start)
+        normalized_end = normalize_cache_datetime(end)
         payload = {
-            "cache_key": f"{symbol.strip().upper()}|{start.isoformat()}|{end.isoformat()}",
+            "cache_key": (
+                f"{symbol.strip().upper()}|{normalized_start.isoformat()}|"
+                f"{normalized_end.isoformat()}"
+            ),
             "symbol": symbol.strip().upper(),
-            "start": start,
-            "end": end,
+            "start": normalized_start,
+            "end": normalized_end,
             "candles": [dict(row) for row in candles],
             "candle_count": len(candles),
-            "stored_at": stored_at or datetime.now(timezone.utc),
+            "stored_at": normalize_cache_datetime(stored_at)
+            if isinstance(stored_at, datetime)
+            else datetime.now(timezone.utc),
         }
-        self.entries[(symbol.strip().upper(), start, end)] = payload
+        self.entries[(symbol.strip().upper(), normalized_start, normalized_end)] = (
+            payload
+        )
         return payload
 
     def _count_documents(self, _query):
@@ -155,6 +171,24 @@ def test_market_data_cache_uses_exact_match_with_symbol_normalization():
     assert cached is not None
     assert cached.key.symbol == "AAPL"
     assert cached.candle_count == 1
+
+
+def test_market_data_cache_normalizes_naive_datetimes_to_utc_keys():
+    cache = InMemoryMarketDataCache()
+    start = datetime.fromisoformat("2024-01-01T09:30")
+    end = datetime.fromisoformat("2024-01-01T09:31")
+
+    cache.put(symbol="AAPL", start=start, end=end, candles=[{"ts": "x"}])
+
+    cached = cache.get(
+        symbol="AAPL",
+        start=datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc),
+        end=datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc),
+    )
+
+    assert cached is not None
+    assert cached.key.start == datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    assert cached.key.end == datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc)
 
 
 def test_market_data_cache_clear_removes_all_entries():
@@ -294,6 +328,27 @@ def test_market_data_cache_repository_deletes_expired_entries_with_naive_stored_
 
     assert deleted_count == 1
     assert repository.get_entry(symbol="AAPL", start=start, end=end) is None
+
+
+def test_market_data_cache_repository_normalizes_key_datetimes_on_write():
+    repository = MarketDataCacheRepository(_Database())
+
+    repository.put_entry(
+        symbol="AAPL",
+        start=datetime(2024, 1, 1, 9, 30),
+        end=datetime(2024, 1, 1, 9, 31),
+        candles=[{"ts": "x"}],
+    )
+
+    stored = repository.get_entry(
+        symbol="AAPL",
+        start=datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc),
+        end=datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc),
+    )
+
+    assert stored is not None
+    assert stored["start"] == datetime(2024, 1, 1, 9, 30, tzinfo=timezone.utc)
+    assert stored["end"] == datetime(2024, 1, 1, 9, 31, tzinfo=timezone.utc)
 
 
 def test_market_data_cache_repository_allows_reclaim_after_naive_fill_expiration():
