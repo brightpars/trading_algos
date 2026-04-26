@@ -136,7 +136,7 @@ def _seed_algorithm_catalog(app) -> None:
             "source_row_hash": "abc",
             "source_origin": "imported",
             "is_active": True,
-            "implementation_id": "boundary_breakout",
+            "implementation_id": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "implementation_catalog_ref": "algorithm:6",
             "implementation_source": "runtime_declared",
             "implementation_confidence": 1.0,
@@ -156,7 +156,10 @@ def test_algorithms_api_exposes_param_schema(monkeypatch):
     payload = response.get_json()
     assert payload
     close_high = next(
-        item for item in payload if item["key"] == "close_high_channel_breakout"
+        item
+        for item in payload
+        if item["key"]
+        == "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"
     )
     assert close_high["param_schema"]
     assert close_high["param_schema"][0]["key"] == "window"
@@ -279,7 +282,7 @@ def test_validate_configuration_api_returns_normalized_configuration(monkeypatch
                 {
                     "node_id": "alg-1",
                     "node_type": "algorithm",
-                    "alg_key": "close_high_channel_breakout",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
                     "alg_param": {"window": 2},
                     "buy_enabled": True,
                     "sell_enabled": True,

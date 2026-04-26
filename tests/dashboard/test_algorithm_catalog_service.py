@@ -116,7 +116,7 @@ def _build_service():
             "source_row_hash": "abc",
             "source_origin": "imported",
             "is_active": True,
-            "implementation_id": "boundary_breakout",
+            "implementation_id": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "implementation_catalog_ref": "algorithm:6",
             "implementation_source": "runtime_declared",
             "implementation_confidence": 1.0,
@@ -166,7 +166,9 @@ def test_catalog_service_exposes_catalog_entries_with_status():
     items = service.list_catalog_entries()
     assert items
     assert items[0]["implementation_status"] == "implementation_needs_review"
-    assert items[0]["alg_impl_id"] == "boundary_breakout"
+    assert (
+        items[0]["alg_impl_id"] == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
+    )
 
 
 def test_catalog_service_returns_single_catalog_detail():
@@ -174,7 +176,10 @@ def test_catalog_service_returns_single_catalog_detail():
     item = service.get_catalog_entry("breakout-donchian-channel")
     assert item["name"] == "Breakout (Donchian Channel)"
     assert item["alg_impl_spec"] is not None
-    assert item["alg_impl_spec"]["key"] == "boundary_breakout"
+    assert (
+        item["alg_impl_spec"]["key"]
+        == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
+    )
     assert item["typical_inputs"] == "OHLCV high/low, lookback window"
     assert item["link_source_label"] == "Implementation declared"
     assert item["review_state_label"] == "Not reviewed"
@@ -254,7 +259,7 @@ def test_catalog_service_admin_search_matches_runtime_spec_metadata():
     service = _build_service()
 
     payload = service.list_admin_catalog_entries(
-        search_text="boundary_breakout",
+        search_text="OLD_boundary_breakout_NEW_breakout_donchian_channel",
         page=1,
         page_size=10,
     )
@@ -355,7 +360,7 @@ def test_catalog_service_creates_manual_catalog_entry_with_implementation():
 
     created = service.create_catalog_entry(
         catalog_values={
-            "name": "Manual Boundary Breakout",
+            "name": "Manual OLD Boundary Breakout NEW Breakout Donchian Channel",
             "category": "Custom",
             "subcategory": "",
             "advanced_label": "No",
@@ -371,11 +376,13 @@ def test_catalog_service_creates_manual_catalog_entry_with_implementation():
             "admin_annotations": "",
         },
         catalog_type="algorithm",
-        alg_impl_id="boundary_breakout",
+        alg_impl_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
     )
 
     assert created["source_version"] == "manual"
-    assert created["alg_impl_id"] == "boundary_breakout"
+    assert (
+        created["alg_impl_id"] == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
+    )
     assert created["review_state_label"] == "Not reviewed"
     assert created["alg_impl_link"] is not None
     assert created["alg_impl_link"]["notes"] == (

@@ -20,14 +20,14 @@ class _AlgorithmCatalogServiceStub:
     def __init__(self) -> None:
         self.runnable_algorithms = [
             {
-                "key": "boundary_breakout",
-                "name": "Boundary Breakout",
+                "key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+                "name": "OLD Boundary Breakout NEW Breakout Donchian Channel",
                 "status": "runnable",
                 "default_param": {"window": 5},
             },
             {
-                "key": "close_high_channel_breakout",
-                "name": "Close High Channel Breakout",
+                "key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                "name": "OLD Close High Channel Breakout NEW Channel Breakout With Confirmation",
                 "status": "runnable",
                 "default_param": {"window": 2},
             },
@@ -74,10 +74,16 @@ def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm()
     assert result.skipped_count == 0
     assert len(experiment_service.calls) == 3
     assert experiment_service.calls[0]["algorithms"] == [
-        {"alg_key": "boundary_breakout", "alg_param": {"window": 5}}
+        {
+            "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "alg_param": {"window": 5},
+        }
     ]
     assert experiment_service.calls[1]["algorithms"] == [
-        {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+        {
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "alg_param": {"window": 2},
+        }
     ]
     assert experiment_service.calls[2]["algorithms"] == [
         {
@@ -159,7 +165,7 @@ def test_submit_single_algorithm_for_symbols_normalizes_and_deduplicates_symbols
     )
 
     result = service.submit_single_algorithm_for_symbols(
-        alg_key="boundary_breakout",
+        alg_key="OLD_boundary_breakout_NEW_breakout_donchian_channel",
         symbols_text="aapl\nMSFT, aapl, nvda",
         start_date="2024-01-01",
         start_time="09:30",
@@ -184,7 +190,7 @@ def test_submit_single_algorithm_for_symbols_requires_at_least_one_symbol():
 
     try:
         service.submit_single_algorithm_for_symbols(
-            alg_key="boundary_breakout",
+            alg_key="OLD_boundary_breakout_NEW_breakout_donchian_channel",
             symbols_text="  ,   \n ",
             start_date="2024-01-01",
             start_time="09:30",

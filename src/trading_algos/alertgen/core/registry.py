@@ -7,7 +7,8 @@ def get_default_alertgen_sensor_config(name="sensor_0", *, symbol="SYMBOL"):
     default_spec = next(
         spec
         for spec in list_alert_algorithm_specs()
-        if spec.key == "aggregate_boundary_and_channel"
+        if spec.key
+        == "OLD_aggregate_boundary_and_channel_NEW_hard_boolean_gating_and_or_majority"
     )
     return {
         "name": name,

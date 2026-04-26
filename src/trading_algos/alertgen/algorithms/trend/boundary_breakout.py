@@ -13,7 +13,7 @@ NEGATIVE_INFITIY_FLOAT = float("-inf")
 
 class BoundaryBreakoutAlertAlgorithm(BaseAlertAlgorithm):
     def __init__(self, symbol, report_base_path, date_str="", evaluate_window_len=5):
-        self.alg_name = "boundary_breakout"
+        self.alg_name = "OLD_boundary_breakout_NEW_breakout_donchian_channel"
         super().__init__(
             self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )
@@ -176,7 +176,9 @@ class BoundaryBreakoutAlertAlgorithm(BaseAlertAlgorithm):
 
 class DoubleRedConfirmationAlertAlgorithm(BoundaryBreakoutAlertAlgorithm):
     def __init__(self, symbol, report_base_path, date_str="", evaluate_window_len=5):
-        self.alg_name = "double_red_confirmation"
+        self.alg_name = (
+            "OLD_double_red_confirmation_NEW_channel_breakout_with_confirmation"
+        )
         BaseAlertAlgorithm.__init__(
             self, self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )
@@ -230,7 +232,9 @@ class DoubleRedConfirmationAlertAlgorithm(BoundaryBreakoutAlertAlgorithm):
 
 class LowAnchoredBoundaryBreakoutAlertAlgorithm(BoundaryBreakoutAlertAlgorithm):
     def __init__(self, symbol, report_base_path, date_str="", evaluate_window_len=5):
-        self.alg_name = "low_anchored_boundary_breakout"
+        self.alg_name = (
+            "OLD_low_anchored_boundary_breakout_NEW_breakout_donchian_channel"
+        )
         BaseAlertAlgorithm.__init__(
             self, self.alg_name, symbol, date_str, evaluate_window_len, report_base_path
         )

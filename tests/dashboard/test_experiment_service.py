@@ -294,7 +294,10 @@ def test_back_to_back_queued_experiments_advance_automatically(monkeypatch, tmp_
         end_date="2024-01-01",
         end_time="16:00",
         algorithms=[
-            {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
+            {
+                "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                "alg_param": {"window": 2},
+            }
         ],
         notes="first",
     )
@@ -305,7 +308,10 @@ def test_back_to_back_queued_experiments_advance_automatically(monkeypatch, tmp_
         end_date="2024-01-02",
         end_time="16:00",
         algorithms=[
-            {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 3}}
+            {
+                "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                "alg_param": {"window": 3},
+            }
         ],
         notes="second",
     )
@@ -368,8 +374,8 @@ def test_run_experiment_job_records_datasource_cache_metadata(monkeypatch, tmp_p
         "trading_algos_dashboard.services.experiment_service.run_alert_algorithm",
         lambda **_kwargs: {
             "execution_steps": [],
-            "alg_key": "boundary_breakout",
-            "alg_name": "Boundary Breakout",
+            "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "alg_name": "OLD Boundary Breakout NEW Breakout Donchian Channel",
             "report": {},
         },
     )
@@ -385,7 +391,7 @@ def test_run_experiment_job_records_datasource_cache_metadata(monkeypatch, tmp_p
         normalized_algorithms=[
             {
                 "symbol": "AAPL",
-                "alg_key": "boundary_breakout",
+                "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
                 "alg_param": {},
                 "buy": True,
                 "sell": True,
@@ -454,8 +460,8 @@ def test_run_experiment_job_normalizes_xmlrpc_datetime_values_in_persisted_paylo
                     "metadata": {"last_candle_ts": kwargs["candles"][0]["ts"]},
                 }
             ],
-            "alg_key": "boundary_breakout",
-            "alg_name": "Boundary Breakout",
+            "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "alg_name": "OLD Boundary Breakout NEW Breakout Donchian Channel",
             "report": {
                 "generated_at": XmlRpcDateTime("20260402T09:31:00"),
             },
@@ -473,7 +479,7 @@ def test_run_experiment_job_normalizes_xmlrpc_datetime_values_in_persisted_paylo
         normalized_algorithms=[
             {
                 "symbol": "AAPL",
-                "alg_key": "boundary_breakout",
+                "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
                 "alg_param": {},
                 "buy": True,
                 "sell": True,

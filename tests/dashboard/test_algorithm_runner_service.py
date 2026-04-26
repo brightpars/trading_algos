@@ -20,7 +20,7 @@ def test_run_alert_algorithm_returns_dashboard_payload(tmp_path):
     result = run_alert_algorithm(
         sensor_config={
             "symbol": "AAPL",
-            "alg_key": "close_high_channel_breakout",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
             "alg_param": {"window": 2},
             "buy": True,
             "sell": True,
@@ -28,7 +28,10 @@ def test_run_alert_algorithm_returns_dashboard_payload(tmp_path):
         report_base_path=str(tmp_path),
         candles=_rows(),
     )
-    assert result["alg_key"] == "close_high_channel_breakout"
+    assert (
+        result["alg_key"]
+        == "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"
+    )
     assert "eval_dict" in result
     assert "chart_payload" in result
     assert result["report"]["report_version"] == "1.0"
@@ -45,7 +48,7 @@ def test_run_alert_algorithm_handles_short_input_history(tmp_path):
     result = run_alert_algorithm(
         sensor_config={
             "symbol": "AAPL",
-            "alg_key": "close_high_channel_breakout",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
             "alg_param": {"window": 20},
             "buy": True,
             "sell": True,

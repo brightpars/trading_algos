@@ -39,7 +39,7 @@ def _sample_rows(count: int = 5) -> list[dict[str, Any]]:
 def _algorithm_node(
     node_id: str,
     *,
-    alg_key: str = "close_high_channel_breakout",
+    alg_key: str = "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
     alg_param: dict[str, object] | None = None,
     buy_enabled: bool = True,
     sell_enabled: bool = True,
@@ -327,7 +327,9 @@ def test_configuration_compatibility_classifies_version_and_algorithm_issues(
     compatibility = evaluate_configuration_compatibility(configuration)
 
     assert compatibility.compatibility_state == "warning"
-    assert compatibility.algorithm_refs == ("close_high_channel_breakout",)
+    assert compatibility.algorithm_refs == (
+        "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+    )
     assert any(
         "expected package version 9.9.9" in item
         for item in compatibility.compatibility_messages

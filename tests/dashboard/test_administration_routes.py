@@ -553,7 +553,7 @@ def test_algorithm_catalog_workspace_shows_run_action_for_implemented_entries(
     _assign_implementation(
         app,
         entry_id="entry-1",
-        implementation_id="boundary_breakout",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
         review_state="confirmed",
     )
 
@@ -561,7 +561,10 @@ def test_algorithm_catalog_workspace_shows_run_action_for_implemented_entries(
 
     assert response.status_code == 200
     assert b">Run<" in response.data
-    assert b"/experiments/new?alg_key=boundary_breakout" in response.data
+    assert (
+        b"/experiments/new?alg_key=OLD_boundary_breakout_NEW_breakout_donchian_channel"
+        in response.data
+    )
     assert b">Runnable<" in response.data
     assert b">Confirmed<" in response.data
 
@@ -578,7 +581,7 @@ def test_algorithm_catalog_search_results_show_run_for_runnable_unreviewed_entri
             "id": "entry-1",
             "catalog_type": "algorithm",
             "catalog_number": 1,
-            "name": "Boundary Breakout Searchable",
+            "name": "OLD Boundary Breakout NEW Breakout Donchian Channel Searchable",
             "slug": "boundary-breakout-searchable",
             "category": "Trend Following",
             "subcategory": "",
@@ -599,18 +602,24 @@ def test_algorithm_catalog_search_results_show_run_for_runnable_unreviewed_entri
     _assign_implementation(
         app,
         entry_id="entry-1",
-        implementation_id="boundary_breakout",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
         review_state="not_reviewed",
     )
 
     response = app.test_client().get("/algorithms?q=searchable")
 
     assert response.status_code == 200
-    assert b"Boundary Breakout Searchable" in response.data
+    assert (
+        b"OLD Boundary Breakout NEW Breakout Donchian Channel Searchable"
+        in response.data
+    )
     assert b">Runnable<" in response.data
     assert b">Not reviewed<" in response.data
     assert b">Run<" in response.data
-    assert b"/experiments/new?alg_key=boundary_breakout" in response.data
+    assert (
+        b"/experiments/new?alg_key=OLD_boundary_breakout_NEW_breakout_donchian_channel"
+        in response.data
+    )
 
 
 def test_algorithm_catalog_hides_run_for_rejected_linked_entry(monkeypatch):
@@ -644,7 +653,7 @@ def test_algorithm_catalog_hides_run_for_rejected_linked_entry(monkeypatch):
     _assign_implementation(
         app,
         entry_id="entry-1",
-        implementation_id="boundary_breakout",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
         review_state="rejected",
     )
 
@@ -654,7 +663,10 @@ def test_algorithm_catalog_hides_run_for_rejected_linked_entry(monkeypatch):
     assert b"Rejected Breakout" in response.data
     assert b">Not runnable<" in response.data
     assert b">Rejected<" in response.data
-    assert b"/experiments/new?alg_key=boundary_breakout" not in response.data
+    assert (
+        b"/experiments/new?alg_key=OLD_boundary_breakout_NEW_breakout_donchian_channel"
+        not in response.data
+    )
 
 
 def test_algorithm_catalog_hides_run_for_deferred_linked_entry(monkeypatch):
@@ -688,7 +700,7 @@ def test_algorithm_catalog_hides_run_for_deferred_linked_entry(monkeypatch):
     _assign_implementation(
         app,
         entry_id="entry-1",
-        implementation_id="boundary_breakout",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
         review_state="deferred",
     )
 
@@ -698,7 +710,10 @@ def test_algorithm_catalog_hides_run_for_deferred_linked_entry(monkeypatch):
     assert b"Deferred Breakout" in response.data
     assert b">Not runnable<" in response.data
     assert b">Deferred<" in response.data
-    assert b"/experiments/new?alg_key=boundary_breakout" not in response.data
+    assert (
+        b"/experiments/new?alg_key=OLD_boundary_breakout_NEW_breakout_donchian_channel"
+        not in response.data
+    )
 
 
 def test_algorithm_detail_hides_run_for_rejected_linked_entry(monkeypatch):
@@ -735,7 +750,7 @@ def test_algorithm_detail_hides_run_for_rejected_linked_entry(monkeypatch):
     _assign_implementation(
         app,
         entry_id="entry-1",
-        implementation_id="boundary_breakout",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
         review_state="rejected",
     )
 
@@ -788,9 +803,9 @@ def test_algorithm_catalog_workspace_creates_manual_algorithm_with_implementatio
     response = app.test_client().post(
         "/algorithms/new",
         data={
-            "name": "Manual Boundary Breakout",
+            "name": "Manual OLD Boundary Breakout NEW Breakout Donchian Channel",
             "catalog_type": "algorithm",
-            "alg_impl_id": "boundary_breakout",
+            "alg_impl_id": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "category": "Custom",
             "subcategory": "",
             "advanced_label": "No",
@@ -810,8 +825,10 @@ def test_algorithm_catalog_workspace_creates_manual_algorithm_with_implementatio
 
     assert response.status_code == 200
     assert b"algorithm_catalog: algorithm created;" in response.data
-    assert b"Manual Boundary Breakout" in response.data
-    assert b"boundary_breakout" in response.data
+    assert (
+        b"Manual OLD Boundary Breakout NEW Breakout Donchian Channel" in response.data
+    )
+    assert b"OLD_boundary_breakout_NEW_breakout_donchian_channel" in response.data
     assert b"Linked implementation" in response.data
     assert b"Builder" in response.data
 
@@ -845,7 +862,9 @@ def test_algorithm_catalog_admin_page_shows_global_search_results(monkeypatch):
         },
     )
     _assign_implementation(
-        app, entry_id="entry-1", implementation_id="boundary_breakout"
+        app,
+        entry_id="entry-1",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
     )
 
     response = app.test_client().get("/algorithms?q=implementation%20declared")
@@ -1097,7 +1116,7 @@ def test_algorithm_detail_page_updates_catalog_fields_and_review_state(monkeypat
     _assign_implementation(
         app,
         entry_id="entry-1",
-        implementation_id="boundary_breakout",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
         review_state="confirmed",
     )
 
@@ -1182,7 +1201,9 @@ def test_algorithm_detail_page_can_update_only_review_state(monkeypatch):
         },
     )
     _assign_implementation(
-        app, entry_id="entry-1", implementation_id="boundary_breakout"
+        app,
+        entry_id="entry-1",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
     )
 
     response = app.test_client().post(
@@ -1203,7 +1224,10 @@ def test_algorithm_detail_page_can_update_only_review_state(monkeypatch):
     assert stored["review_state"] == "confirmed"
     assert stored["name"] == "Seed Entry"
     assert stored["category"] == "Trend Following"
-    assert stored["implementation_id"] == "boundary_breakout"
+    assert (
+        stored["implementation_id"]
+        == "OLD_boundary_breakout_NEW_breakout_donchian_channel"
+    )
 
 
 def test_algorithm_detail_page_shows_linked_implementation_details(monkeypatch):
@@ -1238,7 +1262,9 @@ def test_algorithm_detail_page_shows_linked_implementation_details(monkeypatch):
         },
     )
     _assign_implementation(
-        app, entry_id="entry-1", implementation_id="boundary_breakout"
+        app,
+        entry_id="entry-1",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
     )
 
     response = app.test_client().get("/algorithms/seed-entry")
@@ -1247,7 +1273,10 @@ def test_algorithm_detail_page_shows_linked_implementation_details(monkeypatch):
     assert b"Linked implementation" in response.data
     assert b"_build_boundary_breakout" in response.data
     assert b"trading_algos.alertgen.algorithms.trend.catalog" in response.data
-    assert b"/experiments/new?alg_key=boundary_breakout" in response.data
+    assert (
+        b"/experiments/new?alg_key=OLD_boundary_breakout_NEW_breakout_donchian_channel"
+        in response.data
+    )
 
 
 def test_algorithm_detail_page_rejects_invalid_updates(monkeypatch):
@@ -1333,7 +1362,9 @@ def test_algorithm_catalog_admin_page_preserves_all_filter_options(monkeypatch):
         },
     )
     _assign_implementation(
-        app, entry_id="seed-entry", implementation_id="boundary_breakout"
+        app,
+        entry_id="seed-entry",
+        implementation_id="OLD_boundary_breakout_NEW_breakout_donchian_channel",
     )
 
     response = app.test_client().get(
@@ -1511,7 +1542,7 @@ def test_algorithm_catalog_sync_route_preserves_rejected_review_state(
             "initial_reference": "Ref",
             "source_version": "seed",
             "is_active": True,
-            "implementation_id": "boundary_breakout",
+            "implementation_id": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "implementation_catalog_ref": "algorithm:6",
             "implementation_source": "runtime_declared",
             "implementation_confidence": 1.0,
@@ -1556,7 +1587,7 @@ def test_app_startup_rebuild_preserves_existing_rejected_review_state(monkeypatc
             "initial_reference": "Ref",
             "source_version": "seed",
             "is_active": True,
-            "implementation_id": "boundary_breakout",
+            "implementation_id": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "implementation_catalog_ref": "algorithm:6",
             "implementation_source": "runtime_declared",
             "implementation_confidence": 1.0,
@@ -1614,7 +1645,7 @@ def test_app_startup_rebuild_preserves_regular_catalog_fields(monkeypatch):
             "admin_annotations": "Custom annotations",
             "source_version": "seed",
             "is_active": True,
-            "implementation_id": "boundary_breakout",
+            "implementation_id": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
             "implementation_catalog_ref": "algorithm:6",
             "implementation_source": "runtime_declared",
             "implementation_confidence": 1.0,
