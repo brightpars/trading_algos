@@ -4,18 +4,33 @@ import os
 from dataclasses import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class DashboardConfig:
     secret_key: str
     mongo_uri: str
     mongo_db_name: str
     report_base_path: str
-    smarttrade_path: str
-    smarttrade_user_id: int
     experiment_max_concurrent_runs: int = 1
-    smarttrade_api_base_url: str = "http://127.0.0.1:5000"
-    smarttrade_api_token: str = ""
-    smarttrade_api_timeout_secs: int = 10
+
+    def __init__(
+        self,
+        secret_key: str,
+        mongo_uri: str,
+        mongo_db_name: str,
+        report_base_path: str,
+        *_legacy_args: object,
+        experiment_max_concurrent_runs: int = 1,
+        **_legacy_kwargs: object,
+    ) -> None:
+        object.__setattr__(self, "secret_key", secret_key)
+        object.__setattr__(self, "mongo_uri", mongo_uri)
+        object.__setattr__(self, "mongo_db_name", mongo_db_name)
+        object.__setattr__(self, "report_base_path", report_base_path)
+        object.__setattr__(
+            self,
+            "experiment_max_concurrent_runs",
+            int(experiment_max_concurrent_runs),
+        )
 
     @classmethod
     def from_env(cls) -> "DashboardConfig":
@@ -30,29 +45,10 @@ class DashboardConfig:
             report_base_path=os.environ.get(
                 "TRADING_ALGOS_DASHBOARD_REPORT_PATH", "dashboard_reports"
             ),
-            smarttrade_path=os.environ.get(
-                "SMARTTRADE_PATH", "/home/mohammad/development/smarttrade"
-            ),
-            smarttrade_user_id=int(
-                os.environ.get("TRADING_ALGOS_DASHBOARD_SMARTTRADE_USER_ID", "1")
-            ),
             experiment_max_concurrent_runs=int(
                 os.environ.get(
                     "TRADING_ALGOS_DASHBOARD_EXPERIMENT_MAX_CONCURRENT_RUNS",
                     "1",
-                )
-            ),
-            smarttrade_api_base_url=os.environ.get(
-                "TRADING_ALGOS_DASHBOARD_SMARTTRADE_API_BASE_URL",
-                "http://127.0.0.1:5000",
-            ),
-            smarttrade_api_token=os.environ.get(
-                "TRADING_ALGOS_DASHBOARD_SMARTTRADE_API_TOKEN",
-                "",
-            ),
-            smarttrade_api_timeout_secs=int(
-                os.environ.get(
-                    "TRADING_ALGOS_DASHBOARD_SMARTTRADE_API_TIMEOUT_SECS", "10"
                 )
             ),
         )

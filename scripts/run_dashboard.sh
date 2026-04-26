@@ -3,10 +3,7 @@
 set -euo pipefail
 
 REPO_ROOT="/home/mohammad/development/trading_algos"
-SMARTTRADE_ROOT="/home/mohammad/development/smarttrade"
 VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
-SMARTTRADE_VENV_PYTHON="$SMARTTRADE_ROOT/.venv/bin/python"
-SMARTTRADE_SHUTDOWN_PORTS_SCRIPT="$SMARTTRADE_ROOT/scripts/shutdown_project_ports.sh"
 SHUTDOWN_TIMEOUT_SECS="${SHUTDOWN_TIMEOUT_SECS:-5}"
 APP_PID=""
 STOPPING=0
@@ -17,29 +14,10 @@ if [[ ! -x "$VENV_PYTHON" ]]; then
   exit 1
 fi
 
-if [[ ! -d "$SMARTTRADE_ROOT" ]]; then
-  echo "Smarttrade repository not found at $SMARTTRADE_ROOT"
-  exit 1
-fi
-
-if [[ ! -x "$SMARTTRADE_VENV_PYTHON" ]]; then
-  echo "Smarttrade virtual environment not found at $SMARTTRADE_VENV_PYTHON"
-  echo "Create it with: python3 -m venv /home/mohammad/development/smarttrade/.venv"
-  exit 1
-fi
-
-SMARTTRADE_SITE_PACKAGES="$($SMARTTRADE_VENV_PYTHON -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
-
-if [[ ! -d "$SMARTTRADE_SITE_PACKAGES" ]]; then
-  echo "Smarttrade site-packages directory not found at $SMARTTRADE_SITE_PACKAGES"
-  exit 1
-fi
-
 export FLASK_APP="trading_algos_dashboard.app:create_app"
 export FLASK_ENV="${FLASK_ENV:-development}"
 export FLASK_DEBUG="${FLASK_DEBUG:-1}"
-export PYTHONPATH="$REPO_ROOT/src:$SMARTTRADE_ROOT:$SMARTTRADE_SITE_PACKAGES${PYTHONPATH:+:$PYTHONPATH}"
-export SMARTTRADE_PATH="$SMARTTRADE_ROOT"
+export PYTHONPATH="$REPO_ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
 export TRADING_ALGOS_DASHBOARD_MONGO_URI="${TRADING_ALGOS_DASHBOARD_MONGO_URI:-mongodb://127.0.0.1:27017}"
 export TRADING_ALGOS_DASHBOARD_MONGO_DB="${TRADING_ALGOS_DASHBOARD_MONGO_DB:-trading_algos_dashboard}"
 export TRADING_ALGOS_DASHBOARD_REPORT_PATH="${TRADING_ALGOS_DASHBOARD_REPORT_PATH:-dashboard_reports}"
@@ -68,7 +46,7 @@ try:
     mongo_db_name = os.environ["TRADING_ALGOS_DASHBOARD_MONGO_DB"]
     client = MongoClient(mongo_uri, serverSelectionTimeoutMS=2000)
     document = client[mongo_db_name]["dashboard_server_control_settings"].find_one(
-        {"settings_id": "smarttrade_server_control"}
+        {"settings_id": "dashboard_service_control"}
     ) or {}
     stored_ports = document.get("ports") or {}
     ports = [int(stored_ports.get(name, default)) for name, default in definitions.items()]
@@ -78,6 +56,41 @@ except Exception:
 
 print(" ".join(str(port) for port in ports))
 PY
+}
+
+collect_pids_for_port() {
+  local port="$1"
+  lsof -t -nP -iTCP:"${port}" -sTCP:LISTEN 2>/dev/null | sort -u || true
+}
+
+release_ports() {
+  local ports_string="$1"
+  read -r -a ports <<< "$ports_string"
+
+  for port in "${ports[@]}"; do
+    [[ -z "$port" ]] && continue
+    local pids
+    pids="$(collect_pids_for_port "$port")"
+    if [[ -z "$pids" ]]; then
+      continue
+    fi
+
+    while IFS= read -r pid; do
+      [[ -z "$pid" ]] && continue
+      kill -TERM "$pid" 2>/dev/null || true
+    done <<< "$pids"
+
+    sleep 1
+
+    local remaining
+    remaining="$(collect_pids_for_port "$port")"
+    if [[ -n "$remaining" ]]; then
+      while IFS= read -r pid; do
+        [[ -z "$pid" ]] && continue
+        kill -KILL "$pid" 2>/dev/null || true
+      done <<< "$remaining"
+    fi
+  done
 }
 
 cleanup() {
@@ -118,13 +131,11 @@ cleanup() {
     wait "$APP_PID" 2>/dev/null || true
   fi
 
-  if [[ -x "$SMARTTRADE_SHUTDOWN_PORTS_SCRIPT" ]]; then
-    local service_ports
-    local ports_to_release
-    service_ports="$(resolve_service_ports)"
-    ports_to_release="$PORT${service_ports:+ $service_ports}"
-    SMARTTRADE_PORTS="$ports_to_release" "$SMARTTRADE_SHUTDOWN_PORTS_SCRIPT" || true
-  fi
+  local service_ports
+  local ports_to_release
+  service_ports="$(resolve_service_ports)"
+  ports_to_release="$PORT${service_ports:+ $service_ports}"
+  release_ports "$ports_to_release"
 
   return "$exit_code"
 }
@@ -135,8 +146,6 @@ trap 'cleanup EXIT' EXIT
 
 cd "$REPO_ROOT"
 echo "Starting dashboard on http://$HOST:$PORT"
-echo "Using smarttrade root: $SMARTTRADE_ROOT"
-echo "Using smarttrade site-packages: $SMARTTRADE_SITE_PACKAGES"
 "$VENV_PYTHON" -m flask run --host "$HOST" --port "$PORT" &
 APP_PID=$!
 wait "$APP_PID"

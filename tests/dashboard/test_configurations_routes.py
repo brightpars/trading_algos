@@ -240,26 +240,14 @@ def test_configuration_detail_shows_publish_history(monkeypatch):
     draft_id = app.extensions["configuration_builder_service"].create_draft(
         _sample_configuration_payload()
     )
-    app.extensions["publication_record_repository"].create_record(
-        {
-            "draft_id": draft_id,
-            "created_at": "2026-04-21T10:00:00Z",
-            "remote_config_id": "algcfg_1",
-            "remote_status": "published",
-            "result": {"config_id": "algcfg_1"},
-        }
-    )
     response = app.test_client().get(f"/configurations/{draft_id}")
     assert response.status_code == 200
     assert b"Configuration summary" in response.data
-    assert b"Publish history" in response.data
-    assert b"algcfg_1" in response.data
     assert b"Structure summary" in response.data
     assert b"Edit draft" in response.data
     assert b"Delete draft" in response.data
     assert b"Revision 1" in response.data
     assert b"Initial revision created." in response.data
-    assert b"Published" in response.data
 
 
 def test_configuration_detail_shows_revision_change_summary(monkeypatch):
@@ -301,45 +289,6 @@ def test_edit_configuration_missing_draft_returns_404(monkeypatch):
     assert response.status_code == 404
 
 
-def test_configuration_detail_validate_remote_uses_publish_service(monkeypatch):
-    app = _build_app(monkeypatch)
-    draft_id = app.extensions["configuration_builder_service"].create_draft(
-        _sample_configuration_payload()
-    )
-    monkeypatch.setattr(
-        app.extensions["configuration_publish_service"],
-        "validate_remote",
-        lambda payload: {
-            "compatibility": {"compatibility_state": "compatible"},
-            "payload": payload,
-        },
-    )
-    response = app.test_client().post(
-        f"/configurations/{draft_id}/validate-remote",
-        follow_redirects=True,
-    )
-    assert response.status_code == 200
-    assert b"Remote validation ok" in response.data
-
-
-def test_configuration_detail_publish_uses_publish_service(monkeypatch):
-    app = _build_app(monkeypatch)
-    draft_id = app.extensions["configuration_builder_service"].create_draft(
-        _sample_configuration_payload()
-    )
-    monkeypatch.setattr(
-        app.extensions["configuration_publish_service"],
-        "publish",
-        lambda draft_id, payload: {"config_id": "algcfg_1", "status": "published"},
-    )
-    response = app.test_client().post(
-        f"/configurations/{draft_id}/publish",
-        follow_redirects=True,
-    )
-    assert response.status_code == 200
-    assert b"Published configuration remote_config_id=algcfg_1" in response.data
-
-
 def test_delete_configuration_removes_draft_and_related_history(monkeypatch):
     app = _build_app(monkeypatch)
     draft_id = app.extensions["configuration_builder_service"].create_draft(
@@ -351,15 +300,6 @@ def test_delete_configuration_removes_draft_and_related_history(monkeypatch):
             **_sample_configuration_payload(),
             "name": "Updated Combo Breakout",
         },
-    )
-    app.extensions["publication_record_repository"].create_record(
-        {
-            "draft_id": draft_id,
-            "created_at": "2026-04-21T10:00:00Z",
-            "remote_config_id": "algcfg_1",
-            "remote_status": "published",
-            "result": {"config_id": "algcfg_1"},
-        }
     )
 
     response = app.test_client().post(
@@ -375,10 +315,6 @@ def test_delete_configuration_removes_draft_and_related_history(monkeypatch):
     )
     assert (
         app.extensions["configuration_revision_repository"].list_revisions(draft_id)
-        == []
-    )
-    assert (
-        app.extensions["publication_record_repository"].list_records_for_draft(draft_id)
         == []
     )
 

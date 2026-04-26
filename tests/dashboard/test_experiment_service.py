@@ -80,7 +80,7 @@ class _Db(dict):
 class _FakeDataSourceService:
     def get_market_data_server_details(self):
         return {
-            "kind": "smarttrade_dataserver",
+            "kind": "xmlrpc_dataserver",
             "ip": "127.0.0.1",
             "port": 7003,
             "endpoint": "127.0.0.1:7003",
@@ -195,7 +195,7 @@ class _CacheAwareDataSourceService:
         self.cache_hit = cache_hit
 
     def get_market_data_server_details(self) -> dict[str, Any]:
-        return {"kind": "smarttrade_dataserver", "endpoint": "127.0.0.2:6010"}
+        return {"kind": "xmlrpc_dataserver", "endpoint": "127.0.0.2:6010"}
 
     def fetch_candles(
         self, *, symbol: str, start: datetime, end: datetime
@@ -419,7 +419,7 @@ def test_run_experiment_job_normalizes_xmlrpc_datetime_values_in_persisted_paylo
 
     class _XmlRpcDataSourceService:
         def get_market_data_server_details(self) -> dict[str, Any]:
-            return {"kind": "smarttrade_dataserver", "endpoint": "127.0.0.2:6010"}
+            return {"kind": "xmlrpc_dataserver", "endpoint": "127.0.0.2:6010"}
 
         def fetch_candles(
             self, *, symbol: str, start: datetime, end: datetime

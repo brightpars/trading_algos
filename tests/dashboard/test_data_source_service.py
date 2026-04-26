@@ -6,7 +6,7 @@ from trading_algos_dashboard.services.data_source_service import (
     DataSourceUnavailableError,
     MarketDataFetchResult,
     MarketDataUnavailableError,
-    SmarttradeDataSourceService,
+    MarketDataSourceService,
 )
 from trading_algos_dashboard.services.market_data_cache import (
     InMemoryMarketDataCache,
@@ -84,8 +84,7 @@ class _MongoLikeRow:
 
 
 def test_data_source_service_uses_override_endpoint_for_label():
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
         endpoint_resolver=lambda: ("10.1.2.3", 7007),
     )
@@ -99,8 +98,7 @@ def test_check_connection_returns_endpoint_from_proxy(monkeypatch):
             assert timeout_seconds == 2.0
             return "pong"
 
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
         endpoint_resolver=lambda: ("127.0.0.9", 7777),
     )
@@ -128,8 +126,7 @@ def test_check_connection_uses_timeout_aware_ping_once(monkeypatch):
                 "fallback ping should not be used when timeout ping exists"
             )
 
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
         endpoint_resolver=lambda: ("127.0.0.9", 7777),
     )
@@ -149,8 +146,7 @@ def test_is_proxy_server_up_uses_timeout_aware_ping_when_available():
             calls.append(timeout_seconds)
             return "pong"
 
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -163,8 +159,7 @@ def test_is_proxy_server_up_falls_back_to_is_server_up_when_timeout_ping_missing
         def is_server_up(self):
             return True
 
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -172,8 +167,7 @@ def test_is_proxy_server_up_falls_back_to_is_server_up_when_timeout_ping_missing
 
 
 def test_check_connection_raises_when_server_is_unavailable(monkeypatch):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
         endpoint_resolver=lambda: ("127.0.0.9", 7777),
     )
@@ -192,8 +186,7 @@ def test_check_connection_raises_when_server_is_unavailable(monkeypatch):
 
 
 def test_fetch_candles_reads_via_proxy_minute_by_minute(monkeypatch):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -241,8 +234,7 @@ def test_fetch_candles_reads_via_proxy_minute_by_minute(monkeypatch):
 
 
 def test_fetch_candles_prefers_bulk_candles_proxy_method_when_available(monkeypatch):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -292,8 +284,7 @@ def test_fetch_candles_prefers_bulk_candles_proxy_method_when_available(monkeypa
 
 
 def test_fetch_candles_normalizes_xmlrpc_datetime_values(monkeypatch):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -328,8 +319,7 @@ def test_fetch_candles_normalizes_xmlrpc_datetime_values(monkeypatch):
 def test_fetch_candles_raises_market_data_unavailable_when_all_proxy_rows_missing(
     monkeypatch,
 ):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -355,8 +345,7 @@ def test_fetch_candles_raises_market_data_unavailable_when_all_proxy_rows_missin
 
 
 def test_fetch_candles_logs_selected_proxy_mode(monkeypatch, caplog):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -389,8 +378,7 @@ def test_fetch_candles_logs_selected_proxy_mode(monkeypatch, caplog):
 
 
 def test_fetch_candles_logs_proxy_completion(monkeypatch, caplog):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -420,8 +408,7 @@ def test_fetch_candles_logs_proxy_completion(monkeypatch, caplog):
 
 
 def test_fetch_candles_logs_bulk_proxy_completion(monkeypatch, caplog):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -444,8 +431,7 @@ def test_fetch_candles_logs_bulk_proxy_completion(monkeypatch, caplog):
 
 
 def test_fetch_candles_uses_cache_for_identical_request(monkeypatch):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
     calls: list[str] = []
@@ -476,8 +462,7 @@ def test_fetch_candles_uses_cache_for_identical_request(monkeypatch):
 
 
 def test_fetch_candles_returns_fresh_copies_for_cache_hits(monkeypatch):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -505,8 +490,7 @@ def test_fetch_candles_returns_fresh_copies_for_cache_hits(monkeypatch):
 
 
 def test_fetch_candles_logs_cache_events(monkeypatch, caplog):
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
     )
 
@@ -538,8 +522,7 @@ def test_fetch_candles_returns_shared_cache_hit_without_proxy_call(monkeypatch):
         memory_cache=InMemoryMarketDataCache(),
         shared_cache=MongoMarketDataCache(repository=_MarketDataCacheRepository()),
     )
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
         market_data_cache=layered_cache,
     )
@@ -568,8 +551,7 @@ def test_market_data_server_details_include_shared_cache_metadata():
         memory_cache=InMemoryMarketDataCache(),
         shared_cache=MongoMarketDataCache(repository=_MarketDataCacheRepository()),
     )
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
         endpoint_resolver=lambda: ("127.0.0.2", 6010),
         market_data_cache=layered_cache,
@@ -596,8 +578,7 @@ def test_fetch_candles_waits_for_inflight_shared_fill_before_proxy(monkeypatch):
             candles=[{"ts": "2024-01-01 09:30:00", "Close": 10.5}],
         )
 
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
         market_data_cache=layered_cache,
         sleep_fn=_sleep_fn,
@@ -629,8 +610,7 @@ def test_fetch_candles_releases_fill_claim_after_proxy_fetch(monkeypatch):
         memory_cache=InMemoryMarketDataCache(),
         shared_cache=MongoMarketDataCache(repository=repository),
     )
-    service = SmarttradeDataSourceService(
-        smarttrade_path="/tmp/smarttrade",
+    service = MarketDataSourceService(
         user_id=1,
         market_data_cache=layered_cache,
     )

@@ -309,7 +309,7 @@ def test_experiment_api_returns_runtime_metadata(monkeypatch):
             "status": "completed",
             "symbol": "AAPL",
             "dataset_source": {
-                "kind": "smarttrade_dataserver",
+                "kind": "xmlrpc_dataserver",
                 "ip": "127.0.0.1",
                 "port": 7003,
                 "endpoint": "127.0.0.1:7003",

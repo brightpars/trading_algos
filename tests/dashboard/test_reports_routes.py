@@ -68,9 +68,7 @@ def test_reports_page_renders(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     client = app.test_client()
     response = client.get("/reports")
     assert response.status_code == 200

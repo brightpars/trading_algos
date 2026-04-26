@@ -89,8 +89,6 @@ def test_create_app_registers_core_routes(monkeypatch):
             mongo_uri="mongodb://example",
             mongo_db_name="db",
             report_base_path="reports",
-            smarttrade_path="/tmp/smarttrade",
-            smarttrade_user_id=1,
             experiment_max_concurrent_runs=2,
         )
     )

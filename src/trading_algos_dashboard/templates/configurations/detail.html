@@ -99,12 +99,6 @@
 <div class="d-flex gap-2 mb-3">
   <a class="btn btn-outline-secondary" href="{{ url_for('configurations.edit_configuration', draft_id=draft.draft_id) }}">Edit draft</a>
   <a class="btn btn-outline-success" href="{{ url_for('experiments.new_experiment', draft_id=draft.draft_id) }}">Run this configuration</a>
-  <form method="post" action="{{ url_for('configurations.validate_configuration_remote', draft_id=draft.draft_id) }}">
-    <button class="btn btn-outline-primary" type="submit">Validate in SmartTrade</button>
-  </form>
-  <form method="post" action="{{ url_for('configurations.publish_configuration', draft_id=draft.draft_id) }}">
-    <button class="btn btn-success" type="submit">Publish to SmartTrade</button>
-  </form>
   {% if summary.status == 'draft' %}
   <form method="post" action="{{ url_for('configurations.delete_configuration', draft_id=draft.draft_id) }}">
     <button class="btn btn-outline-danger" type="submit">Delete draft</button>
@@ -130,30 +124,6 @@
       {% endfor %}
     </ul>
   </div>
-  {% endfor %}
-</div>
-<h2 class="h4 mt-4">Publish history</h2>
-<div class="builder-history-list">
-  {% for record in publication_records %}
-  <div class="builder-card builder-history-card">
-    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
-      <div>
-        <h3 class="h6 mb-1">Publish event</h3>
-        <p class="text-muted small mb-0">{{ record.created_at }}</p>
-      </div>
-      <span class="badge text-bg-{{ record.status_class }}">{{ record.status_label }}</span>
-    </div>
-    <dl class="row small mb-0">
-      <dt class="col-sm-4">Remote config ID</dt>
-      <dd class="col-sm-8">{{ record.remote_config_id or 'unknown' }}</dd>
-      <dt class="col-sm-4">Remote version</dt>
-      <dd class="col-sm-8">{{ record.remote_version or 'unknown' }}</dd>
-      <dt class="col-sm-4">Status</dt>
-      <dd class="col-sm-8">{{ record.remote_status or 'unknown' }}</dd>
-    </dl>
-  </div>
-  {% else %}
-  <div class="builder-card"><p class="text-muted mb-0">No publish records yet.</p></div>
   {% endfor %}
 </div>
 {% endblock %}

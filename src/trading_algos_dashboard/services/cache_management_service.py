@@ -8,7 +8,7 @@ from trading_algos_dashboard.services.chart_service import (
     normalize_interactive_payloads,
 )
 from trading_algos_dashboard.services.data_source_service import (
-    SmarttradeDataSourceService,
+    MarketDataSourceService,
 )
 from trading_algos_dashboard.services.market_data_cache import CachedMarketData
 from trading_algos_dashboard.services.market_data_cache import LayeredMarketDataCache
@@ -34,7 +34,7 @@ class CacheManagementService:
         self,
         *,
         market_data_cache: LayeredMarketDataCache,
-        data_source_service: SmarttradeDataSourceService,
+        data_source_service: MarketDataSourceService,
     ) -> None:
         self.market_data_cache = market_data_cache
         self.data_source_service = data_source_service

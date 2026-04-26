@@ -33,9 +33,6 @@ from trading_algos_dashboard.repositories.algorithm_catalog_import_run_repositor
 from trading_algos_dashboard.repositories.algorithm_catalog_repository import (
     AlgorithmCatalogRepository,
 )
-from trading_algos_dashboard.repositories.publication_record_repository import (
-    PublicationRecordRepository,
-)
 from trading_algos_dashboard.repositories.result_repository import ResultRepository
 from trading_algos_dashboard.repositories.market_data_cache_repository import (
     MarketDataCacheRepository,
@@ -62,16 +59,13 @@ from trading_algos_dashboard.services.administration_service import (
     AdministrationService,
 )
 from trading_algos_dashboard.services.data_source_service import (
-    SmarttradeDataSourceService,
+    MarketDataSourceService,
 )
 from trading_algos_dashboard.services.data_source_settings_service import (
     DataSourceSettingsService,
 )
 from trading_algos_dashboard.services.configuration_builder_service import (
     ConfigurationBuilderService,
-)
-from trading_algos_dashboard.services.configuration_publish_service import (
-    ConfigurationPublishService,
 )
 from trading_algos_dashboard.services.experiment_service import ExperimentService
 from trading_algos_dashboard.services.bulk_experiment_service import (
@@ -112,8 +106,6 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         MONGO_URI=cfg.mongo_uri,
         MONGO_DB_NAME=cfg.mongo_db_name,
         REPORT_BASE_PATH=cfg.report_base_path,
-        SMARTTRADE_PATH=cfg.smarttrade_path,
-        SMARTTRADE_USER_ID=cfg.smarttrade_user_id,
         EXPERIMENT_MAX_CONCURRENT_RUNS=cfg.experiment_max_concurrent_runs,
     )
 
@@ -124,7 +116,6 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     result_repository = ResultRepository(mongo.db)
     configuration_draft_repository = ConfigurationDraftRepository(mongo.db)
     configuration_revision_repository = ConfigurationRevisionRepository(mongo.db)
-    publication_record_repository = PublicationRecordRepository(mongo.db)
     data_source_settings_repository = DataSourceSettingsRepository(mongo.db)
     algorithm_catalog_repository = AlgorithmCatalogRepository(mongo.db)
     market_data_cache_repository = MarketDataCacheRepository(mongo.db)
@@ -163,9 +154,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
             ttl_hours=cache_settings["shared_ttl_hours"],
         ),
     )
-    data_source_service = SmarttradeDataSourceService(
-        smarttrade_path=cfg.smarttrade_path,
-        user_id=cfg.smarttrade_user_id,
+    data_source_service = MarketDataSourceService(
         endpoint_resolver=lambda: (
             data_source_settings_service.get_effective_settings()["ip"],
             data_source_settings_service.get_effective_settings()["port"],
@@ -216,17 +205,8 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     configuration_builder_service = ConfigurationBuilderService(
         draft_repository=configuration_draft_repository,
         revision_repository=configuration_revision_repository,
-        publication_record_repository=publication_record_repository,
-    )
-    configuration_publish_service = ConfigurationPublishService(
-        publication_record_repository=publication_record_repository,
-        base_url=cfg.smarttrade_api_base_url,
-        token=cfg.smarttrade_api_token,
-        timeout_secs=cfg.smarttrade_api_timeout_secs,
     )
     server_control_service = ServerControlService(
-        smarttrade_path=cfg.smarttrade_path,
-        user_id=cfg.smarttrade_user_id,
         repository=server_control_settings_repository,
     )
 
@@ -237,7 +217,6 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["configuration_revision_repository"] = (
         configuration_revision_repository
     )
-    app.extensions["publication_record_repository"] = publication_record_repository
     app.extensions["data_source_settings_repository"] = data_source_settings_repository
     app.extensions["algorithm_catalog_repository"] = algorithm_catalog_repository
     app.extensions["market_data_cache_repository"] = market_data_cache_repository
@@ -279,7 +258,6 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["report_service"] = report_service
     app.extensions["evaluation_service"] = evaluation_service
     app.extensions["configuration_builder_service"] = configuration_builder_service
-    app.extensions["configuration_publish_service"] = configuration_publish_service
     app.extensions["server_control_service"] = server_control_service
 
     app.register_blueprint(home_bp)

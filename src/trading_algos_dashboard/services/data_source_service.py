@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-import importlib
 import logging
-import sys
 from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 from time import perf_counter
 from time import sleep
 from typing import Any
+from typing import Protocol
 from typing import cast
 from uuid import uuid4
 from xmlrpc.client import DateTime as XmlRpcDateTime
 from xmlrpc.client import Fault
+from xmlrpc.client import ServerProxy
 
 from trading_algos_dashboard.services.data_source_settings_service import (
     DEFAULT_DATA_SERVER_IP,
@@ -36,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class DataSourceUnavailableError(RuntimeError):
-    """Raised when the smarttrade data source cannot be accessed."""
+    """Raised when the market data source cannot be accessed."""
 
 
 class MarketDataUnavailableError(ValueError):
@@ -54,23 +53,81 @@ class MarketDataFetchResult:
     candle_count: int
 
 
-class SmarttradeDataSourceService:
+class MarketDataProxy(Protocol):
+    def ping(self) -> str: ...
+
+    def get_data(self, symbol: str, ts: datetime) -> Any: ...
+
+    def get_candles(self, symbol: str, start: datetime, end: datetime) -> Any: ...
+
+
+class XmlRpcMarketDataProxy:
+    def __init__(self, *, ip: str, port: int, timeout_seconds: float) -> None:
+        self.endpoint = f"http://{ip}:{port}"
+        self.timeout_seconds = timeout_seconds
+        self._proxy = ServerProxy(self.endpoint, allow_none=True)
+
+    def ping(self) -> str:
+        ping_with_timeout = getattr(self._proxy, "ping_with_timeout", None)
+        if callable(ping_with_timeout):
+            return str(ping_with_timeout(self.timeout_seconds))
+        ping = getattr(self._proxy, "ping", None)
+        if callable(ping):
+            return str(ping())
+        is_server_up = getattr(self._proxy, "is_server_up", None)
+        if callable(is_server_up) and bool(is_server_up()):
+            return "pong"
+        return "down"
+
+    def get_data(self, symbol: str, ts: datetime) -> Any:
+        return self._proxy.get_data(symbol, ts)
+
+    def get_candles(self, symbol: str, start: datetime, end: datetime) -> Any:
+        return self._proxy.get_candles(symbol, start, end)
+
+
+class MarketDataSourceService:
     def __init__(
         self,
         *,
-        smarttrade_path: str,
-        user_id: int,
-        endpoint_resolver: Any | None = None,
+        smarttrade_path: str | None = None,
+        user_id: int | None = None,
+        endpoint_resolver: Callable[[], tuple[str, int] | None] | None = None,
         market_data_cache: LayeredMarketDataCache | None = None,
         sleep_fn: Callable[[float], None] | None = None,
+        proxy_factory: Callable[..., MarketDataProxy] | None = None,
     ):
-        self.smarttrade_path = smarttrade_path
-        self.user_id = user_id
         self.endpoint_resolver = endpoint_resolver
         self.market_data_cache = market_data_cache or LayeredMarketDataCache(
             memory_cache=InMemoryMarketDataCache(enabled=True)
         )
         self.sleep_fn = sleep_fn or sleep
+        self.proxy_factory = proxy_factory or (
+            lambda *, ip, port, timeout_seconds: XmlRpcMarketDataProxy(
+                ip=ip,
+                port=port,
+                timeout_seconds=timeout_seconds,
+            )
+        )
+
+    def _resolved_endpoint(self) -> tuple[str, int]:
+        if self.endpoint_resolver is None:
+            return DEFAULT_DATA_SERVER_IP, DEFAULT_DATA_SERVER_PORT
+        resolved = self.endpoint_resolver()
+        if resolved is None:
+            return DEFAULT_DATA_SERVER_IP, DEFAULT_DATA_SERVER_PORT
+        return str(resolved[0]), int(resolved[1])
+
+    def _data_server_endpoint_label(self) -> str:
+        ip, port = self._resolved_endpoint()
+        return f"{ip}:{port}"
+
+    def _format_unavailable_message(self) -> str:
+        return (
+            "Market data service is unavailable. "
+            "Please make sure the data server is running. "
+            f"Tried to connect to {self._data_server_endpoint_label()}."
+        )
 
     def _is_proxy_server_up(
         self,
@@ -81,100 +138,48 @@ class SmarttradeDataSourceService:
         ping_with_timeout = getattr(proxy, "ping_with_timeout", None)
         if callable(ping_with_timeout):
             return ping_with_timeout(timeout_seconds) == "pong"
-        return bool(proxy.is_server_up())
-
-    def _resolved_endpoint_override(self) -> tuple[str, int] | None:
-        if self.endpoint_resolver is None:
-            return None
-        resolved = self.endpoint_resolver()
-        if resolved is None:
-            return None
-        return str(resolved[0]), int(resolved[1])
-
-    def _format_unavailable_message(self) -> str:
-        endpoint = self._data_server_endpoint_label()
-        return (
-            "Smarttrade data service is unavailable. "
-            "Please make sure the data server is running. "
-            f"Tried to connect to {endpoint}."
-        )
-
-    def _prepare_imports(self) -> None:
-        path = str(Path(self.smarttrade_path).resolve())
-        if path not in sys.path:
-            sys.path.insert(0, path)
-
-    def _data_server_endpoint_label(self) -> str:
-        endpoint = self._resolved_endpoint()
-        return f"{endpoint[0]}:{endpoint[1]}"
-
-    def _resolved_endpoint(self) -> tuple[str, int]:
-        override = self._resolved_endpoint_override()
-        if override is not None:
-            return override
-        self._prepare_imports()
-        try:
-            config_service_module = importlib.import_module("config.service")
-            get_config_service = getattr(config_service_module, "get_config_service")
-            config_service = get_config_service()
-            ip = str(config_service.get_effective_value("DATA_SERVER_IP"))
-            port = int(config_service.get_effective_value("DATA_SERVER_PORT"))
-            return ip, port
-        except Exception:
-            return DEFAULT_DATA_SERVER_IP, DEFAULT_DATA_SERVER_PORT
+        ping = getattr(proxy, "ping", None)
+        if callable(ping):
+            return ping() == "pong"
+        is_server_up = getattr(proxy, "is_server_up", None)
+        if callable(is_server_up):
+            return bool(is_server_up())
+        return False
 
     def get_market_data_server_details(self) -> dict[str, Any]:
         ip, port = self._resolved_endpoint()
         return {
-            "kind": "smarttrade_dataserver",
+            "kind": "xmlrpc_dataserver",
             "ip": ip,
             "port": port,
             "endpoint": f"{ip}:{port}",
-            "cache": (
-                {
-                    "enabled": self.market_data_cache.enabled,
-                    **self.market_data_cache.stats(),
-                }
-            ),
+            "cache": {
+                "enabled": self.market_data_cache.enabled,
+                **self.market_data_cache.stats(),
+            },
         }
+
+    def _data_proxy(self) -> MarketDataProxy:
+        ip, port = self._resolved_endpoint()
+        try:
+            proxy = self.proxy_factory(
+                ip=ip,
+                port=port,
+                timeout_seconds=DEFAULT_CONNECTION_CHECK_TIMEOUT_SECONDS,
+            )
+            if not self._is_proxy_server_up(proxy):
+                raise DataSourceUnavailableError(self._format_unavailable_message())
+            return proxy
+        except DataSourceUnavailableError:
+            raise
+        except Exception as exc:
+            raise DataSourceUnavailableError(
+                self._format_unavailable_message()
+            ) from exc
 
     @staticmethod
     def _clone_candles(candles: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
         return [dict(row) for row in candles]
-
-    def _create_proxy(self, *, ip: str, port: int) -> Any:
-        self._prepare_imports()
-        try:
-            online_services_module = importlib.import_module(
-                "utils_shared.online_services"
-            )
-            users_context_module = importlib.import_module(
-                "utils_shared.context.users_context_manager"
-            )
-            proxy_operations_module = importlib.import_module(
-                "utils_shared.objects_factory.proxy_operations"
-            )
-            data_proxy_class = getattr(online_services_module, "Data_Proxy")
-            users_context_manager = getattr(
-                users_context_module, "Users_Context_Manager"
-            )
-            get_or_create_proxy_obj = getattr(
-                proxy_operations_module, "get_or_create_proxy_obj"
-            )
-        except ModuleNotFoundError as exc:
-            raise DataSourceUnavailableError(
-                "Smarttrade data service dependencies are unavailable. "
-                "Run the dashboard in an environment where smarttrade is installed."
-            ) from exc
-
-        ctx = users_context_manager().get_ctx(self.user_id)
-        return get_or_create_proxy_obj(
-            ctx,
-            data_proxy_class,
-            f"DataProxyObj:{ip}:{port}",
-            ip,
-            port,
-        )
 
     @staticmethod
     def _normalize_xmlrpc_value(value: Any) -> Any:
@@ -187,18 +192,16 @@ class SmarttradeDataSourceService:
             return value.astimezone(timezone.utc)
         if isinstance(value, Mapping):
             return {
-                str(key): SmarttradeDataSourceService._normalize_xmlrpc_value(item)
+                str(key): MarketDataSourceService._normalize_xmlrpc_value(item)
                 for key, item in value.items()
             }
         if isinstance(value, tuple):
             return tuple(
-                SmarttradeDataSourceService._normalize_xmlrpc_value(item)
-                for item in value
+                MarketDataSourceService._normalize_xmlrpc_value(item) for item in value
             )
         if isinstance(value, list):
             return [
-                SmarttradeDataSourceService._normalize_xmlrpc_value(item)
-                for item in value
+                MarketDataSourceService._normalize_xmlrpc_value(item) for item in value
             ]
         return value
 
@@ -217,7 +220,7 @@ class SmarttradeDataSourceService:
             else:
                 raise TypeError("Unsupported candle row type")
         mapping.pop("_id", None)
-        normalized = SmarttradeDataSourceService._normalize_xmlrpc_value(mapping)
+        normalized = MarketDataSourceService._normalize_xmlrpc_value(mapping)
         if not isinstance(normalized, dict):
             raise TypeError("Normalized candle row must be a mapping")
         return normalized
@@ -278,34 +281,6 @@ class SmarttradeDataSourceService:
             perf_counter() - started_at_perf,
         )
         return result
-
-    def _data_proxy(self) -> Any:
-        try:
-            override = self._resolved_endpoint_override()
-            if override is None:
-                self._prepare_imports()
-                data_proxy_module = importlib.import_module(
-                    "utils_shared.objects_factory.data_proxy"
-                )
-                get_or_create_data_proxy = getattr(
-                    data_proxy_module, "get_or_create_data_proxy"
-                )
-                proxy = get_or_create_data_proxy(self.user_id)
-            else:
-                ip, port = override
-                proxy = self._create_proxy(ip=ip, port=port)
-            if not self._is_proxy_server_up(proxy):
-                raise DataSourceUnavailableError(self._format_unavailable_message())
-            return proxy
-        except ModuleNotFoundError as exc:
-            raise DataSourceUnavailableError(
-                "Smarttrade data service dependencies are unavailable. "
-                "Run the dashboard in an environment where smarttrade is installed."
-            ) from exc
-        except Exception as exc:
-            raise DataSourceUnavailableError(
-                self._format_unavailable_message()
-            ) from exc
 
     def check_connection(self) -> dict[str, Any]:
         self._data_proxy()
@@ -434,6 +409,27 @@ class SmarttradeDataSourceService:
                 return cached
             self.sleep_fn(DEFAULT_CACHE_FILL_POLL_INTERVAL_SECONDS)
         return None
+
+
+class LegacyMarketDataSourceService(MarketDataSourceService):
+    def __init__(
+        self,
+        *,
+        smarttrade_path: str | None = None,
+        user_id: int | None = None,
+        endpoint_resolver: Callable[[], tuple[str, int] | None] | None = None,
+        market_data_cache: LayeredMarketDataCache | None = None,
+        sleep_fn: Callable[[float], None] | None = None,
+        proxy_factory: Callable[..., MarketDataProxy] | None = None,
+    ):
+        super().__init__(
+            smarttrade_path=smarttrade_path,
+            user_id=user_id,
+            endpoint_resolver=endpoint_resolver,
+            market_data_cache=market_data_cache,
+            sleep_fn=sleep_fn,
+            proxy_factory=proxy_factory,
+        )
 
 
 def parse_date_range(

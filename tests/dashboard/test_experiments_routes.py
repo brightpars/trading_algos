@@ -8,7 +8,7 @@ from trading_algos_dashboard.services.data_source_service import (
     DataSourceUnavailableError,
     MarketDataFetchResult,
     MarketDataUnavailableError,
-    SmarttradeDataSourceService,
+    MarketDataSourceService,
 )
 
 
@@ -159,9 +159,7 @@ def test_new_experiment_page_renders(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     client = app.test_client()
     response = client.get("/experiments/new")
     assert response.status_code == 200
@@ -179,9 +177,7 @@ def test_bulk_experiment_page_renders(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
 
     response = app.test_client().get("/experiments/bulk")
 
@@ -216,6 +212,7 @@ def test_bulk_experiment_creates_one_queued_experiment_per_runnable_algorithm(
         data={
             "bulk_mode": "all_algorithms_for_symbol",
             "symbol": "AAPL",
+            "skip_non_executable_defaults": "true",
             "start_date": "2024-01-01",
             "start_time": "09:30",
             "end_date": "2024-01-31",
@@ -290,9 +287,7 @@ def test_bulk_experiment_returns_400_and_preserves_form_state_for_invalid_symbol
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
 
     response = app.test_client().post(
         "/experiments/bulk",
@@ -361,9 +356,7 @@ def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypa
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     draft_id = app.extensions["configuration_builder_service"].create_draft(
         {
             "config_key": "combo_breakout",
@@ -401,9 +394,7 @@ def test_new_experiment_page_prefills_selected_algorithm_from_query(monkeypatch)
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
 
     response = app.test_client().get(
         "/experiments/new?alg_key=OLD_boundary_breakout_NEW_breakout_donchian_channel"
@@ -421,9 +412,7 @@ def test_experiment_history_allows_deleting_one_experiment(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_keep",
@@ -479,9 +468,7 @@ def test_configuration_detail_offers_run_link(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     draft_id = app.extensions["configuration_builder_service"].create_draft(
         {
             "config_key": "combo_breakout",
@@ -513,9 +500,7 @@ def test_new_experiment_page_shows_recent_run_presets(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_newest",
@@ -592,9 +577,7 @@ def test_new_experiment_page_deduplicates_recent_run_presets_by_config(monkeypat
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_duplicate_newest",
@@ -698,9 +681,7 @@ def test_new_experiment_page_treats_different_time_ranges_as_distinct_presets(
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_same_algos_time_1",
@@ -748,9 +729,7 @@ def test_new_experiment_page_deduplicates_recent_configuration_run_presets(monke
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     configuration_payload = {
         "config_key": "combo_breakout",
         "name": "Combo Breakout",
@@ -810,9 +789,7 @@ def test_new_experiment_page_treats_configuration_runs_with_different_time_range
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     configuration_payload = {
         "config_key": "combo_breakout",
         "name": "Combo Breakout",
@@ -872,9 +849,7 @@ def test_create_experiment_returns_503_when_data_source_dependencies_are_missing
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
 
     monkeypatch.setattr(
         app.extensions["experiment_service"],
@@ -917,9 +892,7 @@ def test_experiment_form_reuses_cookie_values_on_next_render(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     client = app.test_client()
     client.set_cookie(
         "trading_algos_dashboard_experiment_form",
@@ -941,9 +914,7 @@ def test_create_experiment_returns_400_for_malformed_algorithm_entries(monkeypat
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     client = app.test_client()
     response = client.post(
         "/experiments",
@@ -1018,7 +989,7 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
         app.extensions["data_source_service"],
         "get_market_data_server_details",
         lambda: {
-            "kind": "smarttrade_dataserver",
+            "kind": "xmlrpc_dataserver",
             "ip": "10.0.0.5",
             "port": 7003,
             "endpoint": "10.0.0.5:7003",
@@ -1063,7 +1034,7 @@ def test_create_experiment_accepts_valid_algorithm_payload(monkeypatch, tmp_path
         }
     ]
     assert stored_experiments[0]["dataset_source"] == {
-        "kind": "smarttrade_dataserver",
+        "kind": "xmlrpc_dataserver",
         "ip": "10.0.0.5",
         "port": 7003,
         "endpoint": "10.0.0.5:7003",
@@ -1137,9 +1108,7 @@ def test_experiment_detail_shows_runtime_metadata(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_runtime",
@@ -1151,7 +1120,7 @@ def test_experiment_detail_shows_runtime_metadata(monkeypatch):
             "symbol": "AAPL",
             "status": "completed",
             "dataset_source": {
-                "kind": "smarttrade_dataserver",
+                "kind": "xmlrpc_dataserver",
                 "ip": "127.0.0.1",
                 "port": 7003,
                 "endpoint": "127.0.0.1:7003",
@@ -1209,9 +1178,7 @@ def test_experiment_detail_renders_standardized_report_sections(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_reported",
@@ -1279,9 +1246,7 @@ def test_experiment_detail_links_to_evaluations(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_linked",
@@ -1308,9 +1273,7 @@ def test_running_experiment_detail_shows_runtime_panel(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_running",
@@ -1378,9 +1341,7 @@ def test_queued_experiment_detail_shows_queue_panel(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_queued",
@@ -1429,9 +1390,7 @@ def test_experiment_history_shows_queue_sections(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_running",
@@ -1474,9 +1433,7 @@ def test_cancel_queued_experiment_removes_it_from_queue(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_queued",
@@ -1506,9 +1463,7 @@ def test_cancel_experiment_requests_graceful_stop(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_running",
@@ -1599,9 +1554,7 @@ def test_cancel_experiment_rejects_completed_experiment(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_done",
@@ -1756,7 +1709,7 @@ def test_create_experiment_returns_400_when_no_market_data_is_available(
 
 
 def test_fetch_candles_skips_missing_timestamps_when_other_data_exists():
-    service = SmarttradeDataSourceService(smarttrade_path="/tmp/smarttrade", user_id=1)
+    service = MarketDataSourceService()
 
     class _Proxy:
         def get_data(self, _symbol, ts):
@@ -1789,7 +1742,7 @@ def test_fetch_candles_skips_missing_timestamps_when_other_data_exists():
 
 
 def test_fetch_candles_raises_market_data_error_when_all_timestamps_are_missing():
-    service = SmarttradeDataSourceService(smarttrade_path="/tmp/smarttrade", user_id=1)
+    service = MarketDataSourceService()
 
     class _Proxy:
         def get_data(self, _symbol, _ts):
@@ -1813,7 +1766,7 @@ def test_fetch_candles_raises_market_data_error_when_all_timestamps_are_missing(
 
 
 def test_data_source_unavailable_message_includes_data_server_endpoint(monkeypatch):
-    service = SmarttradeDataSourceService(smarttrade_path="/tmp/smarttrade", user_id=1)
+    service = MarketDataSourceService()
 
     monkeypatch.setattr(
         service,
@@ -1822,7 +1775,7 @@ def test_data_source_unavailable_message_includes_data_server_endpoint(monkeypat
     )
 
     assert service._format_unavailable_message() == (
-        "Smarttrade data service is unavailable. "
+        "Market data service is unavailable. "
         "Please make sure the data server is running. "
         "Tried to connect to 127.0.0.1:7003."
     )
@@ -1832,9 +1785,7 @@ def test_recent_preset_does_not_double_encode_algorithms_json(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     app.extensions["experiment_repository"].create_experiment(
         {
             "experiment_id": "exp_boundary",

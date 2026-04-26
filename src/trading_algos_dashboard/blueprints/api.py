@@ -203,7 +203,4 @@ def configuration(draft_id: str):
     )
     if payload is None:
         return jsonify({"error": "not found"}), 404
-    payload["publication_records"] = current_app.extensions[
-        "configuration_publish_service"
-    ].list_records_for_draft(draft_id)
     return jsonify(payload)

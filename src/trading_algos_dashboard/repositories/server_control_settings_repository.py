@@ -5,7 +5,7 @@ from typing import Any
 
 from trading_algos_dashboard.repositories.mongo_base import MongoRepository
 
-_SETTINGS_ID = "smarttrade_server_control"
+_SETTINGS_ID = "dashboard_service_control"
 
 
 class ServerControlSettingsRepository(MongoRepository):

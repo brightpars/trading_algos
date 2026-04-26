@@ -262,33 +262,6 @@ def _decorate_revisions(revisions: list[dict[str, object]]) -> list[dict[str, ob
     return list(reversed(decorated))
 
 
-def _decorate_publication_records(
-    records: list[dict[str, object]],
-) -> list[dict[str, object]]:
-    decorated: list[dict[str, object]] = []
-    for record in records:
-        remote_status = str(record.get("remote_status") or "unknown")
-        status_class = {
-            "published": "success",
-            "active": "success",
-            "warning": "warning",
-            "failed": "danger",
-            "error": "danger",
-        }.get(remote_status, "secondary")
-        result = record.get("result") or {}
-        result_dict = result if isinstance(result, dict) else {}
-        decorated.append(
-            {
-                **record,
-                "status_class": status_class,
-                "status_label": remote_status.replace("_", " ").title(),
-                "remote_version": result_dict.get("version")
-                or record.get("remote_version"),
-            }
-        )
-    return decorated
-
-
 @bp.get("")
 def list_configurations():
     drafts = current_app.extensions["configuration_builder_service"].list_drafts()
@@ -393,56 +366,7 @@ def detail_configuration(draft_id: str):
     payload["structure_tree"] = _build_structure_tree(draft_payload)
     payload["summary"] = _build_configuration_summary(draft_payload)
     payload["revisions"] = _decorate_revisions(payload["revisions"])
-    payload["publication_records"] = _decorate_publication_records(
-        current_app.extensions["configuration_publish_service"].list_records_for_draft(
-            draft_id
-        )
-    )
     return render_template("configurations/detail.html", **payload)
-
-
-@bp.post("/<draft_id>/validate-remote")
-def validate_configuration_remote(draft_id: str):
-    payload = current_app.extensions["configuration_builder_service"].get_draft_detail(
-        draft_id
-    )
-    if payload is None:
-        abort(404)
-    try:
-        result = current_app.extensions[
-            "configuration_publish_service"
-        ].validate_remote(payload["draft"]["payload"])
-    except Exception as exc:
-        flash(f"Remote validation failed: {exc}", "danger")
-    else:
-        compatibility = result.get("compatibility", {})
-        flash(
-            f"Remote validation ok. compatibility_state={compatibility.get('compatibility_state', 'unknown')}",
-            "success",
-        )
-    return redirect(url_for("configurations.detail_configuration", draft_id=draft_id))
-
-
-@bp.post("/<draft_id>/publish")
-def publish_configuration(draft_id: str):
-    payload = current_app.extensions["configuration_builder_service"].get_draft_detail(
-        draft_id
-    )
-    if payload is None:
-        abort(404)
-    try:
-        result = current_app.extensions["configuration_publish_service"].publish(
-            draft_id=draft_id,
-            payload=payload["draft"]["payload"],
-        )
-    except Exception as exc:
-        flash(f"Publish failed: {exc}", "danger")
-    else:
-        flash(
-            f"Published configuration remote_config_id={result.get('config_id', 'unknown')}",
-            "success",
-        )
-    return redirect(url_for("configurations.detail_configuration", draft_id=draft_id))
 
 
 @bp.post("/<draft_id>/delete")

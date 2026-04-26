@@ -10,9 +10,7 @@ def test_evaluations_index_renders(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
 
     response = app.test_client().get("/evaluations")
 
@@ -25,9 +23,7 @@ def test_evaluations_index_renders_comparable_cohort_list(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     start = datetime(2024, 2, 1, 9, 30, tzinfo=timezone.utc)
     end = datetime(2024, 2, 3, 16, 0, tzinfo=timezone.utc)
     app.extensions["experiment_repository"].create_experiment(
@@ -59,9 +55,7 @@ def test_evaluations_cohort_renders_matching_completed_runs(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
     start = datetime(2024, 2, 1, 9, 30, tzinfo=timezone.utc)
     end = datetime(2024, 2, 3, 16, 0, tzinfo=timezone.utc)
     app.extensions["experiment_repository"].create_experiment(
@@ -115,9 +109,7 @@ def test_evaluations_cohort_returns_400_for_invalid_range(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    app = create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
 
     response = app.test_client().get(
         "/evaluations/cohort?symbol=AAPL&start_date=2024-02-03&start_time=16:00&end_date=2024-02-01&end_time=09:30"

@@ -71,9 +71,7 @@ def _build_app(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
     )
-    return create_app(
-        DashboardConfig("x", "mongodb://example", "db", "reports", "/tmp/smarttrade", 1)
-    )
+    return create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
 
 
 def test_home_page_renders_saved_data_source_settings(monkeypatch):
