@@ -12,6 +12,10 @@ from trading_servers import DataServer
 from trading_servers import FakeDateTimeServer
 from trading_servers.xmlrpc_server import Base_XML_RPC_Server
 
+from trading_algos_dashboard.services.engines_control_runtime_service import (
+    EnginesControlRuntimeService,
+)
+
 
 @dataclass(frozen=True)
 class ServiceRuntimeConfig:
@@ -42,6 +46,15 @@ class MongoCounterRepository:
 
 
 class DashboardEnginesControlServer(Base_XML_RPC_Server):
+    def __init__(
+        self,
+        *args: Any,
+        runtime_service: EnginesControlRuntimeService | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._runtime_service = runtime_service or EnginesControlRuntimeService()
+
     def start_decision_maker(self, _obj: Any) -> int:
         self.reject_if_shutting_down()
         return 0
@@ -58,11 +71,17 @@ class DashboardEnginesControlServer(Base_XML_RPC_Server):
         self.reject_if_shutting_down()
         return 0
 
+    def run_backtrace(self, request: Any) -> dict[str, Any]:
+        self.reject_if_shutting_down()
+        result = self._runtime_service.run_backtrace(request)
+        return dict(result)
+
     def register_all_functions(self) -> None:
         self.server.register_function(self.start_decision_maker)
         self.server.register_function(self.run_alertgen_and_sensors)
         self.server.register_function(self.run_all_engines)
         self.server.register_function(self.stop_all_engines)
+        self.server.register_function(self.run_backtrace)
 
 
 def _build_config() -> ServiceRuntimeConfig:
