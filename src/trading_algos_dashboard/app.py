@@ -9,6 +9,7 @@ from trading_algos_dashboard.blueprints.algorithms import bp as algorithms_bp
 from trading_algos_dashboard.blueprints.administration import bp as administration_bp
 from trading_algos_dashboard.blueprints.configurations import bp as configurations_bp
 from trading_algos_dashboard.blueprints.api import bp as api_bp
+from trading_algos_dashboard.blueprints.backtraces import bp as backtraces_bp
 from trading_algos_dashboard.blueprints.evaluations import bp as evaluations_bp
 from trading_algos_dashboard.blueprints.experiments import bp as experiments_bp
 from trading_algos_dashboard.blueprints.home import bp as home_bp
@@ -96,6 +97,9 @@ from trading_algos_dashboard.services.report_service import ReportService
 from trading_algos_dashboard.services.server_control_service import ServerControlService
 from trading_algos_dashboard.services.backtrace_client_service import (
     BacktraceClientService,
+)
+from trading_algos_dashboard.services.backtrace_dashboard_service import (
+    BacktraceDashboardService,
 )
 from trading_algos_dashboard.services.engines_control_runtime_service import (
     EnginesControlRuntimeService,
@@ -226,6 +230,9 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         runtime_service=engines_control_runtime_service,
         backtrace_session_repository=backtrace_session_repository,
     )
+    backtrace_dashboard_service = BacktraceDashboardService(
+        backtrace_client_service=backtrace_client_service,
+    )
 
     app.extensions["mongo"] = mongo
     app.extensions["experiment_repository"] = experiment_repository
@@ -279,9 +286,11 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     app.extensions["server_control_service"] = server_control_service
     app.extensions["engines_control_runtime_service"] = engines_control_runtime_service
     app.extensions["backtrace_client_service"] = backtrace_client_service
+    app.extensions["backtrace_dashboard_service"] = backtrace_dashboard_service
 
     app.register_blueprint(home_bp)
     app.register_blueprint(algorithms_bp)
+    app.register_blueprint(backtraces_bp)
     app.register_blueprint(administration_bp)
     app.register_blueprint(configurations_bp)
     app.register_blueprint(experiments_bp)

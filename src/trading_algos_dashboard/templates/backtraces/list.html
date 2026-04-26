@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Backtrace Runs{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="mb-1">Backtrace runs</h1>
+    <p class="text-muted mb-0">Recent manual backtrace submissions and their results.</p>
+  </div>
+  <a class="btn btn-primary" href="{{ url_for('backtraces.new_backtrace') }}">New backtrace</a>
+</div>
+
+{% if runs %}
+<div class="table-responsive">
+  <table class="table table-striped align-middle">
+    <thead>
+      <tr>
+        <th>Run</th>
+        <th>Status</th>
+        <th>Algorithm</th>
+        <th>Symbol</th>
+        <th>Input summary</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in runs %}
+      <tr>
+        <td><code>{{ run.run_id }}</code></td>
+        <td>
+          <span class="badge {% if run.status == 'completed' %}text-bg-success{% else %}text-bg-danger{% endif %}">
+            {{ run.status }}
+          </span>
+        </td>
+        <td><code>{{ run.algorithm_key }}</code></td>
+        <td>{{ run.symbol }}</td>
+        <td>
+          <div class="small">{{ run.input_summary_text }}</div>
+          {% if run.error %}
+          <div class="text-danger small mt-1">{{ run.error }}</div>
+          {% endif %}
+        </td>
+        <td>{{ run.created_at or '—' }}</td>
+        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('backtraces.detail_backtrace', run_id=run.run_id) }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="alert alert-secondary">
+  No backtrace runs yet. <a href="{{ url_for('backtraces.new_backtrace') }}">Create the first run</a>.
+</div>
+{% endif %}
+{% endblock %}

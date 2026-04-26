@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}New Backtrace{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="mb-1">Manual backtrace</h1>
+    <p class="text-muted mb-0">Submit a simplified backtrace run with manual JSON input.</p>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('backtraces.list_backtraces') }}">View recent runs</a>
+</div>
+
+<form method="post" action="{{ url_for('backtraces.create_backtrace') }}" class="row g-3">
+  <div class="col-md-6">
+    <label class="form-label" for="algorithm_key">Algorithm key</label>
+    <input id="algorithm_key" class="form-control" name="algorithm_key" value="{{ form_data.algorithm_key }}" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label" for="symbol">Symbol</label>
+    <input id="symbol" class="form-control" name="symbol" value="{{ form_data.symbol }}" required>
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="algorithm_params_json">Params JSON</label>
+    <textarea id="algorithm_params_json" class="form-control font-monospace" rows="6" name="algorithm_params_json">{{ form_data.algorithm_params_json }}</textarea>
+    <div class="form-text">Example: {"window": 20}</div>
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="candles_json">Candles JSON</label>
+    <textarea id="candles_json" class="form-control font-monospace" rows="14" name="candles_json" required>{{ form_data.candles_json }}</textarea>
+    <div class="form-text">Provide an array of candle objects with ts, Open, High, Low, and Close.</div>
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="metadata_json">Metadata JSON</label>
+    <textarea id="metadata_json" class="form-control font-monospace" rows="6" name="metadata_json">{{ form_data.metadata_json }}</textarea>
+    <div class="form-text">Optional JSON object for labels or notes.</div>
+  </div>
+  <div class="col-12">
+    <button class="btn btn-primary" type="submit">Run backtrace</button>
+  </div>
+</form>
+{% endblock %}

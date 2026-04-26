@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Backtrace {{ run.run_id }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="mb-1">Backtrace result</h1>
+    <p class="text-muted mb-0"><code>{{ run.run_id }}</code></p>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{{ url_for('backtraces.list_backtraces') }}">Back to runs</a>
+    <a class="btn btn-primary" href="{{ url_for('backtraces.new_backtrace') }}">New backtrace</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="border rounded p-3 h-100 bg-light">
+      <div class="text-muted small">Status</div>
+      <div class="fw-semibold">{{ run.status }}</div>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="border rounded p-3 h-100 bg-light">
+      <div class="text-muted small">Algorithm key</div>
+      <div><code>{{ run.algorithm_key }}</code></div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="border rounded p-3 h-100 bg-light">
+      <div class="text-muted small">Symbol</div>
+      <div class="fw-semibold">{{ run.symbol }}</div>
+    </div>
+  </div>
+  <div class="col-md-2">
+    <div class="border rounded p-3 h-100 bg-light">
+      <div class="text-muted small">Candles</div>
+      <div class="fw-semibold">{{ run.input_summary.candle_count if run.input_summary else 0 }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h5">Input summary</h2>
+        <ul class="mb-3">
+          <li><strong>Params keys:</strong> {{ run.algorithm_params.keys()|list }}</li>
+          <li><strong>Metadata keys:</strong> {{ run.metadata.keys()|list }}</li>
+          <li><strong>Started:</strong> {{ run.started_at or '—' }}</li>
+          <li><strong>Finished:</strong> {{ run.finished_at or '—' }}</li>
+        </ul>
+        <h3 class="h6">Candle preview</h3>
+        <pre class="small bg-light p-3 rounded mb-0">{{ run.candles_preview|tojson(indent=2) }}</pre>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h5">Signal and evaluation summary</h2>
+        <h3 class="h6 mt-3">Signal summary</h3>
+        <pre class="small bg-light p-3 rounded">{{ run.signal_summary|tojson(indent=2) }}</pre>
+        <h3 class="h6">Evaluation summary</h3>
+        <pre class="small bg-light p-3 rounded mb-0">{{ run.evaluation_summary|tojson(indent=2) }}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="h5">Execution steps</h2>
+        {% if run.execution_steps %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Step</th>
+                <th>Started</th>
+                <th>Finished</th>
+                <th>Metadata</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for step in run.execution_steps %}
+              <tr>
+                <td>{{ step.label or step.step }}</td>
+                <td>{{ step.started_at or '—' }}</td>
+                <td>{{ step.finished_at or '—' }}</td>
+                <td><code>{{ step.metadata or {} }}</code></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0">No execution steps recorded.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h5">Diagnostics / error</h2>
+        {% if run.error %}
+        <div class="alert alert-danger">{{ run.error }}</div>
+        {% endif %}
+        <pre class="small bg-light p-3 rounded mb-0">{{ (run.report.diagnostics if run.report else {})|tojson(indent=2) }}</pre>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h2 class="h5">Report / chart summary</h2>
+        <ul>
+          <li><strong>Report version:</strong> {{ run.report.report_version if run.report else '—' }}</li>
+          <li><strong>Chart payload keys:</strong> {{ run.chart_payload.keys()|list }}</li>
+          <li><strong>Charts:</strong> {{ run.report.charts|length if run.report and run.report.charts else 0 }}</li>
+          <li><strong>Tables:</strong> {{ run.report.tables|length if run.report and run.report.tables else 0 }}</li>
+        </ul>
+        <pre class="small bg-light p-3 rounded mb-0">{{ run.report|tojson(indent=2) }}</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
+    <details>
+      <summary>Raw JSON</summary>
+      <div class="row g-3 mt-1">
+        <div class="col-lg-6">
+          <h3 class="h6">Request</h3>
+          <pre class="small bg-light p-3 rounded mb-0">{{ run.request_json }}</pre>
+        </div>
+        <div class="col-lg-6">
+          <h3 class="h6">Result</h3>
+          <pre class="small bg-light p-3 rounded mb-0">{{ run.full_result_json }}</pre>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>
+{% endblock %}
