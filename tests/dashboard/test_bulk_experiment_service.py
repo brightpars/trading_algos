@@ -31,6 +31,17 @@ class _AlgorithmCatalogServiceStub:
                 "status": "runnable",
                 "default_param": {"window": 2},
             },
+            {
+                "key": "delta_neutral_volatility_trading",
+                "name": "Delta Neutral Volatility Trading",
+                "status": "runnable",
+                "default_param": {
+                    "rows": [],
+                    "iv_rv_threshold": 0.05,
+                    "min_gamma": 0.01,
+                    "target_delta_band": 0.1,
+                },
+            },
         ]
 
     def list_runnable_algorithm_implementations(self) -> list[dict[str, Any]]:
@@ -59,14 +70,85 @@ def test_submit_all_algorithms_for_symbol_creates_one_experiment_per_algorithm()
         notes="bulk notes",
     )
 
-    assert result.created_count == 2
-    assert len(experiment_service.calls) == 2
+    assert result.created_count == 3
+    assert result.skipped_count == 0
+    assert len(experiment_service.calls) == 3
     assert experiment_service.calls[0]["algorithms"] == [
         {"alg_key": "boundary_breakout", "alg_param": {"window": 5}}
     ]
     assert experiment_service.calls[1]["algorithms"] == [
         {"alg_key": "close_high_channel_breakout", "alg_param": {"window": 2}}
     ]
+    assert experiment_service.calls[2]["algorithms"] == [
+        {
+            "alg_key": "delta_neutral_volatility_trading",
+            "alg_param": {
+                "rows": [],
+                "iv_rv_threshold": 0.05,
+                "min_gamma": 0.01,
+                "target_delta_band": 0.1,
+            },
+        }
+    ]
+
+
+def test_submit_all_algorithms_for_symbol_skips_non_executable_defaults_when_enabled() -> (
+    None
+):
+    experiment_service = _ExperimentServiceStub()
+    service = BulkExperimentService(
+        experiment_service=experiment_service,
+        algorithm_catalog_service=_AlgorithmCatalogServiceStub(),
+    )
+
+    result = service.submit_all_algorithms_for_symbol(
+        symbol="AAPL",
+        start_date="2024-01-01",
+        start_time="09:30",
+        end_date="2024-01-31",
+        end_time="16:00",
+        skip_non_executable_defaults=True,
+    )
+
+    assert result.created_count == 2
+    assert result.skipped_count == 1
+    assert result.skipped_algorithms == ["delta_neutral_volatility_trading"]
+    assert len(experiment_service.calls) == 2
+
+
+def test_submit_all_algorithms_for_symbol_includes_alg_key_in_validation_error() -> (
+    None
+):
+    class _FailingExperimentServiceStub(_ExperimentServiceStub):
+        def create_experiment(self, **kwargs: Any) -> str:
+            algorithm = kwargs["algorithms"][0]
+            if algorithm["alg_key"] == "delta_neutral_volatility_trading":
+                raise ValueError(
+                    "Alert generator sensor_config alg_param rows must be a non-empty list"
+                )
+            return super().create_experiment(**kwargs)
+
+    experiment_service = _FailingExperimentServiceStub()
+    service = BulkExperimentService(
+        experiment_service=experiment_service,
+        algorithm_catalog_service=_AlgorithmCatalogServiceStub(),
+    )
+
+    try:
+        service.submit_all_algorithms_for_symbol(
+            symbol="AAPL",
+            start_date="2024-01-01",
+            start_time="09:30",
+            end_date="2024-01-31",
+            end_time="16:00",
+        )
+    except ValueError as exc:
+        assert str(exc) == (
+            "Bulk submission failed for alg_key=delta_neutral_volatility_trading: "
+            "Alert generator sensor_config alg_param rows must be a non-empty list"
+        )
+    else:
+        raise AssertionError("Expected ValueError with alg_key context")
 
 
 def test_submit_single_algorithm_for_symbols_normalizes_and_deduplicates_symbols():

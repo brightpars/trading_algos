@@ -49,6 +49,17 @@
             <textarea class="form-control" rows="3" name="notes">{{ form_data.notes }}</textarea>
           </div>
           <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="skip_non_executable_defaults" value="true" id="skip-non-executable-defaults" {% if form_data.skip_non_executable_defaults == 'true' %}checked{% endif %}>
+              <label class="form-check-label" for="skip-non-executable-defaults">
+                Skip algorithms whose default params are not directly executable
+              </label>
+            </div>
+            <div class="form-text">
+              When enabled, algorithms with placeholder defaults such as empty <code>rows</code> lists are skipped instead of failing the whole bulk submission.
+            </div>
+          </div>
+          <div class="col-12">
             <button class="btn btn-primary" type="submit">Queue all runnable algorithms</button>
           </div>
         </form>

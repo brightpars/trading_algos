@@ -74,6 +74,9 @@ from trading_algos_dashboard.services.experiment_service import ExperimentServic
 from trading_algos_dashboard.services.bulk_experiment_service import (
     BulkExperimentService,
 )
+from trading_algos_dashboard.services.cache_management_service import (
+    CacheManagementService,
+)
 from trading_algos_dashboard.services.evaluation_service import EvaluationService
 from trading_algos_dashboard.services.experiment_runtime_settings_service import (
     ExperimentRuntimeSettingsService,
@@ -164,6 +167,10 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         ),
         market_data_cache=market_data_cache,
     )
+    cache_management_service = CacheManagementService(
+        market_data_cache=market_data_cache,
+        data_source_service=data_source_service,
+    )
     experiment_service = ExperimentService(
         experiment_repository=experiment_repository,
         result_repository=result_repository,
@@ -248,6 +255,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
         market_data_cache_settings_service
     )
     app.extensions["data_source_service"] = data_source_service
+    app.extensions["cache_management_service"] = cache_management_service
     app.extensions["experiment_service"] = experiment_service
     app.extensions["bulk_experiment_service"] = bulk_experiment_service
     app.extensions["administration_service"] = administration_service

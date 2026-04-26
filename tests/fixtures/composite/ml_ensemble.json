@@ -1,0 +1,56 @@
+[
+  {
+    "timestamp": "2025-01-01",
+    "meta_features": {
+      "regime_confidence": 0.2,
+      "breadth": 0.1
+    },
+    "child_outputs": [
+      {
+        "child_key": "model_a",
+        "signal_label": "buy",
+        "score": 0.7,
+        "confidence": 0.8
+      },
+      {
+        "child_key": "model_b",
+        "signal_label": "buy",
+        "score": 0.5,
+        "confidence": 0.7
+      },
+      {
+        "child_key": "model_c",
+        "signal_label": "neutral",
+        "score": 0.1,
+        "confidence": 0.4
+      }
+    ]
+  },
+  {
+    "timestamp": "2025-01-02",
+    "meta_features": {
+      "regime_confidence": -0.3,
+      "breadth": -0.2
+    },
+    "child_outputs": [
+      {
+        "child_key": "model_a",
+        "signal_label": "sell",
+        "score": -0.8,
+        "confidence": 0.9
+      },
+      {
+        "child_key": "model_b",
+        "signal_label": "sell",
+        "score": -0.6,
+        "confidence": 0.8
+      },
+      {
+        "child_key": "model_c",
+        "signal_label": "neutral",
+        "score": -0.1,
+        "confidence": 0.5
+      }
+    ]
+  }
+]

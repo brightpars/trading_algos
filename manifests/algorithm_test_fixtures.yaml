@@ -9,6 +9,9 @@ fixtures:
   - Fast moving average crosses slow moving average exactly once
   - Buy event occurs on the first positive crossover
   - No sell event appears later in the fixture horizon
+  - Short-history evaluation remains neutral until warmup is satisfied
+  - Normalized outputs include trend score, regime label, spread, confirmation state, warmup readiness, and reason codes for dashboard explanation
+  - Registration metadata and catalog references remain aligned with the manifest row and dashboard payloads
 - fixture_id: fixture.trend_whipsaw_guard_v1
   domain: single_asset_ohlcv
   purpose: Sideways price action used to validate anti-whipsaw filters.
@@ -17,6 +20,8 @@ fixtures:
   expected_behaviors:
   - Trend algorithms produce fewer events when a minimum-spread or confirmation filter is enabled
   - No lookahead is required to suppress noisy crossover churn
+  - Guarded variants can stay neutral when alignment is insufficient to justify a trade
+  - Diagnostics expose confirmation state, pending-versus-confirmed reason codes, and alignment context for churn explanation
 - fixture_id: fixture.momentum_sustained_up_v1
   domain: single_asset_ohlcv
   purpose: Sustained price continuation for single-asset momentum checks.
@@ -25,11 +30,16 @@ fixtures:
   expected_behaviors:
   - Momentum score rises above bullish threshold
   - No bearish reversal occurs while continuation remains intact
+  - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - KST signal-cross configurations may remain neutral when the oscillator stays positive but does not clear its signal line, while zero-cross mode can still promote a bullish regime
+  - Volume-confirmed momentum stays neutral with explicit confirmation-missing reason codes when price momentum is strong but relative volume stays below the configured gate
+  - Diagnostics expose primary value, threshold context, regime label, and reason codes for dashboard explanation
+  - Normalized output metadata identifies momentum family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.momentum_cross_sectional_ranking_v1
   domain: multi_asset_panel
   purpose: Deterministic ranking of a small universe on rebalance dates.
   inputs:
-    dataset_path: tests/fixtures/momentum/cross_sectional_ranking.parquet
+    dataset_path: tests/fixtures/momentum/cross_sectional_ranking.csv
   expected_behaviors:
   - Known winners rank above known losers on the target rebalance date
   - Selection list is reproducible under the declared ranking rule
@@ -41,6 +51,10 @@ fixtures:
   expected_behaviors:
   - Stretch metric reaches entry threshold once
   - Strategy exits when price or indicator reverts toward mean
+  - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - Overshoot-aware mean-reversion algorithms can emit at least one bullish reversion signal on the downside stretch
+  - Diagnostics expose primary value, signal value, threshold context, exit value, confirmation state, and reason codes for dashboard explanation
+  - Normalized output metadata identifies mean_reversion family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.mean_reversion_range_oscillation_v1
   domain: single_asset_ohlcv
   purpose: Range-bound oscillation used to validate repeated mean-reversion behavior.
@@ -57,6 +71,11 @@ fixtures:
   expected_behaviors:
   - Compression flag turns on before breakout
   - Breakout signal appears only after expansion begins
+  - ATR-channel breakout stays neutral during compression and promotes a bullish breakout only after price clears the dynamic upper band
+  - Volatility mean reversion emits a sell or short-vol style signal only after realized volatility rises materially above its rolling baseline
+  - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - Diagnostics expose compression state, breakout level or ATR bands, realized-volatility ratio context, confirmation state, warmup readiness, and reason codes for dashboard explanation
+  - Normalized output metadata identifies volatility_options family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.pattern_support_rejection_v1
   domain: single_asset_ohlcv
   purpose: Support touch followed by clear rejection.
@@ -65,6 +84,11 @@ fixtures:
   expected_behaviors:
   - Support touch is detected inside configured buffer
   - Buy signal requires rejection confirmation, not just a touch
+  - Short-history evaluation remains neutral until each algorithm warmup is satisfied
+  - Support-bounce diagnostics expose support level, touch distance, rejection strength, warmup readiness, and reason codes for dashboard explanation
+  - Breakout-retest stays neutral with awaiting-breakout diagnostics when the fixture does not contain a qualifying breakout-retest sequence
+  - Pivot and inside-bar variants can remain neutral while still exposing nearest-level or mother-bar diagnostics needed to explain why no trade was taken
+  - Normalized output metadata identifies pattern_price_action family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.pattern_opening_range_breakout_v1
   domain: intraday_ohlcv
   purpose: Opening range with one clean breakout direction.
@@ -73,6 +97,9 @@ fixtures:
   expected_behaviors:
   - Opening range is frozen after configured window
   - Breakout signal occurs only after range is fully defined
+  - Short-history evaluation remains neutral until the opening-range warmup is satisfied
+  - Diagnostics expose opening-range high and low, session label, session minute, range-complete state, breakout distance, warmup readiness, and reason codes for dashboard explanation
+  - Normalized output metadata identifies pattern_price_action family, bar-series reporting mode, and catalog reference for child-algorithm composition
 - fixture_id: fixture.cross_asset_carry_ranking_v1
   domain: multi_asset_panel
   purpose: Small carry universe with deterministic ranking.
@@ -93,50 +120,69 @@ fixtures:
   domain: fundamentals_pti
   purpose: Monthly factor rebalance with point-in-time accounting inputs.
   inputs:
-    dataset_path: tests/fixtures/factors/monthly_rebalance.parquet
+    dataset_path: tests/fixtures/factors/monthly_rebalance.csv
   expected_behaviors:
   - Factor scores are reproducible under point-in-time data
   - Rebalance output is generated only on scheduled dates
+  - Low-volatility and low-beta variants prefer AAA on the first monthly rebalance and BBB on the second monthly rebalance
+  - Dividend yield prefers CCC across both monthly rebalances while growth and liquidity rotate from AAA to BBB
+  - Normalized outputs expose selected symbols, weights, ranking details, selection strength, exposure counts, and top-ranked diagnostics for dashboard explanation
+  - Short-history evaluations remain neutral with warmup_pending reason codes until minimum universe size is met
 - fixture_id: fixture.event_earnings_after_close_v1
   domain: event_calendar
   purpose: Earnings event arriving after close and traded next valid window.
   inputs:
-    dataset_path: tests/fixtures/events/earnings_after_close.parquet
+    dataset_path: tests/fixtures/events/earnings_after_close.csv
   expected_behaviors:
   - Event window starts from the correct public availability point
   - No signal appears before the after-close announcement timestamp
+  - Short-history evaluation remains neutral with warmup_pending reason codes until the first post-warmup bar is available
+  - Diagnostics expose event_window_active, event_window_phase, event_anchor_timestamp, warmup_ready, and decision_reason for dashboard explanation
+  - Interactive report payloads preserve metadata, summary metrics, and latest child diagnostics for event-window reporting
 - fixture_id: fixture.event_index_rebalance_window_v1
   domain: event_calendar
   purpose: Index add/delete flow window around a rebalance event.
   inputs:
-    dataset_path: tests/fixtures/events/index_rebalance.parquet
+    dataset_path: tests/fixtures/events/index_rebalance.csv
   expected_behaviors:
   - Expected flow direction is attached to the right symbols
   - Signal exists only inside the configured rebalance window
+  - Non-bullish event phases remain neutral with explicit phase-filtered or inactive reason codes
+  - Short-history evaluation remains neutral with warmup_pending reason codes until the first actionable window bar is available
+  - Diagnostics expose event_type, event_window_phase, expected flow context, warmup readiness, and decision_reason for dashboard explanation
 - fixture_id: fixture.statarb_pair_divergence_reversion_v1
   domain: pair_prices
   purpose: Stable pair with one temporary spread divergence and convergence.
   inputs:
-    dataset_path: tests/fixtures/stat_arb/pair_divergence.parquet
+    dataset_path: tests/fixtures/stat_arb/pair_divergence.csv
   expected_behaviors:
   - Spread z-score crosses entry threshold during divergence
   - Paired trade exits when spread normalizes
+  - Short-history evaluation remains neutral with warmup_pending reason codes until aligned pair history satisfies the configured minimum history
+  - Distance and cointegration variants expose spread_value, zscore, hedge_ratio, spread_direction, active_legs, selected_symbol, and decision_reason diagnostics for dashboard explanation
+  - Multi-leg outputs retain per-leg side, weight, quantity_scale, and leg-role diagnostics so paired positions serialize cleanly despite framework blockers remaining open
 - fixture_id: fixture.relative_value_curve_spread_v1
   domain: multi_leg_curve_data
   purpose: Simple curve-spread distortion for relative-value strategies.
   inputs:
-    dataset_path: tests/fixtures/relative_value/curve_spread.parquet
+    dataset_path: tests/fixtures/relative_value/curve_spread.csv
   expected_behaviors:
   - Curve-spread metric becomes extreme on known dates
   - Strategy emits paired-leg directions rather than one-sided signal
+  - Basket and funding-style relative-value variants preserve normalized leg payloads, gross and net exposure fields, and hedge-ratio context in dashboard-facing diagnostics
+  - Carry- or basis-aware variants remain neutral when carry distortion stays below threshold and explain the suppression with explicit decision reasons
 - fixture_id: fixture.options_iv_rv_gap_v1
   domain: options_surface
   purpose: Implied-versus-realized volatility gap for options strategies.
   inputs:
-    dataset_path: tests/fixtures/options/iv_rv_gap.parquet
+    dataset_path: tests/fixtures/options/iv_rv_gap.csv
   expected_behaviors:
   - Volatility-premium measure rises above configured threshold
   - Signal reflects the configured long-vol or short-vol policy
+  - Delta-neutral and gamma-scalping variants remain neutral during warmup and expose hedge, greek, and selection diagnostics for dashboard explanation
+  - Dispersion, skew, and term-structure variants emit directionally distinct signals when the fixture alternates between rich and cheap surface regimes
+  - Straddle-timing remains neutral when expected move does not clear priced move by threshold and explains the suppression with explicit reason codes
+  - Normalized outputs expose underlying symbol, selected contracts, contract count, warmup readiness, and decision reason fields for dashboard explanation
 - fixture_id: fixture.execution_twap_schedule_v1
   domain: execution_schedule
   purpose: Simple TWAP schedule with catch-up behavior.
@@ -177,6 +223,8 @@ fixtures:
   expected_behaviors:
   - AND, OR, and majority rules match expected truth-table rows
   - Tie and veto policies produce deterministic final states
+  - Short child sets remain neutral until the aligned child set is complete
+  - Diagnostics expose vote counts, warmup readiness, and child contribution rows for dashboard explanation
 - fixture_id: fixture.composite_weighted_blend_v1
   domain: child_output_stream
   purpose: Weighted-score blend across aligned child strategies.
@@ -185,38 +233,52 @@ fixtures:
   expected_behaviors:
   - Weighted sum matches expected numeric result
   - Final thresholds map the score to the expected state
+  - Score and confidence inputs are clamped into normalized output ranges before threshold mapping
+  - Incomplete child sets remain neutral and expose warmup diagnostics until all children are aligned
 - fixture_id: fixture.composite_rank_aggregation_v1
   domain: cross_sectional_child_outputs
   purpose: Cross-sectional rank aggregation on a small universe.
   inputs:
-    dataset_path: tests/fixtures/composite/rank_aggregation.parquet
+    dataset_path: tests/fixtures/composite/rank_aggregation.json
   expected_behaviors:
   - Aggregate rank is reproducible from the child ranks
   - Top-k selection matches expected result
+  - Assets missing enough child rank or score inputs remain excluded with warmup_pending diagnostics until minimum_child_count is satisfied
+  - Diagnostics expose selected symbols, top-ranked symbol, selection strength, missing symbols, and reason codes for dashboard explanation
+  - Interactive report payloads preserve catalog reference alignment between normalized output and portfolio-weight output
 - fixture_id: fixture.composite_risk_budget_v1
   domain: strategy_return_streams
   purpose: Risk-budget allocation across multiple sleeves.
   inputs:
-    dataset_path: tests/fixtures/composite/risk_budget.parquet
+    dataset_path: tests/fixtures/composite/risk_budget.json
   expected_behaviors:
   - Risk contribution targets are reflected in output weights
   - Weight changes are stable under the configured rebalance cadence
+  - Warmup remains neutral with explicit insufficient-history sleeve diagnostics until min_history is satisfied
+  - Diagnostics expose selected sleeves, realized sleeve volatility, mean return context, risk contributions, gross exposure, and reason codes for dashboard explanation
+  - Volatility-targeting overlays using the same return stream fixture expose realized volatility, applied leverage, selected symbols, and warmup readiness in allocation diagnostics
 - fixture_id: fixture.composite_regime_switch_v1
   domain: regime_features
   purpose: Regime-gated child activation with explicit state changes.
   inputs:
-    dataset_path: tests/fixtures/composite/regime_switch.parquet
+    dataset_path: tests/fixtures/composite/regime_switch.json
   expected_behaviors:
   - Regime label flips on the known transition
   - Active child set changes according to regime map
+  - Diagnostics expose regime probabilities, active and gated child keys, warmup readiness, and child contribution rows for dashboard explanation
+  - Regime child payloads retain both active and gated children so the dashboard can explain why a sleeve was suppressed
 - fixture_id: fixture.composite_ml_ensemble_v1
   domain: model_prediction_streams
   purpose: Aggregation of child model predictions into one final prediction.
   inputs:
-    dataset_path: tests/fixtures/composite/ml_ensemble.parquet
+    dataset_path: tests/fixtures/composite/ml_ensemble.json
   expected_behaviors:
   - Meta-aggregation is deterministic for the fixture
   - Final thresholded state matches expected result
+  - Bagging remains neutral until min_history is satisfied, then emits the expected sell state with threshold and child-contribution diagnostics
+  - Boosting honors learning-rate and stage-weight inputs while preserving normalized score and confidence ranges
+  - Stacking exposes meta-feature values, meta-model adjustments, latest diagnostics, and interactive-report payload fields needed for dashboard explanation
+  - Short-history and incomplete-child-set evaluations remain neutral with explicit warmup reason codes and expected-versus-actual child-count diagnostics
 - fixture_id: fixture.composite_rl_policy_stub_v1
   domain: rl_environment
   purpose: Stub environment for RL allocation and hierarchical policy plumbing.
@@ -225,3 +287,7 @@ fixtures:
   expected_behaviors:
   - State vector is parsed deterministically
   - Policy action maps cleanly to output allocation structure
+  - Warmup-pending rows remain neutral with explicit environment-contract and reason-code diagnostics until min_history is satisfied
+  - Action alias, override, and template fallback configuration preserves normalized gross-exposure limits and resolved action metadata
+  - Hierarchical policy gating restricts actions to the preferred family while preserving preferred-family diagnostics in normalized and portfolio outputs
+  - Interactive report payloads preserve catalog reference alignment, rebalance counts, selected symbols, and latest allocation diagnostics for dashboard explanation

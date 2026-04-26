@@ -1,0 +1,18 @@
+[
+  {
+    "timestamp": "2025-01-31",
+    "asset_rows": [
+      {"symbol": "AAA", "child_rank_1": 1, "child_rank_2": 2, "child_score_1": 0.90},
+      {"symbol": "BBB", "child_rank_1": 2, "child_rank_2": 1, "child_score_1": 0.80},
+      {"symbol": "CCC", "child_rank_1": 3, "child_rank_2": 3, "child_score_1": 0.40}
+    ]
+  },
+  {
+    "timestamp": "2025-02-28",
+    "asset_rows": [
+      {"symbol": "AAA", "child_rank_1": 2, "child_rank_2": 2, "child_score_1": 0.65},
+      {"symbol": "BBB", "child_rank_1": 1, "child_rank_2": 1, "child_score_1": 0.95},
+      {"symbol": "CCC", "child_rank_1": 3, "child_rank_2": 3, "child_score_1": 0.35}
+    ]
+  }
+]

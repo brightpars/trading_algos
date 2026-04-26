@@ -1,8 +1,8 @@
 manifest_version: 1
 source_catalog:
-  requirements_doc_path: docs/algorithm_library_requirements_v4.md
+  requirements_doc_path: docs/algorithm_library_requirements_enriched.md
   requirements_doc_version: 4
-  implementation_plan_path: docs/algorithm_library_systematic_implementation_plan_v2.md
+  implementation_plan_path: docs/algorithm_library_systematic_implementation_plan.md
   source_catalog_generated_from: algorithm_library_requirements_v4.html
   source_catalog_generated_at: '2026-04-23'
 expected_totals:
@@ -177,8 +177,8 @@ rows:
   display_category: Trend Following
   subcategory: simple
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -224,7 +224,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 1; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:2
   source_doc_ref: requirements_v4:algorithm:2
   kind: algorithm
@@ -233,8 +233,8 @@ rows:
   display_category: Trend Following
   subcategory: exponential
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -280,7 +280,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 2; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:3
   source_doc_ref: requirements_v4:algorithm:3
   kind: algorithm
@@ -289,8 +289,8 @@ rows:
   display_category: Trend Following
   subcategory: triple
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -335,7 +335,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 3; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:4
   source_doc_ref: requirements_v4:algorithm:4
   kind: algorithm
@@ -344,8 +344,8 @@ rows:
   display_category: Trend Following
   subcategory: price
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -391,7 +391,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 4; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:5
   source_doc_ref: requirements_v4:algorithm:5
   kind: algorithm
@@ -400,8 +400,8 @@ rows:
   display_category: Trend Following
   subcategory: moving
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -446,7 +446,7 @@ rows:
   - performance_smoke
   batch: trend_wave_1
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 5; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_1 with fixture-backed behavior checks, warmup coverage, normalized diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:6
   source_doc_ref: requirements_v4:algorithm:6
   kind: algorithm
@@ -455,8 +455,8 @@ rows:
   display_category: Trend Following
   subcategory: breakout
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -502,7 +502,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 6; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed breakout coverage, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:7
   source_doc_ref: requirements_v4:algorithm:7
   kind: algorithm
@@ -511,8 +511,8 @@ rows:
   display_category: Trend Following
   subcategory: channel
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -558,7 +558,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 7; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed confirmation and whipsaw checks, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:8
   source_doc_ref: requirements_v4:algorithm:8
   kind: algorithm
@@ -567,8 +567,8 @@ rows:
   display_category: Trend Following
   subcategory: adx
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -614,7 +614,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 8; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed trend-filter behavior, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:9
   source_doc_ref: requirements_v4:algorithm:9
   kind: algorithm
@@ -623,8 +623,8 @@ rows:
   display_category: Trend Following
   subcategory: parabolic
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -670,7 +670,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 9; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed SAR behavior, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:10
   source_doc_ref: requirements_v4:algorithm:10
   kind: algorithm
@@ -679,8 +679,8 @@ rows:
   display_category: Trend Following
   subcategory: supertrend
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -726,7 +726,7 @@ rows:
   - performance_smoke
   batch: trend_wave_2
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 10; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_2 with fixture-backed SuperTrend behavior, normalized dashboard diagnostics, warmup handling, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:11
   source_doc_ref: requirements_v4:algorithm:11
   kind: algorithm
@@ -735,8 +735,8 @@ rows:
   display_category: Trend Following
   subcategory: ichimoku
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -782,7 +782,7 @@ rows:
   - performance_smoke
   batch: trend_wave_3
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 11; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_3 with fixture-backed behavior checks, warmup coverage, normalized dashboard diagnostics including Ichimoku state fields, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:12
   source_doc_ref: requirements_v4:algorithm:12
   kind: algorithm
@@ -791,8 +791,8 @@ rows:
   display_category: Trend Following
   subcategory: macd
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -839,7 +839,7 @@ rows:
   - performance_smoke
   batch: trend_wave_3
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 12; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_3 with fixture-backed crossover and whipsaw checks, warmup coverage, normalized dashboard diagnostics including MACD state fields, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:13
   source_doc_ref: requirements_v4:algorithm:13
   kind: algorithm
@@ -848,8 +848,8 @@ rows:
   display_category: Trend Following
   subcategory: linear
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -895,7 +895,7 @@ rows:
   - performance_smoke
   batch: trend_wave_3
   source_reference_code: INV-ALGO
-  notes: Seeded from requirements_v4 row 13; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_3 with fixture-backed trend checks, warmup coverage, normalized dashboard diagnostics including regression state fields, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:14
   source_doc_ref: requirements_v4:algorithm:14
   kind: algorithm
@@ -904,8 +904,8 @@ rows:
   display_category: Trend Following
   subcategory: time
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / position trading
   home_suitability: 1
@@ -950,7 +950,7 @@ rows:
   - performance_smoke
   batch: trend_wave_3
   source_reference_code: AQR-TSMOM
-  notes: Seeded from requirements_v4 row 14; initial starter-pack metadata auto-generated.
+  notes: Hardened in trend_wave_3 with fixture-backed momentum checks, warmup coverage, normalized dashboard diagnostics including return state fields, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:15
   source_doc_ref: requirements_v4:algorithm:15
   kind: algorithm
@@ -959,8 +959,8 @@ rows:
   display_category: Momentum
   subcategory: rate
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1005,7 +1005,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 15; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, normalized metadata/diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:16
   source_doc_ref: requirements_v4:algorithm:16
   kind: algorithm
@@ -1015,7 +1015,7 @@ rows:
   subcategory: cross
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
   home_suitability: 2
@@ -1066,7 +1066,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_3
   source_reference_code: AQR-MOM
-  notes: Seeded from requirements_v4 row 16; initial starter-pack metadata auto-generated.
+  notes: Implemented in momentum_wave_3 with reusable multi-asset panel helpers, rebalance scheduling, normalized portfolio-weight outputs, parameter schema coverage, registry wiring, fixture-backed ranking checks, and performance-smoke validation.
 - catalog_ref: algorithm:17
   source_doc_ref: requirements_v4:algorithm:17
   kind: algorithm
@@ -1076,7 +1076,7 @@ rows:
   subcategory: relative
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
   home_suitability: 2
@@ -1127,7 +1127,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_3
   source_reference_code: AQR-MOM
-  notes: Seeded from requirements_v4 row 17; initial starter-pack metadata auto-generated.
+  notes: Implemented in momentum_wave_3 with shared cross-sectional ranking helpers, normalized rebalance diagnostics, schema coverage, registry wiring, fixture-backed ranking checks, and performance-smoke validation.
 - catalog_ref: algorithm:18
   source_doc_ref: requirements_v4:algorithm:18
   kind: algorithm
@@ -1137,7 +1137,7 @@ rows:
   subcategory: dual
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
   home_suitability: 2
@@ -1188,7 +1188,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_3
   source_reference_code: AQR-MOM
-  notes: Seeded from requirements_v4 row 18; initial starter-pack metadata auto-generated.
+  notes: Implemented in momentum_wave_3 with absolute-momentum gating, defensive fallback support, reusable rebalance helpers, normalized portfolio outputs, schema coverage, fixture-backed checks, and performance-smoke validation.
 - catalog_ref: algorithm:19
   source_doc_ref: requirements_v4:algorithm:19
   kind: algorithm
@@ -1198,7 +1198,7 @@ rows:
   subcategory: residual
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Medium-term portfolio rotation
   home_suitability: 2
@@ -1249,7 +1249,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_3
   source_reference_code: AQR-MOM
-  notes: Seeded from requirements_v4 row 19; initial starter-pack metadata auto-generated.
+  notes: Implemented in momentum_wave_3 with reusable cross-sectional helpers, score-adjustment support for residual ranking, normalized rebalance diagnostics, schema coverage, fixture-backed checks, and performance-smoke validation.
 - catalog_ref: algorithm:20
   source_doc_ref: requirements_v4:algorithm:20
   kind: algorithm
@@ -1258,8 +1258,8 @@ rows:
   display_category: Momentum
   subcategory: accelerating
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1304,7 +1304,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 20; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, acceleration diagnostics, normalized metadata, and performance-smoke tests.
 - catalog_ref: algorithm:21
   source_doc_ref: requirements_v4:algorithm:21
   kind: algorithm
@@ -1313,8 +1313,8 @@ rows:
   display_category: Momentum
   subcategory: rsi
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1360,7 +1360,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 21; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, normalized metadata/diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:22
   source_doc_ref: requirements_v4:algorithm:22
   kind: algorithm
@@ -1369,8 +1369,8 @@ rows:
   display_category: Momentum
   subcategory: stochastic
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1416,7 +1416,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 22; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, normalized metadata/diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:23
   source_doc_ref: requirements_v4:algorithm:23
   kind: algorithm
@@ -1425,8 +1425,8 @@ rows:
   display_category: Momentum
   subcategory: cci
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1472,7 +1472,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_1
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 23; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_1 with fixture-backed behavior checks, warmup coverage, normalized metadata/diagnostics, and performance-smoke tests.
 - catalog_ref: algorithm:24
   source_doc_ref: requirements_v4:algorithm:24
   kind: algorithm
@@ -1481,8 +1481,8 @@ rows:
   display_category: Momentum
   subcategory: kst
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1528,7 +1528,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_2
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 24; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_2 with warmup coverage, registration and validation checks, fixture-backed KST signal-cross versus zero-cross behavior, normalized diagnostics, and performance-smoke validation.
 - catalog_ref: algorithm:25
   source_doc_ref: requirements_v4:algorithm:25
   kind: algorithm
@@ -1537,8 +1537,8 @@ rows:
   display_category: Momentum
   subcategory: volume
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / short-term momentum
   home_suitability: 1
@@ -1583,7 +1583,7 @@ rows:
   - performance_smoke
   batch: momentum_wave_2
   source_reference_code: MSCI-MOM
-  notes: Seeded from requirements_v4 row 25; initial starter-pack metadata auto-generated.
+  notes: Hardened in momentum_wave_2 with warmup coverage, registration and validation checks, fixture-backed continuation and missing-volume-confirmation behavior, normalized diagnostics, and performance-smoke validation.
 - catalog_ref: algorithm:26
   source_doc_ref: requirements_v4:algorithm:26
   kind: algorithm
@@ -1592,8 +1592,8 @@ rows:
   display_category: Mean Reversion
   subcategory: z
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1638,7 +1638,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 26; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:27
   source_doc_ref: requirements_v4:algorithm:27
   kind: algorithm
@@ -1647,8 +1647,8 @@ rows:
   display_category: Mean Reversion
   subcategory: bollinger
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1694,7 +1694,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 27; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:28
   source_doc_ref: requirements_v4:algorithm:28
   kind: algorithm
@@ -1703,8 +1703,8 @@ rows:
   display_category: Mean Reversion
   subcategory: rsi
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1750,7 +1750,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 28; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:29
   source_doc_ref: requirements_v4:algorithm:29
   kind: algorithm
@@ -1759,8 +1759,8 @@ rows:
   display_category: Mean Reversion
   subcategory: stochastic
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1806,7 +1806,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 29; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:30
   source_doc_ref: requirements_v4:algorithm:30
   kind: algorithm
@@ -1815,8 +1815,8 @@ rows:
   display_category: Mean Reversion
   subcategory: cci
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1862,7 +1862,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_1
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 30; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_1 with fixture-backed overshoot behavior checks, warmup coverage, normalized score/diagnostic payloads, and performance-smoke tests.
 - catalog_ref: algorithm:31
   source_doc_ref: requirements_v4:algorithm:31
   kind: algorithm
@@ -1871,8 +1871,8 @@ rows:
   display_category: Mean Reversion
   subcategory: williams
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -1918,7 +1918,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_2
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 31; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_2 with fixture-backed overshoot checks, warmup coverage, state-specific diagnostics for dashboard explanation, validation coverage, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:32
   source_doc_ref: requirements_v4:algorithm:32
   kind: algorithm
@@ -1927,8 +1927,8 @@ rows:
   display_category: Mean Reversion
   subcategory: intraday
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Intraday / session trading
   home_suitability: 1
@@ -1974,7 +1974,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_3
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 32; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_3 with session-aware warmup handling, fixture-backed intraday behavior checks, dashboard-ready VWAP diagnostics, validation coverage, registration checks, and intraday performance-smoke validation.
 - catalog_ref: algorithm:33
   source_doc_ref: requirements_v4:algorithm:33
   kind: algorithm
@@ -1983,8 +1983,8 @@ rows:
   display_category: Mean Reversion
   subcategory: opening
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Intraday / session trading
   home_suitability: 1
@@ -2029,7 +2029,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_3
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 33; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_3 with session-aware warmup handling, normalized gap-fill diagnostics, fixture-backed opening-gap behavior checks, validation coverage, registration checks, and intraday performance-smoke validation.
 - catalog_ref: algorithm:34
   source_doc_ref: requirements_v4:algorithm:34
   kind: algorithm
@@ -2038,8 +2038,8 @@ rows:
   display_category: Mean Reversion
   subcategory: range
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -2084,7 +2084,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_2
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 34; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_2 with fixture-backed range-oscillation behavior checks, repeated-entry coverage, dashboard-ready range diagnostics, validation coverage, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:35
   source_doc_ref: requirements_v4:algorithm:35
   kind: algorithm
@@ -2093,8 +2093,8 @@ rows:
   display_category: Mean Reversion
   subcategory: ornstein
   tier: tier2
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -2139,7 +2139,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_3
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 35; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_3 with OU readiness diagnostics, fixture-backed overshoot behavior checks, validation coverage, registration checks, normalized output fields, and performance-smoke validation.
 - catalog_ref: algorithm:36
   source_doc_ref: requirements_v4:algorithm:36
   kind: algorithm
@@ -2148,8 +2148,8 @@ rows:
   display_category: Mean Reversion
   subcategory: long
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term contrarian / reversal
   home_suitability: 1
@@ -2194,7 +2194,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_2
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 36; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_2 with fixture-backed overshoot checks, warmup coverage, long-horizon return diagnostics, validation coverage, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:37
   source_doc_ref: requirements_v4:algorithm:37
   kind: algorithm
@@ -2203,8 +2203,8 @@ rows:
   display_category: Mean Reversion
   subcategory: volatility
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / swing mean reversion
   home_suitability: 1
@@ -2249,7 +2249,7 @@ rows:
   - performance_smoke
   batch: mean_reversion_wave_2
   source_reference_code: INV-MR
-  notes: Seeded from requirements_v4 row 37; initial starter-pack metadata auto-generated.
+  notes: Hardened in mean_reversion_wave_2 with fixture-backed oscillation behavior checks, warmup coverage, ATR-normalized diagnostics, validation coverage, registration checks, and performance-smoke validation.
 - catalog_ref: algorithm:38
   source_doc_ref: requirements_v4:algorithm:38
   kind: algorithm
@@ -3126,8 +3126,8 @@ rows:
   display_category: Volatility / Options
   subcategory: volatility
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -3171,7 +3171,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_1
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 52; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_1 with compression-release fixture coverage, normalized dashboard diagnostics, confirmation-state reason codes, registration validation, and performance-smoke checks.
 - catalog_ref: algorithm:53
   source_doc_ref: requirements_v4:algorithm:53
   kind: algorithm
@@ -3180,8 +3180,8 @@ rows:
   display_category: Volatility / Options
   subcategory: atr
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -3225,7 +3225,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_1
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 53; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_1 with fixture-backed ATR-band breakout checks, normalized dashboard diagnostics, confirmation-state reason codes, registration validation, and performance-smoke checks.
 - catalog_ref: algorithm:54
   source_doc_ref: requirements_v4:algorithm:54
   kind: algorithm
@@ -3234,8 +3234,8 @@ rows:
   display_category: Volatility / Options
   subcategory: volatility
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / breakout / volatility timing
   home_suitability: 1
@@ -3279,7 +3279,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_1
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 54; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_1 with elevated-volatility fixture checks, normalized dashboard diagnostics, confirmation-state reason codes, registration validation, and performance-smoke checks.
 - catalog_ref: algorithm:55
   source_doc_ref: requirements_v4:algorithm:55
   kind: algorithm
@@ -3339,7 +3339,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 55; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:56
   source_doc_ref: requirements_v4:algorithm:56
   kind: algorithm
@@ -3399,7 +3399,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 56; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:57
   source_doc_ref: requirements_v4:algorithm:57
   kind: algorithm
@@ -3459,7 +3459,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 57; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:58
   source_doc_ref: requirements_v4:algorithm:58
   kind: algorithm
@@ -3519,7 +3519,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 58; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:59
   source_doc_ref: requirements_v4:algorithm:59
   kind: algorithm
@@ -3579,7 +3579,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 59; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:60
   source_doc_ref: requirements_v4:algorithm:60
   kind: algorithm
@@ -3639,7 +3639,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-TERM
-  notes: Seeded from requirements_v4 row 60; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:61
   source_doc_ref: requirements_v4:algorithm:61
   kind: algorithm
@@ -3699,7 +3699,7 @@ rows:
   - performance_smoke
   batch: volatility_wave_2
   source_reference_code: CME-OPT
-  notes: Seeded from requirements_v4 row 61; initial starter-pack metadata auto-generated.
+  notes: Hardened in volatility_wave_2 with csv-backed options surface fixture coverage, warmup neutrality checks, registration validation, dashboard diagnostics assertions, and performance-smoke coverage. Status remains blocked by options-chain and greeks framework blockers.
 - catalog_ref: algorithm:62
   source_doc_ref: requirements_v4:algorithm:62
   kind: algorithm
@@ -4194,10 +4194,10 @@ rows:
   name: Support and Resistance Bounce
   family: pattern_price_action
   display_category: Pattern / Price Action
-  subcategory: support
+  subcategory: support_resistance
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4209,7 +4209,7 @@ rows:
   code_dependencies:
   - pattern.levels
   - pattern.session
-  target_module: src/trading_algos/alertgen/algorithms/pattern_price_action/support_and_resistance_bounce.py
+  target_module: src/trading_algos/alertgen/algorithms/pattern_price_action/support_resistance_bounce.py
   target_catalog: src/trading_algos/alertgen/algorithms/pattern_price_action/catalog.py
   required_input_domains:
   - single_asset_ohlcv
@@ -4242,7 +4242,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 70; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with fixture-backed support rejection checks, warmup coverage, normalized dashboard diagnostics, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:71
   source_doc_ref: requirements_v4:algorithm:71
   kind: algorithm
@@ -4251,8 +4251,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: breakout
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4297,7 +4297,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 71; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with neutral breakout fixture checks, warmup coverage, normalized dashboard diagnostics, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:72
   source_doc_ref: requirements_v4:algorithm:72
   kind: algorithm
@@ -4306,8 +4306,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: pivot
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4352,7 +4352,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 72; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with pivot-level diagnostic checks, warmup coverage, normalized dashboard diagnostics, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:73
   source_doc_ref: requirements_v4:algorithm:73
   kind: algorithm
@@ -4361,8 +4361,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: opening
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Intraday / session trading
   home_suitability: 1
@@ -4407,7 +4407,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 73; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with opening-range fixture checks, session-aware diagnostics, warmup coverage, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:74
   source_doc_ref: requirements_v4:algorithm:74
   kind: algorithm
@@ -4416,8 +4416,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: inside
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4462,7 +4462,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 74; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_1 with inside-bar neutral fixture checks, warmup coverage, normalized dashboard diagnostics, registration validation, and performance-smoke coverage.
 - catalog_ref: algorithm:75
   source_doc_ref: requirements_v4:algorithm:75
   kind: algorithm
@@ -4471,8 +4471,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: gap
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4517,7 +4517,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_2
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 75; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_2 with fixture-backed neutral gap checks, warmup coverage, normalized dashboard diagnostics, registration validation, parameter validation, and performance-smoke coverage.
 - catalog_ref: algorithm:76
   source_doc_ref: requirements_v4:algorithm:76
   kind: algorithm
@@ -4526,8 +4526,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: trendline
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4572,7 +4572,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_2
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 76; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_2 with fixture-backed trendline-break behavior checks, warmup coverage, normalized dashboard diagnostics, registration validation, parameter validation, and performance-smoke coverage.
 - catalog_ref: algorithm:77
   source_doc_ref: requirements_v4:algorithm:77
   kind: algorithm
@@ -4581,8 +4581,8 @@ rows:
   display_category: Pattern / Price Action
   subcategory: volatility
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short-term / intraday / swing
   home_suitability: 1
@@ -4627,7 +4627,7 @@ rows:
   - performance_smoke
   batch: pattern_wave_2
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 77; initial starter-pack metadata auto-generated.
+  notes: Hardened in pattern_wave_2 with fixture-backed squeeze-state checks, warmup coverage, normalized dashboard diagnostics, registration validation, parameter validation, and performance-smoke coverage.
 - catalog_ref: algorithm:78
   source_doc_ref: requirements_v4:algorithm:78
   kind: algorithm
@@ -4637,7 +4637,7 @@ rows:
   subcategory: carry
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4686,7 +4686,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-ARP
-  notes: Seeded from requirements_v4 row 78; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable cross-asset rebalance helpers, normalized ranking diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:79
   source_doc_ref: requirements_v4:algorithm:79
   kind: algorithm
@@ -4696,7 +4696,7 @@ rows:
   subcategory: yield
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4749,7 +4749,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-ARP
-  notes: Seeded from requirements_v4 row 79; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable multi-leg rebalance output, spread diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:80
   source_doc_ref: requirements_v4:algorithm:80
   kind: algorithm
@@ -4759,7 +4759,7 @@ rows:
   subcategory: curve
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4812,7 +4812,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-ARP
-  notes: Seeded from requirements_v4 row 80; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable multi-leg rebalance output, roll-down spread diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:81
   source_doc_ref: requirements_v4:algorithm:81
   kind: algorithm
@@ -4822,7 +4822,7 @@ rows:
   subcategory: commodity
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4875,7 +4875,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-ARP
-  notes: Seeded from requirements_v4 row 81; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable multi-leg rebalance output, roll-yield spread diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:82
   source_doc_ref: requirements_v4:algorithm:82
   kind: algorithm
@@ -4885,7 +4885,7 @@ rows:
   subcategory: risk
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4934,7 +4934,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-MULTI
-  notes: Seeded from requirements_v4 row 82; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable cross-asset rebalance helpers, normalized regime diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:83
   source_doc_ref: requirements_v4:algorithm:83
   kind: algorithm
@@ -4944,7 +4944,7 @@ rows:
   subcategory: intermarket
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Swing / medium-term macro / carry
   home_suitability: 2
@@ -4993,7 +4993,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: AQR-MULTI
-  notes: Seeded from requirements_v4 row 83; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable cross-asset rebalance helpers, confirmation diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:84
   source_doc_ref: requirements_v4:algorithm:84
   kind: algorithm
@@ -5003,7 +5003,7 @@ rows:
   subcategory: seasonality
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Calendar-driven swing / long-only or tactical
   home_suitability: 2
@@ -5053,7 +5053,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: QPEDIA-CAL
-  notes: Seeded from requirements_v4 row 84; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable calendar-window scoring, normalized rebalance diagnostics, parameter schema coverage, and fixture-backed smoke tests.
 - catalog_ref: algorithm:85
   source_doc_ref: requirements_v4:algorithm:85
   kind: algorithm
@@ -5063,7 +5063,7 @@ rows:
   subcategory: earnings
   tier: tier2
   delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven swing
   home_suitability: 2
@@ -5119,7 +5119,7 @@ rows:
   - performance_smoke
   batch: cross_asset_wave_1
   source_reference_code: CFA-PEAD
-  notes: Seeded from requirements_v4 row 85; initial starter-pack metadata auto-generated.
+  notes: Implemented in cross_asset_wave_1 with reusable event-window ranking helpers, after-close event handling, normalized rebalance diagnostics, and fixture-backed smoke tests.
 - catalog_ref: algorithm:86
   source_doc_ref: requirements_v4:algorithm:86
   kind: algorithm
@@ -5128,22 +5128,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: value
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / rebalancing
   home_suitability: 2
   core_idea: Buy relatively cheap assets by valuation, sell expensive ones.
   typical_inputs: Fundamental factors / ratios
   signal_style: Ranked buy/sell signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5184,7 +5178,7 @@ rows:
   - performance_smoke
   batch: factor_wave_2
   source_reference_code: MSCI-VALUE
-  notes: Seeded from requirements_v4 row 86; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_2 with shared rebalance-factor helpers, normalized portfolio outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:87
   source_doc_ref: requirements_v4:algorithm:87
   kind: algorithm
@@ -5193,22 +5187,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: quality
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / rebalancing
   home_suitability: 2
   core_idea: Use profitability, balance-sheet, earnings-quality metrics.
   typical_inputs: Fundamental data
   signal_style: Ranked signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5249,7 +5237,7 @@ rows:
   - performance_smoke
   batch: factor_wave_2
   source_reference_code: MSCI-QUALITY
-  notes: Seeded from requirements_v4 row 87; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_2 with shared rebalance-factor helpers, normalized portfolio outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:88
   source_doc_ref: requirements_v4:algorithm:88
   kind: algorithm
@@ -5323,22 +5311,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: sentiment
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Short- to medium-term event/sentiment trading
   home_suitability: 1
   core_idea: Trade news, analyst, social, or options sentiment signals.
   typical_inputs: Sentiment feed + price data
   signal_style: Directional signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5379,7 +5361,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 89; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware sentiment diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:90
   source_doc_ref: requirements_v4:algorithm:90
   kind: algorithm
@@ -5388,22 +5370,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: machine
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Any horizon; depends on feature set
   home_suitability: 2
   core_idea: Model probability of next move/state and convert to trade signal.
   typical_inputs: Feature matrix, labels, model params
   signal_style: Probability/score + buy/sell
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5443,7 +5419,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 90; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware classifier diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:91
   source_doc_ref: requirements_v4:algorithm:91
   kind: algorithm
@@ -5452,22 +5428,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: machine
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Any horizon; depends on feature set
   home_suitability: 2
   core_idea: Predict future return or target and threshold into actions.
   typical_inputs: Feature matrix, regression target
   signal_style: Predicted return + signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5507,7 +5477,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 91; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware regressor diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:92
   source_doc_ref: requirements_v4:algorithm:92
   kind: algorithm
@@ -5516,22 +5486,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: regime
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Any horizon; depends on feature set
   home_suitability: 2
   core_idea: Use HMM or similar to detect regime and switch sub-strategies.
   typical_inputs: Returns, vol, macro features
   signal_style: Regime label plus delegated signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5571,7 +5535,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 92; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware regime diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:93
   source_doc_ref: requirements_v4:algorithm:93
   kind: algorithm
@@ -5580,22 +5544,16 @@ rows:
   display_category: Fundamental / ML / Composite
   subcategory: ensemble
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Any horizon; depends on feature set
   home_suitability: 1
   core_idea: Combine outputs of multiple sub-strategies via voting or weighting.
   typical_inputs: Child strategy outputs, weights/rules
   signal_style: Composite final signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -5635,7 +5593,7 @@ rows:
   - performance_smoke
   batch: advanced_model_wave_1
   source_reference_code: QINSTI-ADV
-  notes: Seeded from requirements_v4 row 93; initial starter-pack metadata auto-generated.
+  notes: Hardened in advanced_model_wave_1 with shared factor-portfolio helpers, threshold-aware ensemble diagnostics, normalized rebalance outputs, fixture-backed behavior checks, and dashboard payload coverage.
 - catalog_ref: algorithm:94
   source_doc_ref: requirements_v4:algorithm:94
   kind: algorithm
@@ -6010,22 +5968,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: low
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / monthly rotation / swing portfolio
   home_suitability: 1
   core_idea: Prefer lower-volatility assets or equities over higher-volatility peers.
   typical_inputs: Universe returns, realized volatility or ATR estimates, rebalance schedule, optional sector/country constraints
   signal_style: Cross-sectional rank, portfolio-selection, or long/short signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6066,7 +6018,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: MSCI-MINVOL
-  notes: Seeded from requirements_v4 row 100; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:101
   source_doc_ref: requirements_v4:algorithm:101
   kind: algorithm
@@ -6075,22 +6027,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: minimum
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / portfolio construction
   home_suitability: 2
   core_idea: Construct a portfolio that minimizes estimated total variance subject to constraints.
   typical_inputs: Universe returns, covariance matrix, optimization constraints, rebalance schedule
   signal_style: Optimized portfolio weights rather than a single bar-level trigger
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6131,7 +6077,7 @@ rows:
   - performance_smoke
   batch: factor_wave_2
   source_reference_code: MSCI-MINVOL
-  notes: Seeded from requirements_v4 row 101; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_2 with shared rebalance-factor helpers, inverse-metric weighting support, normalized portfolio outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:102
   source_doc_ref: requirements_v4:algorithm:102
   kind: algorithm
@@ -6205,22 +6151,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: low
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / swing portfolio / factor sleeve
   home_suitability: 2
   core_idea: Go long low-beta assets and short or underweight high-beta assets.
   typical_inputs: Universe returns, rolling beta estimates, leverage rules, rebalance schedule
   signal_style: Cross-sectional long/short factor signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6261,7 +6201,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: AQR-BAB
-  notes: Seeded from requirements_v4 row 103; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:104
   source_doc_ref: requirements_v4:algorithm:104
   kind: algorithm
@@ -6335,22 +6275,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: size
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / monthly or quarterly rotation
   home_suitability: 2
   core_idea: Tilt toward smaller-cap securities, typically with liquidity filters.
   typical_inputs: Market-cap data, universe definitions, liquidity filters, rebalance schedule
   signal_style: Cross-sectional rank or bucket selection
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6391,7 +6325,7 @@ rows:
   - performance_smoke
   batch: factor_wave_2
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 105; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_2 with shared rebalance-factor helpers, normalized portfolio outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:106
   source_doc_ref: requirements_v4:algorithm:106
   kind: algorithm
@@ -6400,22 +6334,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: mid
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / periodic rotation
   home_suitability: 2
   core_idea: Tilt toward mid-cap names as a distinct style sleeve rather than only large or small cap.
   typical_inputs: Market-cap data, band definitions, liquidity filters, rebalance schedule
   signal_style: Bucket-selection / rank-based signal
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6465,22 +6393,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: dividend
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term income investing / monthly or quarterly rotation
   home_suitability: 1
   core_idea: Select assets or equities with higher dividend yield, often with quality and payout sanity checks.
   typical_inputs: Dividend yield, payout ratio, prices, optional quality filters
   signal_style: Cross-sectional rank or income-oriented buy list
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6521,7 +6443,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 107; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_2 with shared rebalance-factor helpers, target-value ranking support, normalized portfolio outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:108
   source_doc_ref: requirements_v4:algorithm:108
   kind: algorithm
@@ -6530,22 +6452,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: growth
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / quarterly rotation
   home_suitability: 2
   core_idea: Prefer companies with stronger growth characteristics such as earnings or sales growth.
   typical_inputs: Fundamental growth metrics, prices, rebalance schedule
   signal_style: Cross-sectional rank / portfolio selection
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6586,7 +6502,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 108; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:109
   source_doc_ref: requirements_v4:algorithm:109
   kind: algorithm
@@ -6595,22 +6511,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: liquidity
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / execution-aware portfolio construction
   home_suitability: 2
   core_idea: Use liquidity metrics either as a selection signal or as a filter for tradability and crowding control.
   typical_inputs: Volume, turnover, bid-ask proxies, market cap, rebalance schedule
   signal_style: Cross-sectional score or tradability filter
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6651,7 +6561,7 @@ rows:
   - performance_smoke
   batch: factor_wave_1
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 109; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_1 with reusable factor portfolio helpers, normalized rebalance outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:110
   source_doc_ref: requirements_v4:algorithm:110
   kind: algorithm
@@ -6660,22 +6570,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: profitability
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / quarterly rotation
   home_suitability: 2
   core_idea: Prefer firms with stronger profitability metrics.
   typical_inputs: ROE/ROA/gross profitability/margins, prices, rebalance schedule
   signal_style: Cross-sectional rank / portfolio selection
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6716,7 +6620,7 @@ rows:
   - performance_smoke
   batch: factor_wave_2
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 110; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_2 with shared rebalance-factor helpers, normalized portfolio outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:111
   source_doc_ref: requirements_v4:algorithm:111
   kind: algorithm
@@ -6725,22 +6629,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: earnings
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / quarterly rotation
   home_suitability: 2
   core_idea: Prefer firms whose reported earnings appear more persistent and lower-noise.
   typical_inputs: Accruals, cash-flow support, earnings data, prices, rebalance schedule
   signal_style: Cross-sectional rank / quality score
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6781,7 +6679,7 @@ rows:
   - performance_smoke
   batch: factor_wave_2
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 111; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_2 with shared rebalance-factor helpers, normalized portfolio outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:112
   source_doc_ref: requirements_v4:algorithm:112
   kind: algorithm
@@ -6855,22 +6753,16 @@ rows:
   display_category: Factor / Risk Premia
   subcategory: low
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Long-term investing / defensive rotation
   home_suitability: 2
   core_idea: Prefer companies with lower leverage and stronger balance-sheet resilience.
   typical_inputs: Debt ratios, interest coverage, balance-sheet metrics, prices
   signal_style: Cross-sectional rank / defensive filter
-  framework_blockers:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
-  framework_dependencies:
-  - blocker.multi_asset_panel_v1
-  - blocker.rebalance_engine_v1
-  - blocker.portfolio_weight_output_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - data.panel
   - rebalance.engine
@@ -6911,7 +6803,7 @@ rows:
   - performance_smoke
   batch: factor_wave_2
   source_reference_code: MSCI-FACS
-  notes: Seeded from requirements_v4 row 113; initial starter-pack metadata auto-generated.
+  notes: Implemented in factor_wave_2 with shared rebalance-factor helpers, normalized portfolio outputs, registry wiring, parameter schema, and fixture-backed tests.
 - catalog_ref: algorithm:114
   source_doc_ref: requirements_v4:algorithm:114
   kind: algorithm
@@ -7111,8 +7003,8 @@ rows:
   display_category: Event-Driven
   subcategory: post
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven / short- to medium-term after earnings
   home_suitability: 2
@@ -7130,7 +7022,7 @@ rows:
   code_dependencies:
   - events.calendar
   - events.window_runner
-  target_module: src/trading_algos/alertgen/algorithms/event_driven/post_earnings_announcement_drift_pead.py
+  target_module: src/trading_algos/alertgen/algorithms/event_driven/pead_post_earnings_announcement_drift.py
   target_catalog: src/trading_algos/alertgen/algorithms/event_driven/catalog.py
   required_input_domains:
   - event_calendar
@@ -7165,7 +7057,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-PEAD
-  notes: Seeded from requirements_v4 row 117; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared event-value helpers, fixture-backed public-timestamp and rebalance-window checks, warmup coverage, normalized decision diagnostics, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: algorithm:118
   source_doc_ref: requirements_v4:algorithm:118
   kind: algorithm
@@ -7174,8 +7066,8 @@ rows:
   display_category: Event-Driven
   subcategory: pre
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven / very short-term before earnings
   home_suitability: 2
@@ -7229,7 +7121,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-PREAD
-  notes: Seeded from requirements_v4 row 118; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared event-value helpers, fixture-backed pre-event phase checks, warmup coverage, normalized decision diagnostics, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: algorithm:119
   source_doc_ref: requirements_v4:algorithm:119
   kind: algorithm
@@ -7238,8 +7130,8 @@ rows:
   display_category: Event-Driven
   subcategory: earnings
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven / around scheduled earnings windows
   home_suitability: 2
@@ -7292,7 +7184,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-EAP
-  notes: Seeded from requirements_v4 row 119; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared event-value helpers, earnings-window fixture coverage, warmup-aware normalized diagnostics, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: algorithm:120
   source_doc_ref: requirements_v4:algorithm:120
   kind: algorithm
@@ -7301,8 +7193,8 @@ rows:
   display_category: Event-Driven
   subcategory: index
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Event-driven / short-term around index rebalances
   home_suitability: 2
@@ -7355,7 +7247,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-REB
-  notes: Seeded from requirements_v4 row 120; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared expected-flow helpers, fixture-backed rebalance-window behavior checks, warmup coverage, phase-filtered decision diagnostics, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: algorithm:121
   source_doc_ref: requirements_v4:algorithm:121
   kind: algorithm
@@ -7364,8 +7256,8 @@ rows:
   display_category: Event-Driven
   subcategory: etf
   tier: tier2
-  delivery_status: blocked_framework
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: true
   best_use_horizon: Event-driven / short-term around ETF rebalance dates
   home_suitability: 2
@@ -7418,7 +7310,7 @@ rows:
   - performance_smoke
   batch: event_wave_1
   source_reference_code: QPEDIA-ETFREB
-  notes: Seeded from requirements_v4 row 121; initial starter-pack metadata auto-generated.
+  notes: Hardened in event_wave_1 with shared expected-flow helpers, fixture-backed ETF rebalance anticipation checks, warmup coverage, normalized decision diagnostics including no-event states, event-report payload coverage, and performance-smoke validation.
 - catalog_ref: combination:1
   source_doc_ref: requirements_v4:combination:1
   kind: combination_method
@@ -7427,8 +7319,8 @@ rows:
   display_category: Rule-Based Combination
   subcategory: hard
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: All horizons if child signals are aligned
   home_suitability: 1
@@ -7475,7 +7367,7 @@ rows:
   - performance_smoke
   batch: composite_contract_wave_1
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 1; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_contract_wave_1 with aligned-child warmup handling, normalized composite-trace diagnostics, fixture-backed behavior checks, registration/validation coverage, and performance-smoke coverage.
 - catalog_ref: combination:2
   source_doc_ref: requirements_v4:combination:2
   kind: combination_method
@@ -7484,8 +7376,8 @@ rows:
   display_category: Rule-Based Combination
   subcategory: weighted
   tier: tier1
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: All horizons; especially good for swing / daily systems
   home_suitability: 1
@@ -7532,7 +7424,7 @@ rows:
   - performance_smoke
   batch: composite_contract_wave_1
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 2; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_contract_wave_1 with score/confidence normalization, aligned-child warmup handling, normalized composite-trace diagnostics, fixture-backed behavior checks, registration/validation coverage, and performance-smoke coverage.
 - catalog_ref: combination:3
   source_doc_ref: requirements_v4:combination:3
   kind: combination_method
@@ -7844,8 +7736,8 @@ rows:
   display_category: Machine Learning Ensemble
   subcategory: bagging
   tier: tier2
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Daily to medium-term predictive systems
   home_suitability: 2
@@ -7892,7 +7784,7 @@ rows:
   - performance_smoke
   batch: composite_wave_4
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 8; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_wave_4 with shared ensemble helper reuse, fixture-backed behavior and warmup coverage, normalized diagnostics/report payload checks, and performance-smoke validation.
 - catalog_ref: combination:9
   source_doc_ref: requirements_v4:combination:9
   kind: combination_method
@@ -7901,8 +7793,8 @@ rows:
   display_category: Machine Learning Ensemble
   subcategory: boosting
   tier: tier2
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Daily to medium-term predictive systems
   home_suitability: 2
@@ -7949,7 +7841,7 @@ rows:
   - performance_smoke
   batch: composite_wave_4
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 9; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_wave_4 with shared ensemble helper reuse, fixture-backed aggregation and warmup coverage, normalized diagnostics/report payload checks, and performance-smoke validation.
 - catalog_ref: combination:10
   source_doc_ref: requirements_v4:combination:10
   kind: combination_method
@@ -7958,8 +7850,8 @@ rows:
   display_category: Machine Learning Ensemble
   subcategory: stacking
   tier: tier2
-  delivery_status: ready_to_implement
-  operational_readiness: prototype_only
+  delivery_status: complete
+  operational_readiness: research_ready
   advanced_or_institutional_only: false
   best_use_horizon: Daily to medium-term predictive systems
   home_suitability: 2
@@ -8006,7 +7898,7 @@ rows:
   - performance_smoke
   batch: composite_wave_4
   source_reference_code: CFA-ENS
-  notes: Seeded from requirements_v4 combination row 10; initial starter-pack metadata auto-generated.
+  notes: Hardened in composite_wave_4 with shared ensemble helper reuse, fixture-backed meta-feature behavior and warmup coverage, normalized diagnostics/report payload checks, and performance-smoke validation.
 - catalog_ref: combination:11
   source_doc_ref: requirements_v4:combination:11
   kind: combination_method
@@ -8015,7 +7907,7 @@ rows:
   display_category: Reinforcement Learning
   subcategory: rl
   tier: tier3
-  delivery_status: blocked_framework
+  delivery_status: complete
   operational_readiness: prototype_only
   advanced_or_institutional_only: true
   best_use_horizon: Portfolio allocation and execution over repeated decisions
@@ -8024,10 +7916,8 @@ rows:
     feedback.
   typical_inputs: State features, reward function, action space, simulator or historical environment
   signal_style: Dynamic weights / actions over time
-  framework_blockers:
-  - blocker.rl_environment_v1
-  framework_dependencies:
-  - blocker.rl_environment_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - composite.alignment
   - rl.environment
@@ -8055,7 +7945,7 @@ rows:
   - rl_environment
   fixture_ids:
   - fixture.composite_rl_policy_stub_v1
-  performance_budget_id: perf.execution_engine_v1
+  performance_budget_id: perf.composite_signal_v1
   required_tests:
   - registry
   - param_validation
@@ -8065,7 +7955,7 @@ rows:
   - performance_smoke
   batch: composite_wave_5
   source_reference_code: CFA-RL
-  notes: Seeded from requirements_v4 combination row 11; initial starter-pack metadata auto-generated.
+  notes: Implemented in composite_wave_5 with reusable RL environment parsing, normalized allocation diagnostics, registry wiring, schema validation, and fixture-backed allocation behavior coverage.
 - catalog_ref: combination:12
   source_doc_ref: requirements_v4:combination:12
   kind: combination_method
@@ -8074,7 +7964,7 @@ rows:
   display_category: Reinforcement Learning
   subcategory: hierarchical
   tier: tier3
-  delivery_status: blocked_framework
+  delivery_status: complete
   operational_readiness: prototype_only
   advanced_or_institutional_only: true
   best_use_horizon: Complex multi-layer systems and multi-horizon control
@@ -8083,10 +7973,8 @@ rows:
     allocations or actions.
   typical_inputs: State features, hierarchical action design, reward functions, child-policy outputs
   signal_style: Layered allocation or action plan
-  framework_blockers:
-  - blocker.rl_environment_v1
-  framework_dependencies:
-  - blocker.rl_environment_v1
+  framework_blockers: []
+  framework_dependencies: []
   code_dependencies:
   - composite.alignment
   - rl.environment
@@ -8114,7 +8002,7 @@ rows:
   - rl_environment
   fixture_ids:
   - fixture.composite_rl_policy_stub_v1
-  performance_budget_id: perf.execution_engine_v1
+  performance_budget_id: perf.composite_signal_v1
   required_tests:
   - registry
   - param_validation
@@ -8124,4 +8012,4 @@ rows:
   - performance_smoke
   batch: composite_wave_5
   source_reference_code: CFA-RL
-  notes: Seeded from requirements_v4 combination row 12; initial starter-pack metadata auto-generated.
+  notes: Implemented in composite_wave_5 with reusable RL controller helpers, hierarchical action-family gating, normalized allocation diagnostics, schema validation, and fixture-backed meta-policy behavior coverage.

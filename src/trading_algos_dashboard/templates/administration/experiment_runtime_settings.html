@@ -73,53 +73,13 @@
 </div>
 
 <div class="card shadow-sm mt-4">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
-      <div>
-        <h2 class="h4 mb-1">Market data cache</h2>
-        <p class="text-muted mb-0">Configure cache retention for fetched candle datasets.</p>
-      </div>
-      <div class="small text-muted">
-        Memory entries: <strong>{{ cache_stats.memory_entry_count }}</strong>
-        · DB entries: <strong>{{ cache_stats.shared_entry_count }}</strong>
-      </div>
+  <div class="card-body d-flex justify-content-between align-items-start gap-3 flex-wrap">
+    <div>
+      <h2 class="h4 mb-1">Market data cache</h2>
+      <p class="text-muted mb-0">Cache settings, manual fills, entry inspection, TTL metadata, and per-entry deletion now live on the dedicated cache management page.</p>
     </div>
-    <form method="post" action="{{ url_for('administration.save_market_data_cache_settings') }}" class="row g-3">
-      <div class="col-md-3">
-        <div class="form-check mt-4">
-          <input class="form-check-input" type="checkbox" id="memory-enabled" name="memory_enabled" {% if cache_settings.memory_enabled %}checked{% endif %}>
-          <label class="form-check-label" for="memory-enabled">Enable memory cache</label>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" for="memory-max-entries">Memory cache max entries</label>
-        <input class="form-control" id="memory-max-entries" type="number" min="1" name="memory_max_entries" value="{{ cache_settings.memory_max_entries }}" required>
-      </div>
-      <div class="col-md-3">
-        <div class="form-check mt-4">
-          <input class="form-check-input" type="checkbox" id="shared-enabled" name="shared_enabled" {% if cache_settings.shared_enabled %}checked{% endif %}>
-          <label class="form-check-label" for="shared-enabled">Enable DB cache</label>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" for="shared-max-entries">DB cache max entries</label>
-        <input class="form-control" id="shared-max-entries" type="number" min="1" name="shared_max_entries" value="{{ cache_settings.shared_max_entries }}" required>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label" for="shared-ttl-hours">DB cache TTL (hours)</label>
-        <input class="form-control" id="shared-ttl-hours" type="number" min="1" name="shared_ttl_hours" value="{{ cache_settings.shared_ttl_hours }}" required>
-      </div>
-      <div class="col-12 d-flex gap-2 flex-wrap">
-        <button class="btn btn-primary" type="submit">Save cache settings</button>
-      </div>
-    </form>
-    <div class="border-top mt-4 pt-3 d-flex gap-2 flex-wrap">
-      <form method="post" action="{{ url_for('administration.clear_market_data_memory_cache') }}">
-        <button class="btn btn-outline-secondary" type="submit">Clear memory cache</button>
-      </form>
-      <form method="post" action="{{ url_for('administration.clear_market_data_shared_cache') }}">
-        <button class="btn btn-outline-danger" type="submit">Clear DB cache</button>
-      </form>
+    <div>
+      <a class="btn btn-outline-secondary" href="{{ url_for('administration.cache_management') }}">Open cache management</a>
     </div>
   </div>
 </div>

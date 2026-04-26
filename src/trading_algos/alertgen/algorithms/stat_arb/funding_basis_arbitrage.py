@@ -1,0 +1,159 @@
+from __future__ import annotations
+
+from typing import Any
+
+from trading_algos.alertgen.algorithms.stat_arb.base import BaseStatArbAlertAlgorithm
+from trading_algos.alertgen.algorithms.stat_arb.helpers import (
+    StatArbRow,
+    basis_snapshot,
+    build_pair_legs,
+    evaluate_spread_state,
+    required_history,
+)
+from trading_algos.contracts.multi_leg_output import MultiLegPosition
+from trading_algos.data.panel_dataset import MultiAssetPanel
+from trading_algos.rebalance.calendar import select_rebalance_timestamps
+
+
+class FundingBasisArbitrageAlertAlgorithm(BaseStatArbAlertAlgorithm):
+    catalog_ref = "algorithm:51"
+
+
+def build_funding_basis_arbitrage_algorithm(
+    *,
+    algorithm_key: str,
+    symbol: str,
+    alg_param: dict[str, Any],
+    report_base_path: str | None = None,
+    sensor_config: dict[str, Any] | None = None,
+) -> FundingBasisArbitrageAlertAlgorithm:
+    _ = report_base_path, sensor_config
+    panel = MultiAssetPanel.from_rows(list(alg_param["rows"]))
+    base_symbol = str(alg_param["base_symbol"])
+    quote_symbol = str(alg_param["quote_symbol"])
+    lookback_window = int(alg_param["lookback_window"])
+    entry_zscore = float(alg_param["entry_zscore"])
+    exit_zscore = float(alg_param["exit_zscore"])
+    carry_threshold = float(alg_param["carry_threshold"])
+    minimum_history = int(alg_param["minimum_history"])
+    warmup_period = required_history(
+        lookback_window=lookback_window,
+        minimum_history=minimum_history,
+    )
+    schedule = select_rebalance_timestamps(
+        panel.timestamps(), frequency=str(alg_param["rebalance_frequency"])
+    )
+    rows: list[StatArbRow] = []
+    is_active = False
+    for timestamp in schedule:
+        base_history = panel.rows_for_symbol_until(base_symbol, timestamp=timestamp)
+        quote_history = panel.rows_for_symbol_until(quote_symbol, timestamp=timestamp)
+        if min(len(base_history), len(quote_history)) < warmup_period:
+            rows.append(
+                StatArbRow(
+                    timestamp=timestamp,
+                    spread_value=0.0,
+                    zscore=None,
+                    hedge_ratio=1.0,
+                    legs=(),
+                    diagnostics={
+                        "selection_reason": "warmup_pending",
+                        "warmup_ready": False,
+                        "minimum_history": minimum_history,
+                        "warmup_period": warmup_period,
+                    },
+                )
+            )
+            continue
+        snapshot = basis_snapshot(
+            panel,
+            timestamp=timestamp,
+            base_symbol=base_symbol,
+            quote_symbol=quote_symbol,
+            lookback_window=lookback_window,
+            basis_field=str(alg_param["basis_field"]),
+            funding_field=str(alg_param["funding_field"]),
+        )
+        if snapshot is None:
+            rows.append(
+                StatArbRow(
+                    timestamp=timestamp,
+                    spread_value=0.0,
+                    zscore=None,
+                    hedge_ratio=1.0,
+                    legs=(),
+                    diagnostics={
+                        "selection_reason": "warmup_pending",
+                        "warmup_ready": False,
+                        "minimum_history": minimum_history,
+                        "warmup_period": warmup_period,
+                    },
+                )
+            )
+            continue
+        zscore = snapshot.zscore
+        legs: tuple[MultiLegPosition, ...] = ()
+        carry_signal = abs(snapshot.spread_value) >= carry_threshold
+        if carry_signal:
+            decision = evaluate_spread_state(
+                zscore=zscore,
+                entry_zscore=entry_zscore,
+                exit_zscore=exit_zscore,
+                was_active=is_active,
+                entry_reason="carry_entry",
+                hold_reason="carry_hold",
+                exit_reason="carry_exit",
+                idle_reason="carry_below_threshold",
+            )
+            is_active = decision.is_active
+            reason = decision.reason
+        elif is_active:
+            is_active = False
+            reason = "carry_exit"
+        else:
+            reason = "carry_below_threshold"
+        if is_active:
+            legs = build_pair_legs(
+                base_symbol=base_symbol,
+                quote_symbol=quote_symbol,
+                hedge_ratio=snapshot.hedge_ratio,
+                spread_value=snapshot.spread_value,
+            )
+        rows.append(
+            StatArbRow(
+                timestamp=timestamp,
+                spread_value=snapshot.spread_value,
+                zscore=zscore,
+                hedge_ratio=snapshot.hedge_ratio,
+                legs=legs,
+                diagnostics={
+                    "selection_reason": reason,
+                    "warmup_ready": True,
+                    "base_symbol": base_symbol,
+                    "quote_symbol": quote_symbol,
+                    "minimum_history": minimum_history,
+                    "warmup_period": warmup_period,
+                    "entry_zscore": entry_zscore,
+                    "exit_zscore": exit_zscore,
+                    "carry_threshold": carry_threshold,
+                    "mean_spread": snapshot.mean_spread,
+                    "spread_volatility": snapshot.spread_volatility,
+                    "zscore": zscore,
+                    "hedge_ratio": snapshot.hedge_ratio,
+                    "carry_signal": carry_signal,
+                    "spread_direction": "positive"
+                    if snapshot.spread_value >= 0.0
+                    else "negative",
+                    "active_legs": len(legs),
+                    "selected_symbol": f"{base_symbol}/{quote_symbol}",
+                },
+            )
+        )
+    return FundingBasisArbitrageAlertAlgorithm(
+        algorithm_key=algorithm_key,
+        symbol=symbol,
+        alg_name="funding_basis_arbitrage",
+        family="stat_arb",
+        subcategory="funding",
+        rows=rows,
+    )

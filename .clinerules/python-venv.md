@@ -57,6 +57,17 @@ When touching a file, implementing something new, or fixing a bug/issue, always 
 11. Avoid noisy logs in hot loops unless they are debug and intentionally diagnostic.
 12. Validation failures and expected user mistakes are not system errors unless they reveal broken assumptions or security concerns.
 
+## Execution rules:
+- Work incrementally in small steps.
+- Do not attempt one large multi-file patch.
+- If multiple files need edits, update them one file at a time.
+- Implement multiple algorithms sequentially, not in one combined edit.
+- Reuse shared helpers instead of duplicating logic.
+- Do not run interactive commands, watch mode, or long-running processes.
+- Run only the smallest relevant non-interactive test subset.
+- Regenerate trackers only after code changes succeed.
+- Keep scope limited to the requested batch.
+
 ## When running tests
 - Tests are not always correct.
 - If a test fails, determine whether the root cause is:
