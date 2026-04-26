@@ -10,6 +10,8 @@ from trading_algos.alertgen import get_alert_algorithm_spec_by_key
 from trading_algos.alertgen.core.validation import normalize_alertgen_sensor_config
 from trading_algos_dashboard.services.backtrace_models import (
     BacktraceCandle,
+    BacktraceDataSource,
+    BacktraceInputMode,
     BacktraceRequest,
     BacktraceResult,
     BacktraceResultDict,
@@ -26,12 +28,18 @@ class BacktraceSessionStore(Protocol):
     def update_session(self, run_id: str, values: dict[str, Any]) -> None: ...
 
 
+class MarketDataFetchService(Protocol):
+    def fetch_candles(
+        self,
+        *,
+        symbol: str,
+        start: datetime,
+        end: datetime,
+    ) -> Any: ...
+
+
 class EnginesControlRuntimeService:
-    _REQUIRED_REQUEST_FIELDS: tuple[str, ...] = (
-        "algorithm_key",
-        "symbol",
-        "candles",
-    )
+    _REQUIRED_REQUEST_FIELDS: tuple[str, ...] = ("algorithm_key", "symbol")
     _REQUIRED_CANDLE_FIELDS: tuple[RequiredCandleField, ...] = (
         "ts",
         "Open",
@@ -44,8 +52,10 @@ class EnginesControlRuntimeService:
         self,
         *,
         backtrace_session_repository: BacktraceSessionStore | None = None,
+        data_source_service: MarketDataFetchService | None = None,
     ) -> None:
         self._backtrace_session_repository = backtrace_session_repository
+        self._data_source_service = data_source_service
 
     def run_backtrace(self, request: dict[str, Any]) -> BacktraceResultDict:
         started_at = self._utc_now()
@@ -113,10 +123,10 @@ class EnginesControlRuntimeService:
             algorithm_key=normalized_request.algorithm_key,
             symbol=normalized_request.symbol,
             input_summary=self._build_input_summary(normalized_request),
-            signal_summary=dict(execution_result["signal_summary"]),
-            evaluation_summary=dict(execution_result["evaluation_summary"]),
-            report=dict(execution_result["report"]),
-            chart_payload=dict(execution_result["chart_payload"]),
+            signal_summary=dict(execution_result["signal_summary"] or {}),
+            evaluation_summary=dict(execution_result["evaluation_summary"] or {}),
+            report=dict(execution_result["report"] or {}),
+            chart_payload=dict(execution_result["chart_payload"] or {}),
             execution_steps=list(execution_result["execution_steps"]),
             error=None,
             started_at=started_at,
@@ -263,7 +273,6 @@ class EnginesControlRuntimeService:
         self._validate_required_fields(request)
         algorithm_key = self._require_non_empty_string(request, "algorithm_key")
         symbol = self._require_non_empty_string(request, "symbol")
-        candles = self._normalize_candles(request["candles"])
         algorithm_params = self._normalize_optional_dict(
             request.get("algorithm_params"),
             field_name="algorithm_params",
@@ -272,12 +281,22 @@ class EnginesControlRuntimeService:
             request.get("metadata"),
             field_name="metadata",
         )
+        input_mode, candles, data_source, start_at, end_at = (
+            self._resolve_request_input(
+                request,
+                symbol=symbol,
+            )
+        )
 
         return BacktraceRequest(
             algorithm_key=algorithm_key,
             algorithm_params=algorithm_params,
             symbol=symbol,
             candles=candles,
+            input_mode=input_mode,
+            data_source=data_source,
+            start_at=start_at,
+            end_at=end_at,
             buy=self._normalize_optional_bool(
                 request.get("buy"), field_name="buy", default=True
             ),
@@ -297,6 +316,106 @@ class EnginesControlRuntimeService:
                 raise ValueError(
                     f"Backtrace request is missing required field: {field_name}"
                 )
+
+    def _resolve_request_input(
+        self,
+        request: dict[str, Any],
+        *,
+        symbol: str,
+    ) -> tuple[
+        BacktraceInputMode,
+        list[BacktraceCandle],
+        BacktraceDataSource | None,
+        str | None,
+        str | None,
+    ]:
+        has_inline_candles = "candles" in request
+        has_data_source = (
+            "data_source" in request or "start_at" in request or "end_at" in request
+        )
+
+        if has_inline_candles == has_data_source:
+            raise ValueError(
+                "Backtrace request must use exactly one input mode: inline candles or data_source with start_at/end_at"
+            )
+
+        if has_inline_candles:
+            return (
+                "inline_candles",
+                self._normalize_candles(request["candles"]),
+                None,
+                None,
+                None,
+            )
+
+        data_source = self._normalize_data_source(request.get("data_source"))
+        start_at = self._require_datetime_string(request, "start_at")
+        end_at = self._require_datetime_string(request, "end_at")
+        candles = self._fetch_data_source_candles(
+            data_source=data_source,
+            symbol=symbol,
+            start_at=start_at,
+            end_at=end_at,
+        )
+        return ("data_source", candles, data_source, start_at, end_at)
+
+    def _normalize_data_source(self, value: Any) -> BacktraceDataSource:
+        if not isinstance(value, dict):
+            raise ValueError(
+                "Backtrace request field data_source must be a JSON object"
+            )
+        kind = value.get("kind")
+        if not isinstance(kind, str) or not kind.strip():
+            raise ValueError(
+                "Backtrace request field data_source.kind must be a non-empty string"
+            )
+        normalized_kind = kind.strip()
+        if normalized_kind != "market_data_service":
+            raise ValueError(
+                "Backtrace request field data_source.kind must be market_data_service"
+            )
+        return BacktraceDataSource(kind=normalized_kind)
+
+    def _require_datetime_string(self, request: dict[str, Any], field_name: str) -> str:
+        value = request.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(
+                f"Backtrace request field {field_name} must be a non-empty ISO datetime string"
+            )
+        normalized = value.strip()
+        self._parse_datetime_string(normalized, field_name=field_name)
+        return normalized
+
+    def _parse_datetime_string(self, value: str, *, field_name: str) -> datetime:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(
+                f"Backtrace request field {field_name} must be a valid ISO datetime string"
+            ) from exc
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _fetch_data_source_candles(
+        self,
+        *,
+        data_source: BacktraceDataSource,
+        symbol: str,
+        start_at: str,
+        end_at: str,
+    ) -> list[BacktraceCandle]:
+        del data_source
+        if self._data_source_service is None:
+            raise ValueError(
+                "Backtrace data-source mode is unavailable because no data source service is configured"
+            )
+        fetch_result = self._data_source_service.fetch_candles(
+            symbol=symbol,
+            start=self._parse_datetime_string(start_at, field_name="start_at"),
+            end=self._parse_datetime_string(end_at, field_name="end_at"),
+        )
+        return self._normalize_candles(fetch_result.candles)
 
     def _normalize_candles(self, candles: Any) -> list[BacktraceCandle]:
         if not isinstance(candles, list):
@@ -368,7 +487,8 @@ class EnginesControlRuntimeService:
         return value.strip()
 
     def _build_input_summary(self, request: BacktraceRequest) -> dict[str, Any]:
-        return {
+        summary: dict[str, Any] = {
+            "input_mode": request.input_mode,
             "candle_count": len(request.candles),
             "buy_enabled": request.buy,
             "sell_enabled": request.sell,
@@ -376,6 +496,11 @@ class EnginesControlRuntimeService:
             "algorithm_param_keys": sorted(request.algorithm_params.keys()),
             "metadata_keys": sorted(request.metadata.keys()),
         }
+        if request.data_source is not None:
+            summary["data_source"] = request.data_source.to_transport_dict()
+            summary["start_at"] = request.start_at
+            summary["end_at"] = request.end_at
+        return summary
 
     def _failed_input_summary(self, request: Any) -> dict[str, Any]:
         if not isinstance(request, dict):
@@ -385,6 +510,13 @@ class EnginesControlRuntimeService:
         return {
             "provided_keys": sorted(request.keys()),
             "candle_count": candle_count,
+            "has_data_source": isinstance(request.get("data_source"), dict),
+            "start_at": request.get("start_at")
+            if isinstance(request.get("start_at"), str)
+            else None,
+            "end_at": request.get("end_at")
+            if isinstance(request.get("end_at"), str)
+            else None,
         }
 
     def _normalize_string_field_if_present(self, request: Any, field_name: str) -> str:

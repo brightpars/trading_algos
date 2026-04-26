@@ -458,7 +458,68 @@ def test_backtrace_submit_api_returns_validation_error(monkeypatch):
     payload = response.get_json()
     assert payload == {
         "error": "validation_error",
-        "message": "Backtrace request is missing required field: candles",
+        "message": "Backtrace request must use exactly one input mode: inline candles or data_source with start_at/end_at",
+    }
+
+
+def test_backtrace_submit_api_accepts_data_source_mode(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    def _fetch_candles(**_kwargs):
+        return type(
+            "_FetchResult",
+            (),
+            {
+                "candles": _backtrace_request_payload()["candles"],
+            },
+        )()
+
+    monkeypatch.setattr(
+        app.extensions["data_source_service"],
+        "fetch_candles",
+        _fetch_candles,
+    )
+
+    response = app.test_client().post(
+        "/api/backtraces",
+        json={
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "algorithm_params": {"window": 2},
+            "symbol": "AAPL",
+            "data_source": {"kind": "market_data_service"},
+            "start_at": "2025-01-01T10:00:00Z",
+            "end_at": "2025-01-01T10:02:00Z",
+            "metadata": {"source": "api-test", "label": "demo"},
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.get_json()
+    assert payload["status"] == "completed"
+    assert payload["request"]["data_source"] == {"kind": "market_data_service"}
+    assert payload["request"]["start_at"] == "2025-01-01T10:00:00Z"
+    assert payload["request"]["end_at"] == "2025-01-01T10:02:00Z"
+    assert payload["input_summary"]["input_mode"] == "data_source"
+
+
+def test_backtrace_submit_api_rejects_mixed_input_modes(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/api/backtraces",
+        json={
+            **_backtrace_request_payload(),
+            "data_source": {"kind": "market_data_service"},
+            "start_at": "2025-01-01T10:00:00Z",
+            "end_at": "2025-01-01T10:02:00Z",
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload == {
+        "error": "validation_error",
+        "message": "Backtrace request must use exactly one input mode: inline candles or data_source with start_at/end_at",
     }
 
 

@@ -140,8 +140,10 @@ def test_new_backtrace_page_renders(monkeypatch):
 
     assert response.status_code == 200
     assert b"Manual backtrace" in response.data
+    assert b'name="input_mode"' in response.data
     assert b'name="algorithm_key"' in response.data
     assert b'name="candles_json"' in response.data
+    assert b'name="start_at"' in response.data
     assert b"View recent runs" in response.data
 
 
@@ -218,3 +220,89 @@ def test_backtrace_validation_error_renders_on_form(monkeypatch):
     assert b"Candles JSON must decode to a JSON array." in response.data
     assert b'name="algorithm_key"' in response.data
     assert b"AAPL" in response.data
+
+
+def test_backtrace_submit_flow_supports_data_source_mode(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    def _fetch_candles(**_kwargs):
+        return type(
+            "_FetchResult",
+            (),
+            {
+                "candles": [
+                    {
+                        "ts": "2025-01-01T10:00:00Z",
+                        "Open": 100.0,
+                        "High": 101.0,
+                        "Low": 99.0,
+                        "Close": 100.5,
+                    },
+                    {
+                        "ts": "2025-01-01T10:01:00Z",
+                        "Open": 100.5,
+                        "High": 101.5,
+                        "Low": 100.0,
+                        "Close": 101.0,
+                    },
+                    {
+                        "ts": "2025-01-01T10:02:00Z",
+                        "Open": 101.0,
+                        "High": 102.0,
+                        "Low": 100.5,
+                        "Close": 101.8,
+                    },
+                ]
+            },
+        )()
+
+    monkeypatch.setattr(
+        app.extensions["data_source_service"],
+        "fetch_candles",
+        _fetch_candles,
+    )
+
+    response = app.test_client().post(
+        "/backtraces",
+        data={
+            "input_mode": "data_source",
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+            "algorithm_params_json": '{"window": 2}',
+            "candles_json": "[]",
+            "data_source_kind": "market_data_service",
+            "start_at": "2025-01-01T10:00:00Z",
+            "end_at": "2025-01-01T10:02:00Z",
+            "metadata_json": '{"source": "dashboard-test", "label": "demo"}',
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    run_id = response.headers["Location"].rsplit("/", 1)[-1]
+    run = app.extensions["backtrace_client_service"].get_run(run_id)
+    assert run is not None
+    assert run["status"] == "completed"
+    assert run["request"]["data_source"] == {"kind": "market_data_service"}
+    assert run["request"]["start_at"] == "2025-01-01T10:00:00Z"
+    assert run["request"]["end_at"] == "2025-01-01T10:02:00Z"
+
+
+def test_backtrace_submit_flow_rejects_invalid_input_mode(monkeypatch):
+    app = _build_app(monkeypatch)
+
+    response = app.test_client().post(
+        "/backtraces",
+        data={
+            "input_mode": "broken",
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+            "algorithm_params_json": '{"window": 2}',
+            "candles_json": "[]",
+            "metadata_json": '{"source": "dashboard-test"}',
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 400
+    assert b"Input mode must be inline_candles or data_source." in response.data

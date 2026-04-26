@@ -225,6 +225,7 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     )
     engines_control_runtime_service = EnginesControlRuntimeService(
         backtrace_session_repository=backtrace_session_repository,
+        data_source_service=data_source_service,
     )
     backtrace_client_service = BacktraceClientService(
         runtime_service=engines_control_runtime_service,

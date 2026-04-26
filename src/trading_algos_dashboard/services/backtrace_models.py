@@ -6,6 +6,11 @@ from typing import Any, Literal, NotRequired, TypedDict
 
 RequiredCandleField = Literal["ts", "Open", "High", "Low", "Close"]
 ResultStatus = Literal["completed", "failed"]
+BacktraceInputMode = Literal["inline_candles", "data_source"]
+
+
+class BacktraceDataSourceDict(TypedDict):
+    kind: str
 
 
 class BacktraceCandleDict(TypedDict):
@@ -21,7 +26,10 @@ class BacktraceRequestDict(TypedDict):
     algorithm_key: str
     algorithm_params: NotRequired[dict[str, Any]]
     symbol: str
-    candles: list[BacktraceCandleDict]
+    candles: NotRequired[list[BacktraceCandleDict]]
+    data_source: NotRequired[BacktraceDataSourceDict]
+    start_at: NotRequired[str]
+    end_at: NotRequired[str]
     buy: NotRequired[bool]
     sell: NotRequired[bool]
     request_id: NotRequired[str]
@@ -69,11 +77,23 @@ class BacktraceCandle:
 
 
 @dataclass(frozen=True)
+class BacktraceDataSource:
+    kind: str
+
+    def to_transport_dict(self) -> BacktraceDataSourceDict:
+        return {"kind": self.kind}
+
+
+@dataclass(frozen=True)
 class BacktraceRequest:
     algorithm_key: str
     algorithm_params: dict[str, Any]
     symbol: str
     candles: list[BacktraceCandle]
+    input_mode: BacktraceInputMode
+    data_source: BacktraceDataSource | None
+    start_at: str | None
+    end_at: str | None
     buy: bool
     sell: bool
     request_id: str | None
@@ -90,6 +110,12 @@ class BacktraceRequest:
             "sell": self.sell,
             "metadata": dict(self.metadata),
         }
+        if self.data_source is not None:
+            payload["data_source"] = self.data_source.to_transport_dict()
+        if self.start_at is not None:
+            payload["start_at"] = self.start_at
+        if self.end_at is not None:
+            payload["end_at"] = self.end_at
         if self.request_id is not None:
             payload["request_id"] = self.request_id
         if self.report_base_path is not None:

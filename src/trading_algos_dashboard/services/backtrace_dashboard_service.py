@@ -12,10 +12,14 @@ class BacktraceDashboardService:
 
     def default_form_data(self) -> dict[str, str]:
         return {
+            "input_mode": "inline_candles",
             "algorithm_key": "",
             "symbol": "",
             "algorithm_params_json": "{}",
             "candles_json": "[]",
+            "data_source_kind": "market_data_service",
+            "start_at": "",
+            "end_at": "",
             "metadata_json": "{}",
         }
 
@@ -45,27 +49,38 @@ class BacktraceDashboardService:
         return self._backtrace_client_service.get_run(run_id)
 
     def _build_request_payload(self, form_data: Mapping[str, str]) -> dict[str, Any]:
+        input_mode = str(form_data.get("input_mode", "inline_candles")).strip()
         algorithm_key = str(form_data.get("algorithm_key", "")).strip()
         symbol = str(form_data.get("symbol", "")).strip()
         algorithm_params = self._parse_json_object(
             form_data.get("algorithm_params_json", "{}"),
             field_label="Params JSON",
         )
-        candles = self._parse_json_array(
-            form_data.get("candles_json", "[]"),
-            field_label="Candles JSON",
-        )
         metadata = self._parse_json_object(
             form_data.get("metadata_json", "{}"),
             field_label="Metadata JSON",
         )
-        return {
+        payload = {
             "algorithm_key": algorithm_key,
             "symbol": symbol,
             "algorithm_params": algorithm_params,
-            "candles": candles,
             "metadata": metadata,
         }
+        if input_mode == "inline_candles":
+            payload["candles"] = self._parse_json_array(
+                form_data.get("candles_json", "[]"),
+                field_label="Candles JSON",
+            )
+            return payload
+        if input_mode == "data_source":
+            data_source_kind = str(
+                form_data.get("data_source_kind", "market_data_service")
+            ).strip()
+            payload["data_source"] = {"kind": data_source_kind}
+            payload["start_at"] = str(form_data.get("start_at", "")).strip()
+            payload["end_at"] = str(form_data.get("end_at", "")).strip()
+            return payload
+        raise ValueError("Input mode must be inline_candles or data_source.")
 
     @staticmethod
     def _parse_json_object(raw_value: object, *, field_label: str) -> dict[str, Any]:

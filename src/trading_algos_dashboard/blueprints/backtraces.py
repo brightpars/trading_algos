@@ -111,10 +111,14 @@ def new_backtrace() -> Response:
 @bp.post("")
 def create_backtrace() -> Response:
     submitted_form_data = {
+        "input_mode": request.form.get("input_mode", "inline_candles"),
         "algorithm_key": request.form.get("algorithm_key", ""),
         "symbol": request.form.get("symbol", ""),
         "algorithm_params_json": request.form.get("algorithm_params_json", "{}"),
         "candles_json": request.form.get("candles_json", "[]"),
+        "data_source_kind": request.form.get("data_source_kind", "market_data_service"),
+        "start_at": request.form.get("start_at", ""),
+        "end_at": request.form.get("end_at", ""),
         "metadata_json": request.form.get("metadata_json", "{}"),
     }
     try:

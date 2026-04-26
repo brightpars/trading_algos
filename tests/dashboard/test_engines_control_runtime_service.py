@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from trading_algos_dashboard.services.engines_control_runtime_service import (
     EnginesControlRuntimeService,
 )
@@ -23,6 +25,22 @@ class _BacktraceSessionRepositoryStub:
 
     def list_recent_runs(self, *, limit: int = 20) -> list[dict[str, object]]:
         return list(self.sessions.values())[:limit]
+
+
+class _DataSourceServiceStub:
+    def __init__(self, candles: list[dict[str, object]]) -> None:
+        self.candles = [dict(candle) for candle in candles]
+        self.calls: list[dict[str, object]] = []
+
+    def fetch_candles(self, *, symbol: str, start: datetime, end: datetime):
+        self.calls.append(
+            {
+                "symbol": symbol,
+                "start": start,
+                "end": end,
+            }
+        )
+        return type("_FetchResult", (), {"candles": [dict(c) for c in self.candles]})()
 
 
 def _candles() -> list[dict[str, object]]:
@@ -65,6 +83,7 @@ def test_run_backtrace_normalizes_defaults_for_valid_request() -> None:
     assert result["symbol"] == "AAPL"
     assert result["error"] is None
     assert result["input_summary"] == {
+        "input_mode": "inline_candles",
         "candle_count": 6,
         "buy_enabled": True,
         "sell_enabled": True,
@@ -125,6 +144,9 @@ def test_run_backtrace_fails_for_invalid_candle_payload_shape() -> None:
     assert result["input_summary"] == {
         "provided_keys": ["algorithm_key", "candles", "symbol"],
         "candle_count": 1,
+        "has_data_source": False,
+        "start_at": None,
+        "end_at": None,
     }
 
 
@@ -168,6 +190,7 @@ def test_run_backtrace_returns_stable_result_shape() -> None:
     assert result["started_at"]
     assert result["finished_at"]
     assert result["input_summary"] == {
+        "input_mode": "inline_candles",
         "candle_count": 6,
         "buy_enabled": False,
         "sell_enabled": True,
@@ -284,3 +307,100 @@ def test_run_backtrace_persists_failure_result() -> None:
     assert persisted["full_result"] == result
     assert persisted["error"] == result["error"]
     assert persisted["finished_at"] == result["finished_at"]
+
+
+def test_run_backtrace_fetches_candles_from_data_source_mode() -> None:
+    data_source_service = _DataSourceServiceStub(_candles() * 2)
+    service = EnginesControlRuntimeService(data_source_service=data_source_service)
+
+    result = service.run_backtrace(
+        {
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+            "data_source": {"kind": "market_data_service"},
+            "start_at": "2025-01-01T10:00:00Z",
+            "end_at": "2025-01-01T10:03:00Z",
+        }
+    )
+
+    assert result["status"] == "completed"
+    assert result["input_summary"] == {
+        "input_mode": "data_source",
+        "candle_count": 4,
+        "buy_enabled": True,
+        "sell_enabled": True,
+        "has_report_base_path": False,
+        "algorithm_param_keys": [],
+        "metadata_keys": [],
+        "data_source": {"kind": "market_data_service"},
+        "start_at": "2025-01-01T10:00:00Z",
+        "end_at": "2025-01-01T10:03:00Z",
+    }
+    assert data_source_service.calls == [
+        {
+            "symbol": "AAPL",
+            "start": datetime(2025, 1, 1, 10, 0, tzinfo=timezone.utc),
+            "end": datetime(2025, 1, 1, 10, 3, tzinfo=timezone.utc),
+        }
+    ]
+
+
+def test_run_backtrace_fails_for_mixed_input_modes() -> None:
+    service = EnginesControlRuntimeService(
+        data_source_service=_DataSourceServiceStub(_candles())
+    )
+
+    result = service.run_backtrace(
+        {
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+            "candles": _candles(),
+            "data_source": {"kind": "market_data_service"},
+            "start_at": "2025-01-01T10:00:00Z",
+            "end_at": "2025-01-01T10:01:00Z",
+        }
+    )
+
+    assert result["status"] == "failed"
+    assert (
+        result["error"]
+        == "Backtrace request must use exactly one input mode: inline candles or data_source with start_at/end_at"
+    )
+
+
+def test_run_backtrace_fails_for_missing_input_mode() -> None:
+    service = EnginesControlRuntimeService()
+
+    result = service.run_backtrace(
+        {
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+        }
+    )
+
+    assert result["status"] == "failed"
+    assert (
+        result["error"]
+        == "Backtrace request must use exactly one input mode: inline candles or data_source with start_at/end_at"
+    )
+
+
+def test_run_backtrace_fails_when_data_source_mode_missing_time_range() -> None:
+    service = EnginesControlRuntimeService(
+        data_source_service=_DataSourceServiceStub(_candles())
+    )
+
+    result = service.run_backtrace(
+        {
+            "algorithm_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "symbol": "AAPL",
+            "data_source": {"kind": "market_data_service"},
+            "start_at": "2025-01-01T10:00:00Z",
+        }
+    )
+
+    assert result["status"] == "failed"
+    assert (
+        result["error"]
+        == "Backtrace request field end_at must be a non-empty ISO datetime string"
+    )
