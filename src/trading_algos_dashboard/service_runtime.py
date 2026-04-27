@@ -13,6 +13,8 @@ from trading_servers import DataServer
 from trading_servers import FakeDateTimeServer
 from trading_servers.xmlrpc_server import Base_XML_RPC_Server
 
+from trading_algos_dashboard.engines_control_runtime import EnginesControlRuntimeServer
+
 
 @dataclass(frozen=True)
 class ServiceRuntimeConfig:
@@ -108,6 +110,14 @@ def _build_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
         )
     if config.name == "fake_datetime":
         return FakeDateTimeServer(
+            user_id=config.user_id,
+            ip=config.host,
+            port=config.port,
+            sever_name=config.name,
+            log_requests_to_terminal=False,
+        )
+    if config.name == "engines_control":
+        return EnginesControlRuntimeServer(
             user_id=config.user_id,
             ip=config.host,
             port=config.port,

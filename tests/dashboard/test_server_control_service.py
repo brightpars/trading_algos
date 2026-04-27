@@ -45,18 +45,21 @@ def test_data_service_environment_contains_dashboard_service_fields():
     assert environment["SERVICE_USER_ID"] == "1"
 
 
-def test_engines_control_has_no_dashboard_default_start_command() -> None:
+def test_engines_control_uses_dashboard_service_runtime_by_default() -> None:
     service = ServerControlService(repository=cast(Any, _Repository()))
     definition = service._definition_by_name("engines_control")
 
     command, source = service._start_command_details(definition)
 
-    assert command is None
-    assert source == "No dashboard start command is configured for this service."
+    assert source == "dashboard default"
+    assert (
+        command
+        == "./.venv/bin/python -m trading_algos_dashboard.service_runtime engines_control"
+    )
 
 
-def test_engines_control_is_not_controllable_from_dashboard() -> None:
+def test_engines_control_is_controllable_from_dashboard() -> None:
     service = ServerControlService(repository=cast(Any, _Repository()))
     definition = service._definition_by_name("engines_control")
 
-    assert definition["controllable"] is False
+    assert definition["controllable"] is True

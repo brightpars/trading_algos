@@ -1,0 +1,70 @@
+from __future__ import annotations
+
+from trading_algos_dashboard.engines_control_runtime import run_engine_chain_payload
+
+
+def _candles() -> list[dict[str, object]]:
+    return [
+        {
+            "ts": "2025-01-01 10:00:00",
+            "Open": 10.0,
+            "High": 11.0,
+            "Low": 9.0,
+            "Close": 10.5,
+        },
+        {
+            "ts": "2025-01-01 10:01:00",
+            "Open": 10.5,
+            "High": 12.0,
+            "Low": 10.0,
+            "Close": 11.5,
+        },
+        {
+            "ts": "2025-01-01 10:02:00",
+            "Open": 11.5,
+            "High": 13.0,
+            "Low": 11.0,
+            "Close": 12.5,
+        },
+    ]
+
+
+def test_run_engine_chain_payload_returns_self_contained_dashboard_result(
+    tmp_path,
+) -> None:
+    result = run_engine_chain_payload(
+        {
+            "symbol": "AAPL",
+            "report_base_path": str(tmp_path),
+            "candles": _candles(),
+            "alertgens": [
+                {
+                    "symbol": "AAPL",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                    "buy": True,
+                    "sell": True,
+                }
+            ],
+            "decmaker": {
+                "decmaker_key": "alg1",
+                "decmaker_param": {
+                    "confidence_threshold_buy": 0.0,
+                    "confidence_threshold_sell": 0.0,
+                    "max_percent_higher_price_buy": 0.0,
+                    "max_percent_lower_price_sell": 0.0,
+                },
+            },
+        }
+    )
+
+    assert result["input_kind"] == "engine_chain"
+    assert result["alg_name"] == "Engine chain for AAPL"
+    assert result["execution_steps"]
+    assert result["execution_steps"][0]["step"] == "run_engine_chain"
+    assert result["execution_steps"][0]["duration_seconds"] >= 0
+    assert result["signal_summary"]["alertgen_count"] == 1
+    assert result["signal_summary"]["total_rows"] == 3
+    assert result["report"]["algorithm_summary"]["runtime_kind"] == "engine_chain"
+    assert result["report"]["diagnostics"]["alertgen_results"]
+    assert "latest_decision" in result
