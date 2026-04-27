@@ -207,6 +207,14 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b'id="run-mode-select"' in response.data
     assert b'data-run-mode-section="engine_chain"' in response.data
     assert b'data-run-mode-section="configuration"' in response.data
+    assert b'name="configuration_source"' in response.data
+    assert b"Quick builder (single algorithm)" in response.data
+    assert b'name="quick_builder_alg_key"' in response.data
+    assert b'data-configuration-source-section="quick_builder"' in response.data
+    assert b'data-configuration-source-section="configuration_json"' in response.data
+    assert b'id="quick-builder-configuration-preview"' in response.data
+    assert b"readonly" in response.data
+    assert b"data-default-param=" in response.data
     assert (
         b'<option value="configuration" selected>Configuration</option>'
         in response.data
@@ -506,6 +514,58 @@ def test_new_experiment_page_prefills_selected_algorithm_from_query(monkeypatch)
         in response.data
     )
     assert b'name="configuration_json"' in response.data
+    assert b'name="quick_builder_alg_key"' in response.data
+    assert (
+        b'value="OLD_boundary_breakout_NEW_breakout_donchian_channel"' in response.data
+    )
+    assert b"data-default-param=" in response.data
+    assert b"quick_param__period" in response.data
+    assert b">5<" in response.data or b'value="5"' in response.data
+
+
+def test_create_experiment_accepts_quick_builder_configuration(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+        )
+    )
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
+
+    response = app.test_client().post(
+        "/experiments",
+        data={
+            "run_mode": "configuration",
+            "configuration_source": "quick_builder",
+            "quick_builder_alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "quick_param__period": "7",
+            "quick_builder_buy_enabled": "true",
+            "quick_builder_sell_enabled": "false",
+            "symbol": "AAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-01",
+            "end_time": "16:00",
+            "notes": "quick builder run",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(experiments) == 1
+    assert experiments[0]["input_kind"] == "configuration"
+    assert experiments[0]["input_snapshot"]["nodes"][0]["alg_key"] == (
+        "OLD_boundary_breakout_NEW_breakout_donchian_channel"
+    )
+    assert experiments[0]["input_snapshot"]["nodes"][0]["alg_param"] == {"period": 7}
+    assert experiments[0]["input_snapshot"]["nodes"][0]["buy_enabled"] is True
+    assert experiments[0]["input_snapshot"]["nodes"][0]["sell_enabled"] is False
 
 
 def test_experiment_history_allows_deleting_one_experiment(monkeypatch):

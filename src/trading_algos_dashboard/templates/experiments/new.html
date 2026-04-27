@@ -67,7 +67,10 @@
   </div>
 </section>
 {% endif %}
-<form method="post" action="{{ url_for('experiments.create_experiment') }}" class="row g-3">
+<form method="post" action="{{ url_for('experiments.create_experiment') }}" class="row g-3" id="new-experiment-form" novalidate>
+  <div class="col-12">
+    <div class="alert alert-danger d-none" id="new-experiment-validation-alert" role="alert"></div>
+  </div>
   <div class="col-12">
     <label class="form-label">Run mode</label>
     <select class="form-select" name="run_mode" id="run-mode-select">
@@ -132,12 +135,111 @@
     <textarea class="form-control" rows="6" name="decmaker_param_json">{{ form_data.decmaker_param_json }}</textarea>
   </div>
   <div class="col-12" data-run-mode-section="configuration">
-    <label class="form-label">Configuration JSON</label>
-    <details {% if selected_configuration or form_data.configuration_json %}open{% endif %}>
-      <summary>Advanced configuration payload</summary>
-      <textarea class="form-control mt-2" rows="8" name="configuration_json">{{ form_data.configuration_json }}</textarea>
-    </details>
-    <div class="form-text">Declarative configuration payload for configuration-based runs, including single-algorithm runs.</div>
+    <label class="form-label">Configuration setup</label>
+    <select class="form-select mb-3" name="configuration_source" id="configuration-source-select">
+      <option value="quick_builder" {% if form_data.configuration_source == 'quick_builder' %}selected{% endif %}>Quick builder (single algorithm)</option>
+      <option value="configuration_json" {% if form_data.configuration_source == 'configuration_json' %}selected{% endif %}>Advanced JSON</option>
+    </select>
+    <div class="form-text mb-3">Use the quick builder for a single algorithm run, or switch to advanced JSON for manual configuration payloads.</div>
+
+    <div data-configuration-source-section="quick_builder">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Algorithm</label>
+          <select class="form-select" name="quick_builder_alg_key" id="quick-builder-alg-key">
+            {% for algorithm in quick_builder_algorithms %}
+            <option
+              value="{{ algorithm.key }}"
+              data-default-param='{{ algorithm.default_param|tojson }}'
+              data-algorithm-name='{{ algorithm.name }}'
+              {% if form_data.quick_builder_alg_key == algorithm.key %}selected{% endif %}
+            >{{ algorithm.name }} ({{ algorithm.key }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Buy enabled</label>
+          <select class="form-select" name="quick_builder_buy_enabled">
+            <option value="true" {% if form_data.quick_builder_buy_enabled != 'false' %}selected{% endif %}>Yes</option>
+            <option value="false" {% if form_data.quick_builder_buy_enabled == 'false' %}selected{% endif %}>No</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Sell enabled</label>
+          <select class="form-select" name="quick_builder_sell_enabled">
+            <option value="true" {% if form_data.quick_builder_sell_enabled != 'false' %}selected{% endif %}>Yes</option>
+            <option value="false" {% if form_data.quick_builder_sell_enabled == 'false' %}selected{% endif %}>No</option>
+          </select>
+        </div>
+        {% for algorithm in quick_builder_algorithms %}
+        <div class="col-12" data-quick-builder-algorithm="{{ algorithm.key }}">
+          <div class="card">
+            <div class="card-body">
+              <h3 class="h6 mb-2">{{ algorithm.name }}</h3>
+              {% if algorithm.description %}
+              <p class="small text-muted mb-3">{{ algorithm.description }}</p>
+              {% endif %}
+              <div class="row g-3">
+                {% for param in algorithm.param_schema %}
+                {% set field_name = 'quick_param__' ~ param.key %}
+                <div class="col-md-4">
+                  <label class="form-label">{{ param.label or param.key }}</label>
+                  {% if param.type == 'boolean' %}
+                  <select class="form-select" name="{{ field_name }}" data-quick-param-key="{{ param.key }}" data-quick-param-type="{{ param.type }}">
+                    <option value="true" {% if form_data[field_name] == 'true' %}selected{% endif %}>True</option>
+                    <option value="false" {% if form_data[field_name] != 'true' %}selected{% endif %}>False</option>
+                  </select>
+                  {% elif param.enum %}
+                  <select class="form-select" name="{{ field_name }}" data-quick-param-key="{{ param.key }}" data-quick-param-type="{{ param.type }}">
+                    {% for option in param.enum %}
+                    <option value="{{ option }}" {% if form_data[field_name] == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                  </select>
+                  {% else %}
+                  <input
+                    class="form-control"
+                    type="{% if param.type == 'integer' or param.type == 'number' %}number{% else %}text{% endif %}"
+                    {% if param.type == 'integer' %}step="1"{% elif param.type == 'number' %}step="any"{% endif %}
+                    {% if param.minimum is defined %}min="{{ param.minimum }}"{% endif %}
+                    {% if param.maximum is defined %}max="{{ param.maximum }}"{% endif %}
+                    name="{{ field_name }}"
+                    value="{{ form_data[field_name] }}"
+                    data-quick-param-key="{{ param.key }}"
+                    data-quick-param-type="{{ param.type }}"
+                    {% if param.required %}required{% endif %}
+                  >
+                  {% endif %}
+                  {% if param.description %}
+                  <div class="form-text">{{ param.description }}</div>
+                  {% endif %}
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="mt-3">
+        <label class="form-label">Generated configuration JSON</label>
+        <textarea
+          class="form-control font-monospace"
+          id="quick-builder-configuration-preview"
+          rows="10"
+          readonly
+        >{{ form_data.configuration_json }}</textarea>
+        <div class="form-text">This preview is generated automatically from the quick-builder inputs and is read-only.</div>
+      </div>
+    </div>
+
+    <div data-configuration-source-section="configuration_json">
+      <label class="form-label">Configuration JSON</label>
+      <details {% if selected_configuration or form_data.configuration_json %}open{% endif %}>
+        <summary>Advanced configuration payload</summary>
+        <textarea class="form-control mt-2" rows="8" name="configuration_json">{{ form_data.configuration_json }}</textarea>
+      </details>
+      <div class="form-text">Declarative configuration payload for configuration-based runs, including single-algorithm runs.</div>
+    </div>
   </div>
   <div class="col-12">
     <label class="form-label">Notes</label>
@@ -151,11 +253,101 @@
 <script>
   (() => {
     const runModeSelect = document.getElementById("run-mode-select");
+    const configurationSourceSelect = document.getElementById("configuration-source-select");
+    const quickBuilderAlgorithmSelect = document.getElementById("quick-builder-alg-key");
+    const experimentForm = document.getElementById("new-experiment-form");
+    const validationAlert = document.getElementById("new-experiment-validation-alert");
     if (!(runModeSelect instanceof HTMLSelectElement)) {
       return;
     }
 
     const sections = Array.from(document.querySelectorAll("[data-run-mode-section]"));
+    const configurationSourceSections = Array.from(document.querySelectorAll("[data-configuration-source-section]"));
+    const quickBuilderAlgorithmSections = Array.from(document.querySelectorAll("[data-quick-builder-algorithm]"));
+    const quickBuilderPreview = document.getElementById("quick-builder-configuration-preview");
+
+    const showValidationAlert = (messages) => {
+      if (!(validationAlert instanceof HTMLElement)) {
+        return;
+      }
+      if (!Array.isArray(messages) || messages.length === 0) {
+        validationAlert.textContent = "";
+        validationAlert.classList.add("d-none");
+        return;
+      }
+      validationAlert.innerHTML = messages.map((message) => `<div>${message}</div>`).join("");
+      validationAlert.classList.remove("d-none");
+    };
+
+    const visibleSections = () => {
+      const activeSections = [];
+      sections.forEach((section) => {
+        if (section instanceof HTMLElement && !section.hidden) {
+          activeSections.push(section);
+        }
+      });
+      configurationSourceSections.forEach((section) => {
+        if (section instanceof HTMLElement && !section.hidden) {
+          activeSections.push(section);
+        }
+      });
+      quickBuilderAlgorithmSections.forEach((section) => {
+        if (section instanceof HTMLElement && !section.hidden) {
+          activeSections.push(section);
+        }
+      });
+      return activeSections;
+    };
+
+    const syncInteractiveFieldState = () => {
+      const activeSections = visibleSections();
+      const activeSet = new Set(activeSections);
+      const allToggleSections = [...sections, ...configurationSourceSections, ...quickBuilderAlgorithmSections];
+
+      allToggleSections.forEach((section) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        const isActive = activeSet.has(section);
+        section.querySelectorAll("input, select, textarea").forEach((field) => {
+          if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+            return;
+          }
+          if (field.id === "quick-builder-configuration-preview") {
+            return;
+          }
+          field.disabled = !isActive;
+        });
+      });
+    };
+
+    const validateVisibleFields = () => {
+      const messages = [];
+      const activeSections = visibleSections();
+      activeSections.forEach((section) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        section.querySelectorAll("input, select, textarea").forEach((field) => {
+          if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
+            return;
+          }
+          if (field.disabled || field.id === "quick-builder-configuration-preview") {
+            return;
+          }
+          const label = section.querySelector(`label[for="${field.id}"]`) || field.closest("div")?.querySelector("label");
+          const fieldLabel = label instanceof HTMLLabelElement ? label.textContent?.trim() || field.name : field.name;
+          if (field.required && field.value.trim() === "") {
+            messages.push(`${fieldLabel} is required.`);
+            return;
+          }
+          if (typeof field.checkValidity === "function" && !field.checkValidity()) {
+            messages.push(`${fieldLabel} is invalid.`);
+          }
+        });
+      });
+      return messages;
+    };
 
     const syncRunModeSections = () => {
       const selectedRunMode = runModeSelect.value;
@@ -168,8 +360,184 @@
       });
     };
 
+    const syncConfigurationSourceSections = () => {
+      if (!(configurationSourceSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      const selectedSource = configurationSourceSelect.value;
+      configurationSourceSections.forEach((section) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        section.hidden = section.dataset.configurationSourceSection !== selectedSource;
+      });
+    };
+
+    const syncQuickBuilderAlgorithmSections = () => {
+      if (!(quickBuilderAlgorithmSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      const selectedAlgorithm = quickBuilderAlgorithmSelect.value;
+      quickBuilderAlgorithmSections.forEach((section) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        section.hidden = section.dataset.quickBuilderAlgorithm !== selectedAlgorithm;
+      });
+    };
+
+    const setQuickBuilderDefaultsForSelectedAlgorithm = () => {
+      if (!(quickBuilderAlgorithmSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      const selectedOption = quickBuilderAlgorithmSelect.selectedOptions[0];
+      if (!(selectedOption instanceof HTMLOptionElement)) {
+        return;
+      }
+      let defaultParam = {};
+      try {
+        defaultParam = JSON.parse(selectedOption.dataset.defaultParam || "{}");
+      } catch {
+        defaultParam = {};
+      }
+      if (typeof defaultParam !== "object" || defaultParam === null || Array.isArray(defaultParam)) {
+        defaultParam = {};
+      }
+
+      const activeSection = document.querySelector(`[data-quick-builder-algorithm="${CSS.escape(quickBuilderAlgorithmSelect.value)}"]`);
+      if (!(activeSection instanceof HTMLElement)) {
+        return;
+      }
+
+      const paramInputs = activeSection.querySelectorAll("[data-quick-param-key]");
+      paramInputs.forEach((input) => {
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+          return;
+        }
+        const paramKey = input.dataset.quickParamKey;
+        if (!paramKey) {
+          return;
+        }
+        const defaultValue = defaultParam[paramKey];
+        if (typeof defaultValue === "boolean") {
+          input.value = defaultValue ? "true" : "false";
+          return;
+        }
+        if (defaultValue !== undefined && defaultValue !== null) {
+          input.value = String(defaultValue);
+        }
+      });
+    };
+
+    const updateQuickBuilderPreview = () => {
+      if (!(quickBuilderPreview instanceof HTMLTextAreaElement)) {
+        return;
+      }
+      if (!(quickBuilderAlgorithmSelect instanceof HTMLSelectElement)) {
+        quickBuilderPreview.value = "";
+        return;
+      }
+
+      const selectedOption = quickBuilderAlgorithmSelect.selectedOptions[0];
+      const algorithmKey = quickBuilderAlgorithmSelect.value;
+      const algorithmName = selectedOption instanceof HTMLOptionElement
+        ? selectedOption.dataset.algorithmName || algorithmKey
+        : algorithmKey;
+      const configSlug = algorithmKey.trim().replaceAll("_", "-") || "algorithm";
+      const activeSection = document.querySelector(`[data-quick-builder-algorithm="${CSS.escape(algorithmKey)}"]`);
+      const algParam = {};
+
+      if (activeSection instanceof HTMLElement) {
+        const paramInputs = activeSection.querySelectorAll("[data-quick-param-key]");
+        paramInputs.forEach((input) => {
+          if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+            return;
+          }
+          const paramKey = input.dataset.quickParamKey;
+          const paramType = input.dataset.quickParamType || "string";
+          if (!paramKey) {
+            return;
+          }
+          if (paramType === "integer") {
+            algParam[paramKey] = Number.parseInt(input.value, 10);
+          } else if (paramType === "number") {
+            algParam[paramKey] = Number.parseFloat(input.value);
+          } else if (paramType === "boolean") {
+            algParam[paramKey] = input.value === "true";
+          } else {
+            algParam[paramKey] = input.value;
+          }
+        });
+      }
+
+      const buyEnabledSelect = document.querySelector('[name="quick_builder_buy_enabled"]');
+      const sellEnabledSelect = document.querySelector('[name="quick_builder_sell_enabled"]');
+      const payload = {
+        config_key: `single-${configSlug}`,
+        version: "1",
+        name: `Algorithm config: ${algorithmKey.trim() || algorithmName}`,
+        root_node_id: "alg1",
+        nodes: [
+          {
+            node_id: "alg1",
+            node_type: "algorithm",
+            alg_key: algorithmKey,
+            alg_param: algParam,
+            buy_enabled: buyEnabledSelect instanceof HTMLSelectElement ? buyEnabledSelect.value === "true" : true,
+            sell_enabled: sellEnabledSelect instanceof HTMLSelectElement ? sellEnabledSelect.value === "true" : true,
+          },
+        ],
+        runtime_overrides: {},
+        compatibility_metadata: {},
+      };
+      quickBuilderPreview.value = JSON.stringify(payload, null, 2);
+    };
+
     runModeSelect.addEventListener("change", syncRunModeSections);
+    if (configurationSourceSelect instanceof HTMLSelectElement) {
+      configurationSourceSelect.addEventListener("change", () => {
+        syncConfigurationSourceSections();
+        syncInteractiveFieldState();
+        showValidationAlert([]);
+      });
+    }
+    if (quickBuilderAlgorithmSelect instanceof HTMLSelectElement) {
+      quickBuilderAlgorithmSelect.addEventListener("change", () => {
+        syncQuickBuilderAlgorithmSections();
+        setQuickBuilderDefaultsForSelectedAlgorithm();
+        syncInteractiveFieldState();
+        updateQuickBuilderPreview();
+        showValidationAlert([]);
+      });
+    }
+    document.querySelectorAll('[name="quick_builder_buy_enabled"], [name="quick_builder_sell_enabled"], [data-quick-param-key]').forEach((input) => {
+      if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+        input.addEventListener("input", () => {
+          updateQuickBuilderPreview();
+          showValidationAlert([]);
+        });
+        input.addEventListener("change", () => {
+          updateQuickBuilderPreview();
+          showValidationAlert([]);
+        });
+      }
+    });
+    if (experimentForm instanceof HTMLFormElement) {
+      experimentForm.addEventListener("submit", (event) => {
+        syncInteractiveFieldState();
+        const messages = validateVisibleFields();
+        if (messages.length > 0) {
+          event.preventDefault();
+          showValidationAlert(messages);
+          validationAlert?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    }
     syncRunModeSections();
+    syncConfigurationSourceSections();
+    syncQuickBuilderAlgorithmSections();
+    syncInteractiveFieldState();
+    updateQuickBuilderPreview();
   })();
 </script>
 {% endblock %}

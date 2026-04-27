@@ -27,6 +27,7 @@ from trading_algos_dashboard.services.data_source_service import (
 )
 from trading_algos_dashboard.services.single_algorithm_configuration import (
     build_single_algorithm_configuration_payload,
+    extract_single_algorithm_from_configuration_payload,
 )
 
 bp = Blueprint("experiments", __name__, url_prefix="/experiments")
@@ -55,6 +56,10 @@ def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str
         )
     return {
         "run_mode": "configuration",
+        "configuration_source": "quick_builder",
+        "quick_builder_alg_key": str(catalog[0]["key"]) if catalog else "",
+        "quick_builder_buy_enabled": "true",
+        "quick_builder_sell_enabled": "true",
         "symbol": "",
         "start_date": "",
         "start_time": "09:30",
@@ -79,6 +84,162 @@ def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str
         if current_app
         else "1",
     }
+
+
+def _supports_quick_builder_algorithm(spec: dict[str, object]) -> bool:
+    default_param = spec.get("default_param")
+    param_schema = spec.get("param_schema")
+    if not isinstance(default_param, dict) or not isinstance(param_schema, list):
+        return False
+
+    supported_types = {"integer", "number", "string", "boolean"}
+    for item in param_schema:
+        if not isinstance(item, dict):
+            return False
+        key = item.get("key")
+        param_type = item.get("type")
+        if not isinstance(key, str) or key not in default_param:
+            return False
+        if param_type not in supported_types:
+            return False
+    return True
+
+
+def _build_quick_builder_algorithms(
+    catalog: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    quick_builder_algorithms: list[dict[str, object]] = []
+    for spec in catalog:
+        if not _supports_quick_builder_algorithm(spec):
+            continue
+        default_param = spec.get("default_param")
+        if not isinstance(default_param, dict):
+            default_param = {}
+        raw_param_schema = spec.get("param_schema")
+        if not isinstance(raw_param_schema, list):
+            raw_param_schema = []
+        quick_builder_algorithms.append(
+            {
+                "key": str(spec.get("key", "")),
+                "name": str(spec.get("name", "")),
+                "description": str(spec.get("description", "")),
+                "default_param": dict(default_param),
+                "param_schema": [
+                    dict(item) for item in raw_param_schema if isinstance(item, dict)
+                ],
+            }
+        )
+    return sorted(quick_builder_algorithms, key=lambda item: str(item["name"]))
+
+
+def _merge_quick_builder_defaults(
+    quick_builder_algorithms: list[dict[str, object]],
+    form_data: dict[str, str],
+) -> None:
+    selected_alg_key = form_data.get("quick_builder_alg_key", "")
+    selected_algorithm = next(
+        (
+            algorithm
+            for algorithm in quick_builder_algorithms
+            if algorithm["key"] == selected_alg_key
+        ),
+        quick_builder_algorithms[0] if quick_builder_algorithms else None,
+    )
+    if selected_algorithm is None:
+        return
+
+    form_data["quick_builder_alg_key"] = str(selected_algorithm["key"])
+    default_param = selected_algorithm.get("default_param", {})
+    if not isinstance(default_param, dict):
+        return
+    for key, value in default_param.items():
+        form_key = f"quick_param__{key}"
+        if form_key not in form_data:
+            form_data[form_key] = (
+                json.dumps(value) if isinstance(value, bool) else str(value)
+            )
+
+
+def _build_quick_builder_configuration_payload(
+    quick_builder_algorithms: list[dict[str, object]],
+    form_data: dict[str, str],
+) -> dict[str, object]:
+    alg_key = form_data.get("quick_builder_alg_key", "").strip()
+    selected_algorithm = next(
+        (
+            algorithm
+            for algorithm in quick_builder_algorithms
+            if algorithm["key"] == alg_key
+        ),
+        None,
+    )
+    if selected_algorithm is None:
+        raise ValueError("A supported quick-builder algorithm is required.")
+
+    alg_param: dict[str, object] = {}
+    raw_param_schema = selected_algorithm.get("param_schema")
+    if not isinstance(raw_param_schema, list):
+        raw_param_schema = []
+    for item in raw_param_schema:
+        if not isinstance(item, dict):
+            continue
+        param_key = str(item.get("key", "")).strip()
+        if not param_key:
+            continue
+        raw_value = form_data.get(f"quick_param__{param_key}", "")
+        if raw_value == "" and item.get("required", False):
+            raise ValueError(f"{item.get('label') or param_key} is required.")
+
+        param_type = str(item.get("type", "string"))
+        if param_type == "integer":
+            parsed_value: object = int(raw_value)
+        elif param_type == "number":
+            parsed_value = float(raw_value)
+        elif param_type == "boolean":
+            parsed_value = raw_value.strip().lower() == "true"
+        else:
+            parsed_value = raw_value
+
+        alg_param[param_key] = parsed_value
+
+    configuration_payload = build_single_algorithm_configuration_payload(
+        alg_key=alg_key,
+        alg_param=alg_param,
+    )
+    nodes = configuration_payload.get("nodes")
+    if isinstance(nodes, list) and nodes and isinstance(nodes[0], dict):
+        nodes[0]["buy_enabled"] = (
+            form_data.get("quick_builder_buy_enabled", "true").strip().lower() == "true"
+        )
+        nodes[0]["sell_enabled"] = (
+            form_data.get("quick_builder_sell_enabled", "true").strip().lower()
+            == "true"
+        )
+    return configuration_payload
+
+
+def _quick_builder_form_data_from_payload(
+    configuration_payload: dict[str, object],
+) -> dict[str, str]:
+    extracted = extract_single_algorithm_from_configuration_payload(
+        configuration_payload
+    )
+    if extracted is None:
+        return {}
+
+    form_data = {
+        "configuration_source": "quick_builder",
+        "quick_builder_alg_key": str(extracted["alg_key"]),
+        "quick_builder_buy_enabled": "true" if extracted["buy"] else "false",
+        "quick_builder_sell_enabled": "true" if extracted["sell"] else "false",
+    }
+    alg_param = extracted.get("alg_param", {})
+    if isinstance(alg_param, dict):
+        for key, value in alg_param.items():
+            form_data[f"quick_param__{key}"] = (
+                json.dumps(value) if isinstance(value, bool) else str(value)
+            )
+    return form_data
 
 
 def _serialize_recent_experiment(experiment: dict[str, object]) -> dict[str, str]:
@@ -305,6 +466,7 @@ def _render_new_experiment(
     catalog = current_app.extensions[
         "algorithm_catalog_service"
     ].list_algorithm_implementations()
+    quick_builder_algorithms = _build_quick_builder_algorithms(catalog)
     decmakers = current_app.extensions[
         "algorithm_catalog_service"
     ].list_decmaker_implementations()
@@ -320,16 +482,31 @@ def _render_new_experiment(
     selected_algorithm = _load_algorithm_preset(request.args.get("alg_key"))
     if selected_configuration is not None:
         effective_form_data["run_mode"] = "configuration"
+        effective_form_data["configuration_source"] = "configuration_json"
         effective_form_data["configuration_json"] = selected_configuration[
             "configuration_json"
         ]
     elif selected_algorithm is not None:
         effective_form_data["run_mode"] = "configuration"
+        effective_form_data["configuration_source"] = "quick_builder"
         effective_form_data["configuration_json"] = selected_algorithm[
             "configuration_json"
         ]
+        try:
+            selected_algorithm_payload = json.loads(
+                selected_algorithm["configuration_json"]
+            )
+        except JSONDecodeError:
+            pass
+        else:
+            if isinstance(selected_algorithm_payload, dict):
+                effective_form_data.update(
+                    _quick_builder_form_data_from_payload(selected_algorithm_payload)
+                )
     if form_data is not None:
         effective_form_data.update(form_data)
+
+    _merge_quick_builder_defaults(quick_builder_algorithms, effective_form_data)
 
     if (
         selected_configuration is None
@@ -350,11 +527,19 @@ def _render_new_experiment(
                     "version": str(configuration_payload.get("version", "")),
                     "configuration_json": effective_form_data["configuration_json"],
                 }
+                if (
+                    effective_form_data.get("configuration_source")
+                    != "configuration_json"
+                ):
+                    effective_form_data.update(
+                        _quick_builder_form_data_from_payload(configuration_payload)
+                    )
 
     return Response(
         render_template(
             "experiments/new.html",
             algorithms=catalog,
+            quick_builder_algorithms=quick_builder_algorithms,
             decmakers=decmakers,
             recent_experiments=_recent_experiment_presets(),
             selected_configuration=selected_configuration,
@@ -487,8 +672,24 @@ def delete_experiment(experiment_id: str):
 
 @bp.post("")
 def create_experiment():
+    configuration_source = request.form.get("configuration_source", "").strip()
+    if not configuration_source:
+        configuration_source = (
+            "quick_builder"
+            if request.form.get("quick_builder_alg_key", "").strip()
+            else "configuration_json"
+        )
+
     submitted_form_data = {
         "run_mode": request.form.get("run_mode", "configuration"),
+        "configuration_source": configuration_source,
+        "quick_builder_alg_key": request.form.get("quick_builder_alg_key", ""),
+        "quick_builder_buy_enabled": request.form.get(
+            "quick_builder_buy_enabled", "true"
+        ),
+        "quick_builder_sell_enabled": request.form.get(
+            "quick_builder_sell_enabled", "true"
+        ),
         "symbol": request.form.get("symbol", ""),
         "start_date": request.form.get("start_date", ""),
         "start_time": request.form.get("start_time", ""),
@@ -504,14 +705,29 @@ def create_experiment():
             current_app.config.get("EXPERIMENT_MAX_CONCURRENT_RUNS", 1)
         ),
     }
+    for key, value in request.form.items():
+        if key.startswith("quick_param__"):
+            submitted_form_data[key] = value
+
     service = current_app.extensions["experiment_service"]
+    quick_builder_algorithms = _build_quick_builder_algorithms(
+        current_app.extensions[
+            "algorithm_catalog_service"
+        ].list_algorithm_implementations()
+    )
     try:
         configuration_payload = None
         engine_chain_payload = None
         if submitted_form_data["run_mode"] == "configuration":
-            configuration_payload = json.loads(
-                submitted_form_data["configuration_json"]
-            )
+            if submitted_form_data["configuration_source"] == "quick_builder":
+                configuration_payload = _build_quick_builder_configuration_payload(
+                    quick_builder_algorithms,
+                    submitted_form_data,
+                )
+            else:
+                configuration_payload = json.loads(
+                    submitted_form_data["configuration_json"]
+                )
         elif submitted_form_data["run_mode"] == "engine_chain":
             engine_chain_payload = {
                 "speed_factor": int(submitted_form_data["speed_factor"]),
