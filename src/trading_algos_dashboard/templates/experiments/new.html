@@ -113,26 +113,127 @@
     </div>
   </div>
   <div class="col-12" data-run-mode-section="engine_chain">
-    <label class="form-label">Alertgens JSON</label>
-    <textarea class="form-control" rows="8" name="alertgens_json">{{ form_data.alertgens_json }}</textarea>
-    <div class="form-text">Use this for engine-chain runs. Provide a JSON array of alertgen engine configs.</div>
-  </div>
-  <div class="col-md-4" data-run-mode-section="engine_chain">
-    <label class="form-label">Decision maker</label>
-    <select class="form-select" name="decmaker_key">
-      {% for decmaker in decmakers %}
-      <option value="{{ decmaker.key }}" {% if form_data.decmaker_key == decmaker.key %}selected{% endif %}>{{ decmaker.label }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-md-4" data-run-mode-section="engine_chain">
-    <label class="form-label">Speed factor</label>
-    <input class="form-control" type="number" min="1" name="speed_factor" value="{{ form_data.speed_factor }}">
-    <div class="form-text">Fake-datetime speed multiplier for faster simulation.</div>
-  </div>
-  <div class="col-12" data-run-mode-section="engine_chain">
-    <label class="form-label">Decision maker params JSON</label>
-    <textarea class="form-control" rows="6" name="decmaker_param_json">{{ form_data.decmaker_param_json }}</textarea>
+    <div class="builder-card">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h2 class="h5 mb-0">Engine chain builder</h2>
+        <span class="text-muted small">Build alertgens and decision-maker inputs without writing JSON</span>
+      </div>
+      <div class="form-text mb-3">Choose alertgens and a decision maker with guided controls first. Generated JSON is shown below as a preview and advanced fallback, not as the primary editing path.</div>
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Alertgen engines</label>
+          <div class="d-flex gap-2 align-items-center">
+            <button class="btn btn-outline-secondary" type="button" id="engine-alertgen-add">Add alertgen</button>
+            <span class="text-muted small" id="engine-alertgen-count-label">{{ form_data.engine_alertgen_count }} configured</span>
+          </div>
+          <input type="hidden" name="engine_alertgen_count" id="engine-alertgen-count" value="{{ form_data.engine_alertgen_count }}">
+          <input type="hidden" name="engine_alertgen_order" id="engine-alertgen-order" value='{{ form_data.engine_alertgen_order or "[1]" }}'>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Decision maker</label>
+          <select class="form-select" name="decmaker_key" id="engine-decmaker-key">
+            {% for decmaker in engine_chain_decmakers %}
+            <option value="{{ decmaker.key }}" data-default-param='{{ decmaker.default_param|tojson }}' {% if form_data.decmaker_key == decmaker.key %}selected{% endif %}>{{ decmaker.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Speed factor</label>
+          <input class="form-control" type="number" min="1" name="speed_factor" value="{{ form_data.speed_factor }}">
+          <div class="form-text">Fake-datetime speed multiplier for faster simulation.</div>
+        </div>
+      </div>
+
+      <div id="engine-alertgen-list">
+        {% for row in engine_alertgen_rows %}
+        <div class="card mb-3 engine-alertgen-card" data-engine-alertgen-section="{{ row.index }}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+              <h3 class="h6 mb-0">Alertgen {{ loop.index }}</h3>
+              <button class="btn btn-outline-danger btn-sm engine-alertgen-remove" type="button" data-engine-alertgen-remove="{{ row.index }}">Remove</button>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Algorithm</label>
+                <select class="form-select engine-alertgen-alg-key" name="engine_alertgen_{{ row.index }}_alg_key" data-engine-alertgen-index="{{ row.index }}">
+                  {% for algorithm in engine_chain_algorithms %}
+                  <option value="{{ algorithm.key }}" data-default-param='{{ algorithm.default_param|tojson }}' data-algorithm-name='{{ algorithm.name }}' {% if row.alg_key == algorithm.key %}selected{% endif %}>{{ algorithm.name }} ({{ algorithm.key }})</option>
+                  {% endfor %}
+                </select>
+              </div>
+              {% for algorithm in engine_chain_algorithms %}
+              <div class="col-12" data-engine-alertgen-algorithm="{{ row.index }}:{{ algorithm.key }}">
+                <div class="row g-3">
+                  {% for param in algorithm.param_schema %}
+                  {% set field_name = 'engine_alertgen_' ~ row.index ~ '_param__' ~ param.key %}
+                  <div class="col-md-4">
+                    <label class="form-label">{{ param.label or param.key }}</label>
+                    {% if param.type == 'boolean' %}
+                    <select class="form-select" name="{{ field_name }}" data-engine-alertgen-param-key="{{ param.key }}" data-engine-alertgen-param-type="{{ param.type }}">
+                      <option value="true" {% if row.param_values[param.key] == 'true' %}selected{% endif %}>True</option>
+                      <option value="false" {% if row.param_values[param.key] != 'true' %}selected{% endif %}>False</option>
+                    </select>
+                    {% else %}
+                    <input class="form-control" type="{% if param.type == 'integer' or param.type == 'number' %}number{% else %}text{% endif %}" {% if param.type == 'integer' %}step="1"{% elif param.type == 'number' %}step="any"{% endif %} name="{{ field_name }}" value="{{ row.param_values[param.key] }}" data-engine-alertgen-param-key="{{ param.key }}" data-engine-alertgen-param-type="{{ param.type }}" {% if param.required %}required{% endif %}>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h3 class="h6 mb-3">Decision maker parameters</h3>
+          {% for decmaker in engine_chain_decmakers %}
+          <div class="row g-3" data-engine-decmaker-section="{{ decmaker.key }}">
+            {% for param in decmaker.param_schema %}
+            {% set field_name = 'engine_decmaker_param__' ~ param.key %}
+            <div class="col-md-4">
+              <label class="form-label">{{ param.label }}</label>
+              {% if param.type == 'boolean' %}
+              <select class="form-select" name="{{ field_name }}" data-engine-decmaker-param-key="{{ param.key }}" data-engine-decmaker-param-type="{{ param.type }}">
+                <option value="true" {% if form_data[field_name] == 'true' %}selected{% endif %}>True</option>
+                <option value="false" {% if form_data[field_name] != 'true' %}selected{% endif %}>False</option>
+              </select>
+              {% else %}
+              <input class="form-control" type="{% if param.type == 'integer' or param.type == 'number' %}number{% else %}text{% endif %}" {% if param.type == 'integer' %}step="1"{% elif param.type == 'number' %}step="any"{% endif %} name="{{ field_name }}" value="{{ form_data[field_name] }}" data-engine-decmaker-param-key="{{ param.key }}" data-engine-decmaker-param-type="{{ param.type }}" required>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label">Generated engine chain payload</label>
+          <textarea class="form-control font-monospace" id="engine-chain-payload-preview" rows="12" readonly>{{ form_data.engine_chain_payload_json }}</textarea>
+          <div class="form-text">This is the final engine-chain payload generated from the guided inputs above.</div>
+        </div>
+        <div class="col-12">
+          <details>
+            <summary>Advanced generated JSON details</summary>
+            <div class="row g-3 mt-1">
+              <div class="col-12">
+          <label class="form-label">Generated alertgens JSON</label>
+          <textarea class="form-control font-monospace" id="engine-chain-alertgens-preview" rows="8" name="alertgens_json" readonly>{{ form_data.alertgens_json }}</textarea>
+              </div>
+              <div class="col-12">
+          <label class="form-label">Generated decision maker params JSON</label>
+          <textarea class="form-control font-monospace" id="engine-chain-decmaker-preview" rows="6" name="decmaker_param_json" readonly>{{ form_data.decmaker_param_json }}</textarea>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="col-12" data-run-mode-section="configuration">
     <label class="form-label">Configuration setup</label>
@@ -459,6 +560,45 @@
     <div class="form-text">Experiments are queued in FIFO order and executed up to the configured concurrency limit of {{ max_concurrent_experiments }}.</div>
   </div>
 </form>
+<template id="engine-alertgen-card-template">
+  <div class="card mb-3 engine-alertgen-card" data-engine-alertgen-section="__INDEX__">
+    <div class="card-body">
+      <div class="d-flex justify-content-between align-items-center mb-3 gap-3 flex-wrap">
+        <h3 class="h6 mb-0">Alertgen __DISPLAY_INDEX__</h3>
+        <button class="btn btn-outline-danger btn-sm engine-alertgen-remove" type="button" data-engine-alertgen-remove="__INDEX__">Remove</button>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Algorithm</label>
+          <select class="form-select engine-alertgen-alg-key" name="engine_alertgen___INDEX___alg_key" data-engine-alertgen-index="__INDEX__">
+            {% for algorithm in engine_chain_algorithms %}
+            <option value="{{ algorithm.key }}" data-default-param='{{ algorithm.default_param|tojson }}' data-algorithm-name='{{ algorithm.name }}'>{{ algorithm.name }} ({{ algorithm.key }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% for algorithm in engine_chain_algorithms %}
+        <div class="col-12" data-engine-alertgen-algorithm="__INDEX__:{{ algorithm.key }}">
+          <div class="row g-3">
+            {% for param in algorithm.param_schema %}
+            <div class="col-md-4">
+              <label class="form-label">{{ param.label or param.key }}</label>
+              {% if param.type == 'boolean' %}
+              <select class="form-select" name="engine_alertgen___INDEX___param__{{ param.key }}" data-engine-alertgen-param-key="{{ param.key }}" data-engine-alertgen-param-type="{{ param.type }}">
+                <option value="true">True</option>
+                <option value="false">False</option>
+              </select>
+              {% else %}
+              <input class="form-control" type="{% if param.type == 'integer' or param.type == 'number' %}number{% else %}text{% endif %}" {% if param.type == 'integer' %}step="1"{% elif param.type == 'number' %}step="any"{% endif %} name="engine_alertgen___INDEX___param__{{ param.key }}" value="" data-engine-alertgen-param-key="{{ param.key }}" data-engine-alertgen-param-type="{{ param.type }}" {% if param.required %}required{% endif %}>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</template>
 <script>
   (() => {
     const runModeSelect = document.getElementById("run-mode-select");
@@ -493,6 +633,20 @@
     const configurationSourceSections = Array.from(document.querySelectorAll("[data-configuration-source-section]"));
     const quickBuilderAlgorithmSections = Array.from(document.querySelectorAll("[data-quick-builder-algorithm]"));
     const quickBuilderPreview = document.getElementById("quick-builder-configuration-preview");
+    const engineAlertgenCountInput = document.getElementById("engine-alertgen-count");
+    const engineAlertgenOrderInput = document.getElementById("engine-alertgen-order");
+    const engineAlertgenCountLabel = document.getElementById("engine-alertgen-count-label");
+    const engineAlertgenAddButton = document.getElementById("engine-alertgen-add");
+    const engineAlertgenList = document.getElementById("engine-alertgen-list");
+    const engineAlertgenCardTemplate = document.getElementById("engine-alertgen-card-template");
+    const engineDecmakerSelect = document.getElementById("engine-decmaker-key");
+    const engineAlertgensPreview = document.getElementById("engine-chain-alertgens-preview");
+    const engineDecmakerPreview = document.getElementById("engine-chain-decmaker-preview");
+    const engineChainPayloadPreview = document.getElementById("engine-chain-payload-preview");
+
+    const engineAlertgenSections = () => Array.from(document.querySelectorAll("[data-engine-alertgen-section]"));
+    const engineAlertgenAlgorithmSections = () => Array.from(document.querySelectorAll("[data-engine-alertgen-algorithm]"));
+    const engineDecmakerSections = () => Array.from(document.querySelectorAll("[data-engine-decmaker-section]"));
 
     const showValidationAlert = (messages) => {
       if (!(validationAlert instanceof HTMLElement)) {
@@ -524,13 +678,35 @@
           activeSections.push(section);
         }
       });
+      engineAlertgenSections().forEach((section) => {
+        if (section instanceof HTMLElement && !section.hidden) {
+          activeSections.push(section);
+        }
+      });
+      engineAlertgenAlgorithmSections().forEach((section) => {
+        if (section instanceof HTMLElement && !section.hidden) {
+          activeSections.push(section);
+        }
+      });
+      engineDecmakerSections().forEach((section) => {
+        if (section instanceof HTMLElement && !section.hidden) {
+          activeSections.push(section);
+        }
+      });
       return activeSections;
     };
 
     const syncInteractiveFieldState = () => {
       const activeSections = visibleSections();
       const activeSet = new Set(activeSections);
-      const allToggleSections = [...sections, ...configurationSourceSections, ...quickBuilderAlgorithmSections];
+      const allToggleSections = [
+        ...sections,
+        ...configurationSourceSections,
+        ...quickBuilderAlgorithmSections,
+        ...engineAlertgenSections(),
+        ...engineAlertgenAlgorithmSections(),
+        ...engineDecmakerSections(),
+      ];
 
       allToggleSections.forEach((section) => {
         if (!(section instanceof HTMLElement)) {
@@ -541,7 +717,12 @@
           if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
             return;
           }
-          if (field.id === "quick-builder-configuration-preview") {
+          if (
+            field.id === "quick-builder-configuration-preview"
+            || field.id === "engine-chain-payload-preview"
+            || field.id === "engine-chain-alertgens-preview"
+            || field.id === "engine-chain-decmaker-preview"
+          ) {
             return;
           }
           field.disabled = !isActive;
@@ -560,7 +741,13 @@
           if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement || field instanceof HTMLTextAreaElement)) {
             return;
           }
-          if (field.disabled || field.id === "quick-builder-configuration-preview") {
+          if (
+            field.disabled
+            || field.id === "quick-builder-configuration-preview"
+            || field.id === "engine-chain-payload-preview"
+            || field.id === "engine-chain-alertgens-preview"
+            || field.id === "engine-chain-decmaker-preview"
+          ) {
             return;
           }
           const label = section.querySelector(`label[for="${field.id}"]`) || field.closest("div")?.querySelector("label");
@@ -612,6 +799,319 @@
         }
         section.hidden = section.dataset.quickBuilderAlgorithm !== selectedAlgorithm;
       });
+    };
+
+    const engineAlertgenIndices = () => {
+      if (!(engineAlertgenOrderInput instanceof HTMLInputElement)) {
+        return [1];
+      }
+      try {
+        const parsed = JSON.parse(engineAlertgenOrderInput.value || "[1]");
+        if (!Array.isArray(parsed)) {
+          return [1];
+        }
+        const normalized = parsed
+          .map((item) => Number.parseInt(String(item), 10))
+          .filter((item) => Number.isInteger(item) && item > 0);
+        return normalized.length > 0 ? normalized : [1];
+      } catch {
+        return [1];
+      }
+    };
+
+    const syncEngineAlertgenMetadata = () => {
+      const indices = engineAlertgenIndices();
+      if (engineAlertgenCountInput instanceof HTMLInputElement) {
+        engineAlertgenCountInput.value = String(indices.length);
+      }
+      if (engineAlertgenCountLabel instanceof HTMLElement) {
+        engineAlertgenCountLabel.textContent = `${indices.length} configured`;
+      }
+      engineAlertgenSections().forEach((section, position) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        const title = section.querySelector("h3");
+        if (title instanceof HTMLElement) {
+          title.textContent = `Alertgen ${position + 1}`;
+        }
+      });
+    };
+
+    const syncEngineAlertgenSections = () => {
+      const activeIndices = new Set(engineAlertgenIndices());
+      engineAlertgenSections().forEach((section) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        const index = Number.parseInt(section.dataset.engineAlertgenSection || "0", 10);
+        section.hidden = !activeIndices.has(index);
+      });
+
+      engineAlertgenAlgorithmSections().forEach((section) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        const rawValue = section.dataset.engineAlertgenAlgorithm || "";
+        const [indexText, algorithmKey] = rawValue.split(":");
+        const index = Number.parseInt(indexText || "0", 10);
+        const select = document.querySelector(`[name="engine_alertgen_${index}_alg_key"]`);
+        const isActiveIndex = activeIndices.has(index);
+        const isSelected = select instanceof HTMLSelectElement && select.value === algorithmKey;
+        section.hidden = !(isActiveIndex && isSelected);
+      });
+      syncEngineAlertgenMetadata();
+    };
+
+    const syncEngineDecmakerSections = () => {
+      const selectedKey = engineDecmakerSelect instanceof HTMLSelectElement
+        ? engineDecmakerSelect.value
+        : "";
+      engineDecmakerSections().forEach((section) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        section.hidden = section.dataset.engineDecmakerSection !== selectedKey;
+      });
+    };
+
+    const attachEngineAlertgenCardListeners = (card) => {
+      if (!(card instanceof HTMLElement)) {
+        return;
+      }
+      const select = card.querySelector('.engine-alertgen-alg-key');
+      if (select instanceof HTMLSelectElement) {
+        select.addEventListener("change", () => {
+          const index = Number.parseInt(select.dataset.engineAlertgenIndex || "0", 10);
+          if (index > 0) {
+            setEngineAlertgenDefaults(index);
+          }
+          syncEngineAlertgenSections();
+          syncInteractiveFieldState();
+          updateEngineChainPreview();
+          showValidationAlert([]);
+        });
+      }
+      card.querySelectorAll('[data-engine-alertgen-param-key]').forEach((input) => {
+        if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+          input.addEventListener("input", () => {
+            updateEngineChainPreview();
+            showValidationAlert([]);
+          });
+          input.addEventListener("change", () => {
+            updateEngineChainPreview();
+            showValidationAlert([]);
+          });
+        }
+      });
+      const removeButton = card.querySelector('.engine-alertgen-remove');
+      if (removeButton instanceof HTMLButtonElement) {
+        removeButton.addEventListener("click", () => {
+          const index = Number.parseInt(removeButton.dataset.engineAlertgenRemove || "0", 10);
+          const remaining = engineAlertgenIndices().filter((item) => item !== index);
+          if (remaining.length === 0) {
+            return;
+          }
+          if (engineAlertgenOrderInput instanceof HTMLInputElement) {
+            engineAlertgenOrderInput.value = JSON.stringify(remaining);
+          }
+          card.remove();
+          syncEngineAlertgenSections();
+          syncInteractiveFieldState();
+          updateEngineChainPreview();
+          showValidationAlert([]);
+        });
+      }
+    };
+
+    const addEngineAlertgenCard = () => {
+      if (!(engineAlertgenCardTemplate instanceof HTMLTemplateElement) || !(engineAlertgenList instanceof HTMLElement) || !(engineAlertgenOrderInput instanceof HTMLInputElement)) {
+        return;
+      }
+      const indices = engineAlertgenIndices();
+      const nextIndex = indices.length === 0 ? 1 : Math.max(...indices) + 1;
+      const nextDisplayIndex = indices.length + 1;
+      const templateHtml = engineAlertgenCardTemplate.innerHTML
+        .replaceAll(/__INDEX__/g, String(nextIndex))
+        .replaceAll(/__DISPLAY_INDEX__/g, String(nextDisplayIndex));
+      engineAlertgenList.insertAdjacentHTML("beforeend", templateHtml);
+      engineAlertgenOrderInput.value = JSON.stringify([...indices, nextIndex]);
+      const newCard = engineAlertgenList.querySelector(`[data-engine-alertgen-section="${nextIndex}"]`);
+      attachEngineAlertgenCardListeners(newCard);
+      setEngineAlertgenDefaults(nextIndex);
+      syncEngineAlertgenSections();
+      syncInteractiveFieldState();
+      updateEngineChainPreview();
+      showValidationAlert([]);
+    };
+
+    const setEngineAlertgenDefaults = (index) => {
+      const select = document.querySelector(`[name="engine_alertgen_${index}_alg_key"]`);
+      if (!(select instanceof HTMLSelectElement)) {
+        return;
+      }
+      const selectedOption = select.selectedOptions[0];
+      if (!(selectedOption instanceof HTMLOptionElement)) {
+        return;
+      }
+      let defaultParam = {};
+      try {
+        defaultParam = JSON.parse(selectedOption.dataset.defaultParam || "{}");
+      } catch {
+        defaultParam = {};
+      }
+      if (typeof defaultParam !== "object" || defaultParam === null || Array.isArray(defaultParam)) {
+        defaultParam = {};
+      }
+      const section = document.querySelector(`[data-engine-alertgen-algorithm="${index}:${CSS.escape(select.value)}"]`);
+      if (!(section instanceof HTMLElement)) {
+        return;
+      }
+      section.querySelectorAll("[data-engine-alertgen-param-key]").forEach((input) => {
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+          return;
+        }
+        const key = input.dataset.engineAlertgenParamKey;
+        if (!key) {
+          return;
+        }
+        const defaultValue = defaultParam[key];
+        if (typeof defaultValue === "boolean") {
+          input.value = defaultValue ? "true" : "false";
+        } else if (defaultValue !== undefined && defaultValue !== null) {
+          input.value = String(defaultValue);
+        } else {
+          input.value = "";
+        }
+      });
+    };
+
+    const setEngineDecmakerDefaults = () => {
+      if (!(engineDecmakerSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      const selectedOption = engineDecmakerSelect.selectedOptions[0];
+      if (!(selectedOption instanceof HTMLOptionElement)) {
+        return;
+      }
+      let defaultParam = {};
+      try {
+        defaultParam = JSON.parse(selectedOption.dataset.defaultParam || "{}");
+      } catch {
+        defaultParam = {};
+      }
+      if (typeof defaultParam !== "object" || defaultParam === null || Array.isArray(defaultParam)) {
+        defaultParam = {};
+      }
+      const section = document.querySelector(`[data-engine-decmaker-section="${CSS.escape(engineDecmakerSelect.value)}"]`);
+      if (!(section instanceof HTMLElement)) {
+        return;
+      }
+      section.querySelectorAll("[data-engine-decmaker-param-key]").forEach((input) => {
+        if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+          return;
+        }
+        const key = input.dataset.engineDecmakerParamKey;
+        if (!key) {
+          return;
+        }
+        const defaultValue = defaultParam[key];
+        if (typeof defaultValue === "boolean") {
+          input.value = defaultValue ? "true" : "false";
+        } else if (defaultValue !== undefined && defaultValue !== null) {
+          input.value = String(defaultValue);
+        } else {
+          input.value = "";
+        }
+      });
+    };
+
+    const updateEngineChainPreview = () => {
+      if (
+        !(engineAlertgensPreview instanceof HTMLTextAreaElement)
+        || !(engineDecmakerPreview instanceof HTMLTextAreaElement)
+        || !(engineChainPayloadPreview instanceof HTMLTextAreaElement)
+      ) {
+        return;
+      }
+
+      const alertgens = [];
+      for (const index of engineAlertgenIndices()) {
+        const select = document.querySelector(`[name="engine_alertgen_${index}_alg_key"]`);
+        if (!(select instanceof HTMLSelectElement)) {
+          continue;
+        }
+        const section = document.querySelector(`[data-engine-alertgen-algorithm="${index}:${CSS.escape(select.value)}"]`);
+        const algParam = {};
+        if (section instanceof HTMLElement) {
+          section.querySelectorAll("[data-engine-alertgen-param-key]").forEach((input) => {
+            if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+              return;
+            }
+            const key = input.dataset.engineAlertgenParamKey;
+            const type = input.dataset.engineAlertgenParamType || "string";
+            if (!key) {
+              return;
+            }
+            if (type === "integer") {
+              algParam[key] = Number.parseInt(input.value, 10);
+            } else if (type === "number") {
+              algParam[key] = Number.parseFloat(input.value);
+            } else if (type === "boolean") {
+              algParam[key] = input.value === "true";
+            } else {
+              algParam[key] = input.value;
+            }
+          });
+        }
+        alertgens.push({ alg_key: select.value, alg_param: algParam });
+      }
+
+      const decmakerParam = {};
+      const selectedDecmakerKey = engineDecmakerSelect instanceof HTMLSelectElement ? engineDecmakerSelect.value : "";
+      const decmakerSection = document.querySelector(`[data-engine-decmaker-section="${CSS.escape(selectedDecmakerKey)}"]`);
+      if (decmakerSection instanceof HTMLElement) {
+        decmakerSection.querySelectorAll("[data-engine-decmaker-param-key]").forEach((input) => {
+          if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+            return;
+          }
+          const key = input.dataset.engineDecmakerParamKey;
+          const type = input.dataset.engineDecmakerParamType || "string";
+          if (!key) {
+            return;
+          }
+          if (type === "integer") {
+            decmakerParam[key] = Number.parseInt(input.value, 10);
+          } else if (type === "number") {
+            decmakerParam[key] = Number.parseFloat(input.value);
+          } else if (type === "boolean") {
+            decmakerParam[key] = input.value === "true";
+          } else {
+            decmakerParam[key] = input.value;
+          }
+        });
+      }
+
+      engineAlertgensPreview.value = JSON.stringify(alertgens, null, 2);
+      engineDecmakerPreview.value = JSON.stringify(decmakerParam, null, 2);
+      engineChainPayloadPreview.value = JSON.stringify(
+        {
+          speed_factor: (() => {
+            const speedFactorInput = document.querySelector('[name="speed_factor"]');
+            if (!(speedFactorInput instanceof HTMLInputElement)) {
+              return 60;
+            }
+            return Number.parseInt(speedFactorInput.value, 10);
+          })(),
+          alertgens,
+          decmaker: {
+            decmaker_key: selectedDecmakerKey,
+            decmaker_param: decmakerParam,
+          },
+        },
+        null,
+        2,
+      );
     };
 
     const setQuickBuilderDefaultsForSelectedAlgorithm = () => {
@@ -920,14 +1420,41 @@
         showValidationAlert([]);
       });
     }
-    document.querySelectorAll('[name="quick_builder_buy_enabled"], [name="quick_builder_sell_enabled"], [data-quick-param-key]').forEach((input) => {
+    if (engineAlertgenAddButton instanceof HTMLButtonElement) {
+      engineAlertgenAddButton.addEventListener("click", addEngineAlertgenCard);
+    }
+    if (engineDecmakerSelect instanceof HTMLSelectElement) {
+      engineDecmakerSelect.addEventListener("change", () => {
+        setEngineDecmakerDefaults();
+        syncEngineDecmakerSections();
+        syncInteractiveFieldState();
+        updateEngineChainPreview();
+        showValidationAlert([]);
+      });
+    }
+    document.querySelectorAll('.engine-alertgen-card').forEach(attachEngineAlertgenCardListeners);
+    document.querySelectorAll('[name="quick_builder_buy_enabled"], [name="quick_builder_sell_enabled"], [data-quick-param-key], [name="speed_factor"]').forEach((input) => {
       if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
         input.addEventListener("input", () => {
           updateQuickBuilderPreview();
+          updateEngineChainPreview();
           showValidationAlert([]);
         });
         input.addEventListener("change", () => {
           updateQuickBuilderPreview();
+          updateEngineChainPreview();
+          showValidationAlert([]);
+        });
+      }
+    });
+    document.querySelectorAll('[data-engine-decmaker-param-key]').forEach((input) => {
+      if (input instanceof HTMLInputElement || input instanceof HTMLSelectElement) {
+        input.addEventListener("input", () => {
+          updateEngineChainPreview();
+          showValidationAlert([]);
+        });
+        input.addEventListener("change", () => {
+          updateEngineChainPreview();
           showValidationAlert([]);
         });
       }
@@ -946,10 +1473,15 @@
     syncRunModeSections();
     syncConfigurationSourceSections();
     syncQuickBuilderAlgorithmSections();
+    syncEngineAlertgenSections();
+    syncEngineDecmakerSections();
+    document.querySelectorAll('.engine-alertgen-card').forEach(attachEngineAlertgenCardListeners);
+    setEngineDecmakerDefaults();
     syncInteractiveFieldState();
     filterSavedConfigurations();
     updateSavedConfigurationSummary();
     updateQuickBuilderPreview();
+    updateEngineChainPreview();
   })();
 </script>
 {% endblock %}

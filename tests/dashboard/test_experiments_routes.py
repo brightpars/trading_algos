@@ -254,6 +254,24 @@ def test_new_experiment_page_preserves_selected_engine_chain_run_mode(monkeypatc
         in response.data
     )
     assert b'data-run-mode-section="engine_chain"' in response.data
+    assert b'id="engine-chain-payload-preview"' in response.data
+    assert b"Advanced generated JSON details" in response.data
+
+
+def test_new_experiment_page_shows_engine_chain_combined_preview(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
+
+    response = app.test_client().get("/experiments/new")
+
+    assert response.status_code == 200
+    assert b'id="engine-chain-payload-preview"' in response.data
+    assert b"Generated engine chain payload" in response.data
+    assert b"Advanced generated JSON details" in response.data
+    assert b'id="engine-alertgen-add"' in response.data
+    assert b'name="engine_alertgen_order"' in response.data
 
 
 def test_bulk_experiment_page_renders(monkeypatch):
@@ -469,6 +487,131 @@ def test_create_experiment_accepts_engine_chain_payload(monkeypatch, tmp_path):
     assert experiments[0]["input_kind"] == "engine_chain"
     assert experiments[0]["input_snapshot"]["speed_factor"] == 30
     assert experiments[0]["input_snapshot"]["decmaker"]["decmaker_key"] == "alg1"
+
+
+def test_create_experiment_accepts_engine_chain_guided_builder_payload(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+        )
+    )
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
+
+    response = app.test_client().post(
+        "/experiments",
+        data={
+            "run_mode": "engine_chain",
+            "symbol": "AAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-01",
+            "end_time": "16:00",
+            "engine_alertgen_count": "2",
+            "engine_alertgen_1_alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "engine_alertgen_1_param__window": "2",
+            "engine_alertgen_2_alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "engine_alertgen_2_param__period": "5",
+            "decmaker_key": "alg1",
+            "engine_decmaker_param__confidence_threshold_buy": "0.7",
+            "engine_decmaker_param__confidence_threshold_sell": "0.4",
+            "engine_decmaker_param__max_percent_higher_price_buy": "0.0",
+            "engine_decmaker_param__max_percent_lower_price_sell": "0.0",
+            "speed_factor": "45",
+            "notes": "engine chain gui run",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(experiments) == 1
+    assert experiments[0]["input_kind"] == "engine_chain"
+    assert experiments[0]["input_snapshot"]["speed_factor"] == 45
+    assert experiments[0]["input_snapshot"]["alertgens"] == [
+        {
+            "symbol": "AAPL",
+            "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "alg_param": {"window": 2},
+            "buy": True,
+            "sell": True,
+        },
+        {
+            "symbol": "AAPL",
+            "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "alg_param": {"period": 5},
+            "buy": True,
+            "sell": True,
+        },
+    ]
+    assert experiments[0]["input_snapshot"]["decmaker"] == {
+        "decmaker_key": "alg1",
+        "decmaker_param": {
+            "confidence_threshold_buy": 0.7,
+            "confidence_threshold_sell": 0.4,
+            "max_percent_higher_price_buy": 0.0,
+            "max_percent_lower_price_sell": 0.0,
+        },
+    }
+
+
+def test_create_experiment_accepts_engine_chain_guided_builder_with_four_alertgens(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+        )
+    )
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
+
+    response = app.test_client().post(
+        "/experiments",
+        data={
+            "run_mode": "engine_chain",
+            "symbol": "AAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-01",
+            "end_time": "16:00",
+            "engine_alertgen_order": "[1,2,3,4]",
+            "engine_alertgen_1_alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "engine_alertgen_1_param__window": "2",
+            "engine_alertgen_2_alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "engine_alertgen_2_param__period": "5",
+            "engine_alertgen_3_alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            "engine_alertgen_3_param__window": "3",
+            "engine_alertgen_4_alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "engine_alertgen_4_param__period": "8",
+            "decmaker_key": "alg1",
+            "engine_decmaker_param__confidence_threshold_buy": "0.6",
+            "engine_decmaker_param__confidence_threshold_sell": "0.6",
+            "engine_decmaker_param__max_percent_higher_price_buy": "0.0",
+            "engine_decmaker_param__max_percent_lower_price_sell": "0.0",
+            "speed_factor": "30",
+            "notes": "four alertgens",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(experiments) == 1
+    assert len(experiments[0]["input_snapshot"]["alertgens"]) == 4
+    assert experiments[0]["input_snapshot"]["alertgens"][3]["alg_param"] == {"period": 8}
 
 
 def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypatch):

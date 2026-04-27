@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from json import JSONDecodeError
 
@@ -70,6 +71,7 @@ def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str
         "configuration_json": default_algorithms,
         "alertgens_json": default_algorithms,
         "decmaker_key": "alg1",
+        "engine_alertgen_count": "1",
         "decmaker_param_json": json.dumps(
             {
                 "confidence_threshold_buy": 0.6,
@@ -132,6 +134,374 @@ def _build_quick_builder_algorithms(
             }
         )
     return sorted(quick_builder_algorithms, key=lambda item: str(item["name"]))
+
+
+def _supports_engine_chain_algorithm(spec: dict[str, object]) -> bool:
+    if str(spec.get("status", "")) not in {"stable", "runnable"}:
+        return False
+    default_param = spec.get("default_param")
+    param_schema = spec.get("param_schema")
+    if not isinstance(default_param, dict) or not isinstance(param_schema, list):
+        return False
+
+    supported_types = {"integer", "number", "string", "boolean"}
+    for item in param_schema:
+        if not isinstance(item, dict):
+            return False
+        key = item.get("key")
+        param_type = item.get("type")
+        if not isinstance(key, str) or key not in default_param:
+            return False
+        if param_type not in supported_types:
+            return False
+    return True
+
+
+def _build_engine_chain_algorithms(
+    catalog: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    engine_chain_algorithms: list[dict[str, object]] = []
+    for spec in catalog:
+        if not _supports_engine_chain_algorithm(spec):
+            continue
+        default_param = spec.get("default_param")
+        raw_param_schema = spec.get("param_schema")
+        if not isinstance(default_param, dict) or not isinstance(
+            raw_param_schema, list
+        ):
+            continue
+        engine_chain_algorithms.append(
+            {
+                "key": str(spec.get("key", "")),
+                "name": str(spec.get("name", "")),
+                "description": str(spec.get("description", "")),
+                "default_param": dict(default_param),
+                "param_schema": [
+                    dict(item) for item in raw_param_schema if isinstance(item, dict)
+                ],
+            }
+        )
+    return sorted(engine_chain_algorithms, key=lambda item: str(item["name"]))
+
+
+def _decmaker_param_schema(default_param: dict[str, object]) -> list[dict[str, object]]:
+    schema: list[dict[str, object]] = []
+    for key, value in default_param.items():
+        if isinstance(value, bool):
+            param_type = "boolean"
+        elif isinstance(value, int) and not isinstance(value, bool):
+            param_type = "integer"
+        elif isinstance(value, float):
+            param_type = "number"
+        else:
+            param_type = "string"
+        schema.append(
+            {
+                "key": str(key),
+                "label": str(key).replace("_", " ").title(),
+                "type": param_type,
+                "required": True,
+            }
+        )
+    return schema
+
+
+def _build_engine_chain_decmakers(
+    decmakers: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    engine_chain_decmakers: list[dict[str, object]] = []
+    for decmaker in decmakers:
+        default_param = decmaker.get("default_param")
+        if not isinstance(default_param, dict):
+            default_param = {}
+        engine_chain_decmakers.append(
+            {
+                "key": str(decmaker.get("key", "")),
+                "label": str(decmaker.get("label") or decmaker.get("name") or ""),
+                "default_param": dict(default_param),
+                "param_schema": _decmaker_param_schema(default_param),
+            }
+        )
+    return sorted(engine_chain_decmakers, key=lambda item: str(item["label"]))
+
+
+def _merge_engine_chain_defaults(
+    engine_chain_algorithms: list[dict[str, object]],
+    engine_chain_decmakers: list[dict[str, object]],
+    form_data: dict[str, str],
+) -> None:
+    parsed_alertgens: list[dict[str, object]] = []
+    try:
+        raw_alertgens = json.loads(form_data.get("alertgens_json", "[]"))
+    except JSONDecodeError:
+        raw_alertgens = []
+    if isinstance(raw_alertgens, list):
+        parsed_alertgens = [item for item in raw_alertgens if isinstance(item, dict)]
+
+    indices = _engine_alertgen_indices(form_data, parsed_alertgens)
+    form_data["engine_alertgen_count"] = str(len(indices))
+    form_data["engine_alertgen_order"] = json.dumps(indices)
+
+    default_algorithm = engine_chain_algorithms[0] if engine_chain_algorithms else None
+    algorithms_by_key = {
+        str(item["key"]): item for item in engine_chain_algorithms if "key" in item
+    }
+    for position, index in enumerate(indices, start=1):
+        form_key = f"engine_alertgen_{index}_alg_key"
+        parsed_alertgen = (
+            parsed_alertgens[position - 1] if position <= len(parsed_alertgens) else None
+        )
+        if form_data.get(form_key, "").strip() == "" and isinstance(
+            parsed_alertgen, dict
+        ):
+            form_data[form_key] = str(parsed_alertgen.get("alg_key", ""))
+        selected_algorithm = algorithms_by_key.get(
+            form_data.get(form_key, ""), default_algorithm
+        )
+        if selected_algorithm is None:
+            form_data[form_key] = ""
+            continue
+        form_data[form_key] = str(selected_algorithm["key"])
+        default_param = selected_algorithm.get("default_param", {})
+        if not isinstance(default_param, dict):
+            default_param = {}
+        parsed_alg_param = (
+            parsed_alertgen.get("alg_param", {})
+            if isinstance(parsed_alertgen, dict)
+            else {}
+        )
+        if not isinstance(parsed_alg_param, dict):
+            parsed_alg_param = {}
+        for key, value in default_param.items():
+            param_form_key = f"engine_alertgen_{index}_param__{key}"
+            if param_form_key in form_data:
+                continue
+            if key in parsed_alg_param:
+                parsed_value = parsed_alg_param[key]
+                form_data[param_form_key] = (
+                    json.dumps(parsed_value)
+                    if isinstance(parsed_value, bool)
+                    else str(parsed_value)
+                )
+                continue
+            form_data[param_form_key] = (
+                json.dumps(value) if isinstance(value, bool) else str(value)
+            )
+
+    parsed_decmaker_param: dict[str, object] = {}
+    try:
+        raw_decmaker_param = json.loads(form_data.get("decmaker_param_json", "{}"))
+    except JSONDecodeError:
+        raw_decmaker_param = {}
+    if isinstance(raw_decmaker_param, dict):
+        parsed_decmaker_param = raw_decmaker_param
+
+    decmakers_by_key = {
+        str(item["key"]): item for item in engine_chain_decmakers if "key" in item
+    }
+    default_decmaker = engine_chain_decmakers[0] if engine_chain_decmakers else None
+    selected_decmaker = decmakers_by_key.get(
+        form_data.get("decmaker_key", ""),
+        default_decmaker,
+    )
+    if selected_decmaker is None:
+        form_data["decmaker_key"] = ""
+        return
+
+    form_data["decmaker_key"] = str(selected_decmaker["key"])
+    default_param = selected_decmaker.get("default_param", {})
+    if not isinstance(default_param, dict):
+        default_param = {}
+    for key, value in default_param.items():
+        param_form_key = f"engine_decmaker_param__{key}"
+        if param_form_key in form_data:
+            continue
+        if key in parsed_decmaker_param:
+            parsed_value = parsed_decmaker_param[key]
+            form_data[param_form_key] = (
+                json.dumps(parsed_value)
+                if isinstance(parsed_value, bool)
+                else str(parsed_value)
+            )
+            continue
+        form_data[param_form_key] = (
+            json.dumps(value) if isinstance(value, bool) else str(value)
+        )
+
+
+def _build_engine_chain_payload_from_form_data(
+    engine_chain_algorithms: list[dict[str, object]],
+    engine_chain_decmakers: list[dict[str, object]],
+    form_data: dict[str, str],
+) -> dict[str, object]:
+    indices = _engine_alertgen_indices(form_data)
+
+    algorithms_by_key = {
+        str(item["key"]): item for item in engine_chain_algorithms if "key" in item
+    }
+    decmakers_by_key = {
+        str(item["key"]): item for item in engine_chain_decmakers if "key" in item
+    }
+
+    alertgens: list[dict[str, object]] = []
+    for position, index in enumerate(indices, start=1):
+        alg_key = form_data.get(f"engine_alertgen_{index}_alg_key", "").strip()
+        selected_algorithm = algorithms_by_key.get(alg_key)
+        if selected_algorithm is None:
+            raise ValueError(f"Alertgen {position} requires a runnable algorithm.")
+        alg_param: dict[str, object] = {}
+        raw_param_schema = selected_algorithm.get("param_schema")
+        if not isinstance(raw_param_schema, list):
+            raw_param_schema = []
+        for item in raw_param_schema:
+            if not isinstance(item, dict):
+                continue
+            param_key = str(item.get("key", "")).strip()
+            if not param_key:
+                continue
+            raw_value = form_data.get(f"engine_alertgen_{index}_param__{param_key}", "")
+            if raw_value == "" and item.get("required", False):
+                raise ValueError(
+                    f"Alertgen {position} {item.get('label') or param_key} is required."
+                )
+            param_type = str(item.get("type", "string"))
+            if param_type == "integer":
+                parsed_value: object = int(raw_value)
+            elif param_type == "number":
+                parsed_value = float(raw_value)
+            elif param_type == "boolean":
+                parsed_value = raw_value.strip().lower() == "true"
+            else:
+                parsed_value = raw_value
+            alg_param[param_key] = parsed_value
+        alertgens.append({"alg_key": alg_key, "alg_param": alg_param})
+
+    decmaker_key = form_data.get("decmaker_key", "").strip()
+    selected_decmaker = decmakers_by_key.get(decmaker_key)
+    if selected_decmaker is None:
+        raise ValueError("A decision maker is required.")
+    decmaker_param: dict[str, object] = {}
+    raw_decmaker_schema = selected_decmaker.get("param_schema")
+    if not isinstance(raw_decmaker_schema, list):
+        raw_decmaker_schema = []
+    for item in raw_decmaker_schema:
+        if not isinstance(item, dict):
+            continue
+        param_key = str(item.get("key", "")).strip()
+        if not param_key:
+            continue
+        raw_value = form_data.get(f"engine_decmaker_param__{param_key}", "")
+        if raw_value == "" and item.get("required", False):
+            raise ValueError(
+                f"Decision maker {item.get('label') or param_key} is required."
+            )
+        param_type = str(item.get("type", "string"))
+        if param_type == "integer":
+            parsed_value = int(raw_value)
+        elif param_type == "number":
+            parsed_value = float(raw_value)
+        elif param_type == "boolean":
+            parsed_value = raw_value.strip().lower() == "true"
+        else:
+            parsed_value = raw_value
+        decmaker_param[param_key] = parsed_value
+
+    return {
+        "speed_factor": int(form_data.get("speed_factor", "60")),
+        "alertgens": alertgens,
+        "decmaker": {
+            "decmaker_key": decmaker_key,
+            "decmaker_param": decmaker_param,
+        },
+    }
+
+
+def _set_engine_chain_preview_payload(
+    engine_chain_algorithms: list[dict[str, object]],
+    engine_chain_decmakers: list[dict[str, object]],
+    form_data: dict[str, str],
+) -> None:
+    try:
+        payload = _build_engine_chain_payload_from_form_data(
+            engine_chain_algorithms,
+            engine_chain_decmakers,
+            form_data,
+        )
+    except (TypeError, ValueError):
+        form_data["engine_chain_payload_json"] = ""
+        return
+    form_data["engine_chain_payload_json"] = json.dumps(payload, indent=2)
+
+
+def _engine_alertgen_indices(
+    form_data: dict[str, str],
+    parsed_alertgens: list[dict[str, object]] | None = None,
+) -> list[int]:
+    raw_order = form_data.get("engine_alertgen_order", "").strip()
+    if raw_order:
+        try:
+            parsed_order = json.loads(raw_order)
+        except JSONDecodeError:
+            parsed_order = []
+        if isinstance(parsed_order, list):
+            normalized_order = [
+                int(item) for item in parsed_order if isinstance(item, (int, str))
+            ]
+            normalized_order = [item for item in normalized_order if item > 0]
+            if normalized_order:
+                return normalized_order
+
+    discovered_indices: set[int] = set()
+    pattern = re.compile(r"^engine_alertgen_(\d+)_")
+    for key in form_data:
+        match = pattern.match(key)
+        if match is None:
+            continue
+        discovered_indices.add(int(match.group(1)))
+    if discovered_indices:
+        return sorted(discovered_indices)
+
+    if parsed_alertgens:
+        return list(range(1, len(parsed_alertgens) + 1))
+    return [1]
+
+
+def _engine_alertgen_rows_for_view(
+    engine_chain_algorithms: list[dict[str, object]],
+    form_data: dict[str, str],
+) -> list[dict[str, object]]:
+    algorithms_by_key = {
+        str(item["key"]): item for item in engine_chain_algorithms if "key" in item
+    }
+    rows: list[dict[str, object]] = []
+    for index in _engine_alertgen_indices(form_data):
+        alg_key = str(form_data.get(f"engine_alertgen_{index}_alg_key", ""))
+        selected_algorithm = algorithms_by_key.get(alg_key)
+        default_param_value = (
+            selected_algorithm.get("default_param", {})
+            if isinstance(selected_algorithm, dict)
+            else {}
+        )
+        default_param = (
+            dict(default_param_value)
+            if isinstance(default_param_value, dict)
+            else {}
+        )
+        param_values = {
+            key: form_data.get(
+                f"engine_alertgen_{index}_param__{key}",
+                json.dumps(value) if isinstance(value, bool) else str(value),
+            )
+            for key, value in default_param.items()
+        }
+        rows.append(
+            {
+                "index": index,
+                "alg_key": alg_key,
+                "param_values": param_values,
+            }
+        )
+    return rows
 
 
 def _merge_quick_builder_defaults(
@@ -601,6 +971,7 @@ def _render_new_experiment(
         "algorithm_catalog_service"
     ].list_algorithm_implementations()
     quick_builder_algorithms = _build_quick_builder_algorithms(catalog)
+    engine_chain_algorithms = _build_engine_chain_algorithms(catalog)
     configuration_presets = _list_configuration_presets()
     pinned_configuration_presets, unpinned_configuration_presets = (
         _decorate_configuration_presets(configuration_presets)
@@ -615,6 +986,7 @@ def _render_new_experiment(
     decmakers = current_app.extensions[
         "algorithm_catalog_service"
     ].list_decmaker_implementations()
+    engine_chain_decmakers = _build_engine_chain_decmakers(decmakers)
     runtime_settings = current_app.extensions[
         "experiment_runtime_settings_service"
     ].get_effective_settings()
@@ -665,6 +1037,16 @@ def _render_new_experiment(
             ]
 
     _merge_quick_builder_defaults(quick_builder_algorithms, effective_form_data)
+    _merge_engine_chain_defaults(
+        engine_chain_algorithms,
+        engine_chain_decmakers,
+        effective_form_data,
+    )
+    _set_engine_chain_preview_payload(
+        engine_chain_algorithms,
+        engine_chain_decmakers,
+        effective_form_data,
+    )
 
     if (
         selected_configuration is None
@@ -698,12 +1080,18 @@ def _render_new_experiment(
             "experiments/new.html",
             algorithms=catalog,
             quick_builder_algorithms=quick_builder_algorithms,
+            engine_chain_algorithms=engine_chain_algorithms,
+            engine_alertgen_rows=_engine_alertgen_rows_for_view(
+                engine_chain_algorithms,
+                effective_form_data,
+            ),
             configuration_presets=configuration_presets,
             pinned_configuration_presets=pinned_configuration_presets,
             recent_configuration_presets=recent_configuration_presets,
             pinned_quick_builder_presets=pinned_quick_builder_presets,
             recent_quick_builder_presets=recent_quick_builder_presets,
             decmakers=decmakers,
+            engine_chain_decmakers=engine_chain_decmakers,
             recent_experiments=_recent_experiment_presets(),
             selected_configuration=selected_configuration,
             form_data=effective_form_data,
@@ -793,6 +1181,10 @@ def _collect_submitted_experiment_form_data() -> dict[str, str]:
     }
     for key, value in request.form.items():
         if key.startswith("quick_param__"):
+            submitted_form_data[key] = value
+        if key.startswith("engine_alertgen_") or key.startswith(
+            "engine_decmaker_param__"
+        ):
             submitted_form_data[key] = value
     return submitted_form_data
 
@@ -1254,6 +1646,16 @@ def create_experiment():
             "algorithm_catalog_service"
         ].list_algorithm_implementations()
     )
+    engine_chain_algorithms = _build_engine_chain_algorithms(
+        current_app.extensions[
+            "algorithm_catalog_service"
+        ].list_algorithm_implementations()
+    )
+    engine_chain_decmakers = _build_engine_chain_decmakers(
+        current_app.extensions[
+            "algorithm_catalog_service"
+        ].list_decmaker_implementations()
+    )
     try:
         configuration_payload = None
         engine_chain_payload = None
@@ -1278,16 +1680,46 @@ def create_experiment():
                     submitted_form_data["configuration_json"]
                 )
         elif submitted_form_data["run_mode"] == "engine_chain":
-            engine_chain_payload = {
-                "speed_factor": int(submitted_form_data["speed_factor"]),
-                "alertgens": json.loads(submitted_form_data["alertgens_json"]),
-                "decmaker": {
-                    "decmaker_key": submitted_form_data["decmaker_key"],
-                    "decmaker_param": json.loads(
-                        submitted_form_data["decmaker_param_json"]
-                    ),
-                },
-            }
+            has_engine_chain_gui_fields = any(
+                key.startswith("engine_alertgen_")
+                or key.startswith("engine_decmaker_param__")
+                for key in submitted_form_data
+            )
+            if has_engine_chain_gui_fields:
+                engine_chain_payload = _build_engine_chain_payload_from_form_data(
+                    engine_chain_algorithms,
+                    engine_chain_decmakers,
+                    submitted_form_data,
+                )
+            else:
+                engine_chain_payload = {
+                    "speed_factor": int(submitted_form_data["speed_factor"]),
+                    "alertgens": json.loads(submitted_form_data["alertgens_json"]),
+                    "decmaker": {
+                        "decmaker_key": submitted_form_data["decmaker_key"],
+                        "decmaker_param": json.loads(
+                            submitted_form_data["decmaker_param_json"]
+                        ),
+                    },
+                }
+            decmaker_payload = engine_chain_payload.get("decmaker")
+            decmaker_param_payload = (
+                decmaker_payload.get("decmaker_param")
+                if isinstance(decmaker_payload, dict)
+                else {}
+            )
+            submitted_form_data["alertgens_json"] = json.dumps(
+                engine_chain_payload["alertgens"],
+                indent=2,
+            )
+            submitted_form_data["decmaker_param_json"] = json.dumps(
+                decmaker_param_payload,
+                indent=2,
+            )
+            submitted_form_data["engine_chain_payload_json"] = json.dumps(
+                engine_chain_payload,
+                indent=2,
+            )
         experiment_id = service.create_experiment(
             symbol=submitted_form_data["symbol"],
             start_date=submitted_form_data["start_date"],
