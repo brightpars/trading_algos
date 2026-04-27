@@ -602,7 +602,16 @@ def _render_new_experiment(
     ].list_algorithm_implementations()
     quick_builder_algorithms = _build_quick_builder_algorithms(catalog)
     configuration_presets = _list_configuration_presets()
-    recent_configuration_presets = _recent_configuration_presets(configuration_presets)
+    pinned_configuration_presets, unpinned_configuration_presets = (
+        _decorate_configuration_presets(configuration_presets)
+    )
+    recent_configuration_presets = _recent_configuration_presets(
+        unpinned_configuration_presets
+    )
+    configuration_presets = unpinned_configuration_presets
+    pinned_quick_builder_presets, recent_quick_builder_presets = (
+        _quick_builder_presets_for_view()
+    )
     decmakers = current_app.extensions[
         "algorithm_catalog_service"
     ].list_decmaker_implementations()
@@ -690,7 +699,10 @@ def _render_new_experiment(
             algorithms=catalog,
             quick_builder_algorithms=quick_builder_algorithms,
             configuration_presets=configuration_presets,
+            pinned_configuration_presets=pinned_configuration_presets,
             recent_configuration_presets=recent_configuration_presets,
+            pinned_quick_builder_presets=pinned_quick_builder_presets,
+            recent_quick_builder_presets=recent_quick_builder_presets,
             decmakers=decmakers,
             recent_experiments=_recent_experiment_presets(),
             selected_configuration=selected_configuration,
@@ -783,6 +795,187 @@ def _collect_submitted_experiment_form_data() -> dict[str, str]:
         if key.startswith("quick_param__"):
             submitted_form_data[key] = value
     return submitted_form_data
+
+
+def _experiment_form_preferences() -> dict[str, object]:
+    repository = current_app.extensions["experiment_form_preferences_repository"]
+    stored = repository.get_preferences() or {}
+    pinned_configuration_draft_ids = stored.get("pinned_configuration_draft_ids")
+    recent_quick_builder_presets = stored.get("recent_quick_builder_presets")
+    pinned_quick_builder_presets = stored.get("pinned_quick_builder_presets")
+    pinned_configuration_ids_list = (
+        pinned_configuration_draft_ids
+        if isinstance(pinned_configuration_draft_ids, list)
+        else []
+    )
+    recent_quick_presets_list = (
+        recent_quick_builder_presets
+        if isinstance(recent_quick_builder_presets, list)
+        else []
+    )
+    pinned_quick_presets_list = (
+        pinned_quick_builder_presets
+        if isinstance(pinned_quick_builder_presets, list)
+        else []
+    )
+    return {
+        "pinned_configuration_draft_ids": [
+            str(item) for item in pinned_configuration_ids_list
+        ],
+        "recent_quick_builder_presets": [
+            dict(item) for item in recent_quick_presets_list if isinstance(item, dict)
+        ],
+        "pinned_quick_builder_presets": [
+            dict(item) for item in pinned_quick_presets_list if isinstance(item, dict)
+        ],
+    }
+
+
+def _save_experiment_form_preferences(preferences: dict[str, object]) -> None:
+    current_app.extensions["experiment_form_preferences_repository"].save_preferences(
+        preferences
+    )
+
+
+def _quick_builder_preset_from_form_data(form_data: dict[str, str]) -> dict[str, str]:
+    preset = {
+        "alg_key": form_data.get("quick_builder_alg_key", ""),
+        "buy_enabled": form_data.get("quick_builder_buy_enabled", "true"),
+        "sell_enabled": form_data.get("quick_builder_sell_enabled", "true"),
+    }
+    for key, value in form_data.items():
+        if key.startswith("quick_param__"):
+            preset[key] = value
+    return preset
+
+
+def _quick_builder_preset_signature(preset: dict[str, str]) -> str:
+    return json.dumps(preset, sort_keys=True)
+
+
+def _record_recent_quick_builder_preset(form_data: dict[str, str]) -> None:
+    preferences = _experiment_form_preferences()
+    preset = _quick_builder_preset_from_form_data(form_data)
+    signature = _quick_builder_preset_signature(preset)
+    recent_presets = preferences["recent_quick_builder_presets"]
+    if not isinstance(recent_presets, list):
+        recent_presets = []
+    recents = [
+        item
+        for item in recent_presets
+        if isinstance(item, dict)
+        and _quick_builder_preset_signature(
+            {str(key): str(value) for key, value in item.items()}
+        )
+        != signature
+    ]
+    updated_recents = [preset, *recents][:5]
+    preferences["recent_quick_builder_presets"] = updated_recents
+    _save_experiment_form_preferences(preferences)
+
+
+def _toggle_pinned_configuration(draft_id: str) -> None:
+    preferences = _experiment_form_preferences()
+    pinned_configuration_ids = preferences["pinned_configuration_draft_ids"]
+    if not isinstance(pinned_configuration_ids, list):
+        pinned_configuration_ids = []
+    pinned_ids = [
+        str(item) for item in pinned_configuration_ids if str(item) != draft_id
+    ]
+    if draft_id not in pinned_configuration_ids:
+        pinned_ids.insert(0, draft_id)
+    preferences["pinned_configuration_draft_ids"] = pinned_ids
+    _save_experiment_form_preferences(preferences)
+
+
+def _toggle_pinned_quick_builder_preset(form_data: dict[str, str]) -> None:
+    preferences = _experiment_form_preferences()
+    preset = _quick_builder_preset_from_form_data(form_data)
+    signature = _quick_builder_preset_signature(preset)
+    pinned_presets = preferences["pinned_quick_builder_presets"]
+    if not isinstance(pinned_presets, list):
+        pinned_presets = []
+    pinned = [
+        item
+        for item in pinned_presets
+        if isinstance(item, dict)
+        and _quick_builder_preset_signature(
+            {str(key): str(value) for key, value in item.items()}
+        )
+        != signature
+    ]
+    if len(pinned) == len(pinned_presets):
+        pinned.insert(0, preset)
+    preferences["pinned_quick_builder_presets"] = pinned[:5]
+    _save_experiment_form_preferences(preferences)
+
+
+def _decorate_configuration_presets(
+    presets: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    preferences = _experiment_form_preferences()
+    raw_pinned_id_list = preferences.get("pinned_configuration_draft_ids", [])
+    pinned_id_list = (
+        [str(item) for item in raw_pinned_id_list]
+        if isinstance(raw_pinned_id_list, list)
+        else []
+    )
+    pinned_ids = set(pinned_id_list)
+    pinned: list[dict[str, str]] = []
+    unpinned: list[dict[str, str]] = []
+    for preset in presets:
+        decorated = {
+            **preset,
+            "is_pinned": "true" if preset["draft_id"] in pinned_ids else "false",
+        }
+        if preset["draft_id"] in pinned_ids:
+            pinned.append(decorated)
+        else:
+            unpinned.append(decorated)
+    pinned.sort(
+        key=lambda item: (
+            pinned_id_list.index(item["draft_id"])
+            if item["draft_id"] in pinned_id_list
+            else 999
+        )
+    )
+    return pinned, unpinned
+
+
+def _quick_builder_presets_for_view() -> tuple[
+    list[dict[str, str]], list[dict[str, str]]
+]:
+    preferences = _experiment_form_preferences()
+    raw_pinned_source = preferences.get("pinned_quick_builder_presets", [])
+    raw_recent_source = preferences.get("recent_quick_builder_presets", [])
+    pinned_source = (
+        [dict(item) for item in raw_pinned_source if isinstance(item, dict)]
+        if isinstance(raw_pinned_source, list)
+        else []
+    )
+    recent_source = (
+        [dict(item) for item in raw_recent_source if isinstance(item, dict)]
+        if isinstance(raw_recent_source, list)
+        else []
+    )
+    pinned = [
+        {**item, "label": item.get("alg_key", "Quick preset")} for item in pinned_source
+    ]
+    pinned_signatures = {
+        _quick_builder_preset_signature(
+            {str(key): str(value) for key, value in item.items()}
+        )
+        for item in pinned_source
+    }
+    recent = [
+        {**item, "label": item.get("alg_key", "Quick preset")}
+        for item in recent_source
+        if _quick_builder_preset_signature(
+            {str(key): str(value) for key, value in item.items()}
+        )
+        not in pinned_signatures
+    ]
+    return pinned, recent
 
 
 def _quick_builder_configuration_payload_from_request() -> dict[str, object]:
@@ -952,16 +1145,18 @@ def bulk_experiment():
 
 @bp.post("/quick-builder/save-draft")
 def save_quick_builder_as_draft():
+    submitted_form_data = _collect_submitted_experiment_form_data()
     try:
         configuration_payload = _quick_builder_configuration_payload_from_request()
         draft_id = current_app.extensions["configuration_builder_service"].create_draft(
             configuration_payload
         )
+        _record_recent_quick_builder_preset(submitted_form_data)
     except ValueError as exc:
         flash(str(exc), "danger")
         return _render_new_experiment(
             status_code=400,
-            form_data=_collect_submitted_experiment_form_data(),
+            form_data=submitted_form_data,
         )
     flash("Quick-builder configuration saved as draft.", "success")
     return redirect(url_for("configurations.detail_configuration", draft_id=draft_id))
@@ -969,16 +1164,18 @@ def save_quick_builder_as_draft():
 
 @bp.post("/quick-builder/open-in-builder")
 def open_quick_builder_in_builder():
+    submitted_form_data = _collect_submitted_experiment_form_data()
     try:
         configuration_payload = _quick_builder_configuration_payload_from_request()
         draft_id = current_app.extensions["configuration_builder_service"].create_draft(
             configuration_payload
         )
+        _record_recent_quick_builder_preset(submitted_form_data)
     except ValueError as exc:
         flash(str(exc), "danger")
         return _render_new_experiment(
             status_code=400,
-            form_data=_collect_submitted_experiment_form_data(),
+            form_data=submitted_form_data,
         )
     flash("Quick-builder configuration opened in the full builder.", "success")
     return redirect(url_for("configurations.edit_configuration", draft_id=draft_id))
@@ -995,6 +1192,19 @@ def open_configuration_template_in_builder(template_key: str):
         return _render_new_experiment(status_code=400)
     flash("Configuration template opened in the full builder.", "success")
     return redirect(url_for("configurations.edit_configuration", draft_id=draft_id))
+
+
+@bp.post("/saved-configurations/<draft_id>/toggle-pin")
+def toggle_pinned_saved_configuration(draft_id: str):
+    _toggle_pinned_configuration(draft_id)
+    return redirect(url_for("experiments.new_experiment", draft_id=draft_id))
+
+
+@bp.post("/quick-builder/toggle-pin")
+def toggle_pinned_quick_builder():
+    submitted_form_data = _collect_submitted_experiment_form_data()
+    _toggle_pinned_quick_builder_preset(submitted_form_data)
+    return _render_new_experiment(form_data=submitted_form_data)
 
 
 @bp.post("/<experiment_id>/cancel")
@@ -1053,6 +1263,7 @@ def create_experiment():
                     quick_builder_algorithms,
                     submitted_form_data,
                 )
+                _record_recent_quick_builder_preset(submitted_form_data)
             elif submitted_form_data["configuration_source"] == "saved_configuration":
                 selected_configuration = _load_configuration_preset(
                     submitted_form_data["selected_draft_id"]

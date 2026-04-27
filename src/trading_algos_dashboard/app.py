@@ -43,6 +43,9 @@ from trading_algos_dashboard.repositories.market_data_cache_settings_repository 
 from trading_algos_dashboard.repositories.experiment_runtime_settings_repository import (
     ExperimentRuntimeSettingsRepository,
 )
+from trading_algos_dashboard.repositories.experiment_form_preferences_repository import (
+    ExperimentFormPreferencesRepository,
+)
 from trading_algos_dashboard.repositories.experiment_scheduler_lease_repository import (
     ExperimentSchedulerLeaseRepository,
 )
@@ -122,6 +125,9 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     market_data_cache_repository = MarketDataCacheRepository(mongo.db)
     market_data_cache_settings_repository = MarketDataCacheSettingsRepository(mongo.db)
     experiment_runtime_settings_repository = ExperimentRuntimeSettingsRepository(
+        mongo.db
+    )
+    experiment_form_preferences_repository = ExperimentFormPreferencesRepository(
         mongo.db
     )
     experiment_scheduler_lease_repository = ExperimentSchedulerLeaseRepository(mongo.db)
@@ -236,6 +242,9 @@ def create_app(config: DashboardConfig | None = None) -> Flask:
     )
     app.extensions["experiment_runtime_settings_repository"] = (
         experiment_runtime_settings_repository
+    )
+    app.extensions["experiment_form_preferences_repository"] = (
+        experiment_form_preferences_repository
     )
     app.extensions["experiment_scheduler_lease_repository"] = (
         experiment_scheduler_lease_repository

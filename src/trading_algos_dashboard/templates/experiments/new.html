@@ -149,22 +149,48 @@
         <span class="text-muted small">Open a ready-made configuration in the full builder</span>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <form method="post" action="{{ url_for('experiments.open_configuration_template_in_builder', template_key='single_algorithm') }}">
-          <button class="btn btn-outline-secondary btn-sm" type="submit">Single algorithm</button>
-        </form>
-        <form method="post" action="{{ url_for('experiments.open_configuration_template_in_builder', template_key='and_strategy') }}">
-          <button class="btn btn-outline-secondary btn-sm" type="submit">AND strategy</button>
-        </form>
-        <form method="post" action="{{ url_for('experiments.open_configuration_template_in_builder', template_key='or_strategy') }}">
-          <button class="btn btn-outline-secondary btn-sm" type="submit">OR strategy</button>
-        </form>
-        <form method="post" action="{{ url_for('experiments.open_configuration_template_in_builder', template_key='breakout_example') }}">
-          <button class="btn btn-outline-secondary btn-sm" type="submit">Breakout example</button>
-        </form>
+        <button class="btn btn-outline-secondary btn-sm" type="submit" formaction="{{ url_for('experiments.open_configuration_template_in_builder', template_key='single_algorithm') }}" formmethod="post">Single algorithm</button>
+        <button class="btn btn-outline-secondary btn-sm" type="submit" formaction="{{ url_for('experiments.open_configuration_template_in_builder', template_key='and_strategy') }}" formmethod="post">AND strategy</button>
+        <button class="btn btn-outline-secondary btn-sm" type="submit" formaction="{{ url_for('experiments.open_configuration_template_in_builder', template_key='or_strategy') }}" formmethod="post">OR strategy</button>
+        <button class="btn btn-outline-secondary btn-sm" type="submit" formaction="{{ url_for('experiments.open_configuration_template_in_builder', template_key='breakout_example') }}" formmethod="post">Breakout example</button>
       </div>
     </div>
 
     <div data-configuration-source-section="quick_builder">
+      {% if pinned_quick_builder_presets %}
+      <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h3 class="h6 mb-0">Pinned quick presets</h3>
+          <span class="text-muted small">Click one to refill the quick builder</span>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          {% for preset in pinned_quick_builder_presets %}
+          <button
+            class="btn btn-outline-warning btn-sm quick-builder-preset"
+            type="button"
+            data-preset='{{ preset|tojson }}'
+          >{{ preset.label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if recent_quick_builder_presets %}
+      <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h3 class="h6 mb-0">Recent quick presets</h3>
+          <span class="text-muted small">Recent single-algorithm setups</span>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          {% for preset in recent_quick_builder_presets %}
+          <button
+            class="btn btn-outline-secondary btn-sm quick-builder-preset"
+            type="button"
+            data-preset='{{ preset|tojson }}'
+          >{{ preset.label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label">Algorithm</label>
@@ -254,6 +280,14 @@
       </div>
       <div class="mt-3 d-flex gap-2 flex-wrap">
         <button
+          class="btn btn-outline-warning"
+          type="submit"
+          formaction="{{ url_for('experiments.toggle_pinned_quick_builder') }}"
+          formmethod="post"
+        >
+          Pin current quick preset
+        </button>
+        <button
           class="btn btn-outline-success"
           type="submit"
           formaction="{{ url_for('experiments.save_quick_builder_as_draft') }}"
@@ -273,6 +307,33 @@
     </div>
 
     <div data-configuration-source-section="saved_configuration">
+      {% if pinned_configuration_presets %}
+      <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h3 class="h6 mb-0">Pinned configurations</h3>
+          <span class="text-muted small">Your favorites stay on top</span>
+        </div>
+        <div class="row g-3">
+          {% for preset in pinned_configuration_presets %}
+          <div class="col-md-4">
+            <div class="card h-100">
+              <div class="card-body d-flex flex-column gap-2">
+                <button
+                  class="btn btn-outline-warning text-start w-100 recent-configuration-preset"
+                  type="button"
+                  data-draft-id="{{ preset.draft_id }}"
+                >
+                  <div class="fw-semibold">{{ preset.name }}</div>
+                  <div class="small text-muted">{{ preset.config_key or preset.draft_id }}</div>
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" type="submit" formaction="{{ url_for('experiments.toggle_pinned_saved_configuration', draft_id=preset.draft_id) }}" formmethod="post">Unpin</button>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
       {% if recent_configuration_presets %}
       <div class="mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -291,6 +352,7 @@
               <div class="small text-muted">{{ preset.config_key or preset.draft_id }}</div>
               <div class="small text-muted">Updated {{ preset.updated_at_label or 'unknown' }}</div>
             </button>
+            <button class="btn btn-outline-warning btn-sm mt-2" type="submit" formaction="{{ url_for('experiments.toggle_pinned_saved_configuration', draft_id=preset.draft_id) }}" formmethod="post">Pin</button>
           </div>
           {% endfor %}
         </div>
@@ -761,6 +823,43 @@
       });
     };
 
+    const applyQuickBuilderPreset = (preset) => {
+      if (!(quickBuilderAlgorithmSelect instanceof HTMLSelectElement) || typeof preset !== "object" || preset === null) {
+        return;
+      }
+      const algKey = String(preset.alg_key || "");
+      if (algKey) {
+        quickBuilderAlgorithmSelect.value = algKey;
+      }
+      const buyEnabledSelect = document.querySelector('[name="quick_builder_buy_enabled"]');
+      const sellEnabledSelect = document.querySelector('[name="quick_builder_sell_enabled"]');
+      if (buyEnabledSelect instanceof HTMLSelectElement && typeof preset.buy_enabled === "string") {
+        buyEnabledSelect.value = preset.buy_enabled;
+      }
+      if (sellEnabledSelect instanceof HTMLSelectElement && typeof preset.sell_enabled === "string") {
+        sellEnabledSelect.value = preset.sell_enabled;
+      }
+      syncQuickBuilderAlgorithmSections();
+      const activeSection = document.querySelector(`[data-quick-builder-algorithm="${CSS.escape(algKey)}"]`);
+      if (activeSection instanceof HTMLElement) {
+        activeSection.querySelectorAll('[data-quick-param-key]').forEach((input) => {
+          if (!(input instanceof HTMLInputElement || input instanceof HTMLSelectElement)) {
+            return;
+          }
+          const paramKey = input.getAttribute('data-quick-param-key');
+          if (!paramKey) {
+            return;
+          }
+          const presetKey = `quick_param__${paramKey}`;
+          if (typeof preset[presetKey] === "string") {
+            input.value = preset[presetKey];
+          }
+        });
+      }
+      syncInteractiveFieldState();
+      updateQuickBuilderPreview();
+    };
+
     document.querySelectorAll('.recent-configuration-preset').forEach((button) => {
       if (!(button instanceof HTMLButtonElement)) {
         return;
@@ -777,6 +876,20 @@
         updateSavedConfigurationSummary();
         syncInteractiveFieldState();
         showValidationAlert([]);
+      });
+    });
+
+    document.querySelectorAll('.quick-builder-preset').forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      button.addEventListener('click', () => {
+        try {
+          applyQuickBuilderPreset(JSON.parse(button.dataset.preset || '{}'));
+          showValidationAlert([]);
+        } catch {
+          // ignore malformed preset payload
+        }
       });
     });
 
