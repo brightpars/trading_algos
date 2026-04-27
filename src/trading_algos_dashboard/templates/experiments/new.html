@@ -70,7 +70,7 @@
 <form method="post" action="{{ url_for('experiments.create_experiment') }}" class="row g-3">
   <div class="col-12">
     <label class="form-label">Run mode</label>
-    <select class="form-select" name="run_mode">
+    <select class="form-select" name="run_mode" id="run-mode-select">
       <option value="engine_chain" {% if form_data.run_mode == 'engine_chain' %}selected{% endif %}>Engine chain (many alertgens + one decmaker)</option>
       <option value="configuration" {% if form_data.run_mode == 'configuration' %}selected{% endif %}>Configuration</option>
     </select>
@@ -109,12 +109,12 @@
       </div>
     </div>
   </div>
-  <div class="col-12">
+  <div class="col-12" data-run-mode-section="engine_chain">
     <label class="form-label">Alertgens JSON</label>
     <textarea class="form-control" rows="8" name="alertgens_json">{{ form_data.alertgens_json }}</textarea>
     <div class="form-text">Use this for engine-chain runs. Provide a JSON array of alertgen engine configs.</div>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-4" data-run-mode-section="engine_chain">
     <label class="form-label">Decision maker</label>
     <select class="form-select" name="decmaker_key">
       {% for decmaker in decmakers %}
@@ -122,16 +122,16 @@
       {% endfor %}
     </select>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-4" data-run-mode-section="engine_chain">
     <label class="form-label">Speed factor</label>
     <input class="form-control" type="number" min="1" name="speed_factor" value="{{ form_data.speed_factor }}">
     <div class="form-text">Fake-datetime speed multiplier for faster simulation.</div>
   </div>
-  <div class="col-12">
+  <div class="col-12" data-run-mode-section="engine_chain">
     <label class="form-label">Decision maker params JSON</label>
     <textarea class="form-control" rows="6" name="decmaker_param_json">{{ form_data.decmaker_param_json }}</textarea>
   </div>
-  <div class="col-12">
+  <div class="col-12" data-run-mode-section="configuration">
     <label class="form-label">Configuration JSON</label>
     <details {% if selected_configuration or form_data.configuration_json %}open{% endif %}>
       <summary>Advanced configuration payload</summary>
@@ -148,4 +148,28 @@
     <div class="form-text">Experiments are queued in FIFO order and executed up to the configured concurrency limit of {{ max_concurrent_experiments }}.</div>
   </div>
 </form>
+<script>
+  (() => {
+    const runModeSelect = document.getElementById("run-mode-select");
+    if (!(runModeSelect instanceof HTMLSelectElement)) {
+      return;
+    }
+
+    const sections = Array.from(document.querySelectorAll("[data-run-mode-section]"));
+
+    const syncRunModeSections = () => {
+      const selectedRunMode = runModeSelect.value;
+      sections.forEach((section) => {
+        if (!(section instanceof HTMLElement)) {
+          return;
+        }
+        const isVisible = section.dataset.runModeSection === selectedRunMode;
+        section.hidden = !isVisible;
+      });
+    };
+
+    runModeSelect.addEventListener("change", syncRunModeSections);
+    syncRunModeSections();
+  })();
+</script>
 {% endblock %}

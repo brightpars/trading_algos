@@ -204,8 +204,36 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b'name="configuration_json"' in response.data
     assert b'name="decmaker_key"' in response.data
     assert b'name="speed_factor"' in response.data
+    assert b'id="run-mode-select"' in response.data
+    assert b'data-run-mode-section="engine_chain"' in response.data
+    assert b'data-run-mode-section="configuration"' in response.data
+    assert (
+        b'<option value="configuration" selected>Configuration</option>'
+        in response.data
+    )
     assert b"Single algorithm" not in response.data
     assert b'name="algorithms_json"' not in response.data
+
+
+def test_new_experiment_page_preserves_selected_engine_chain_run_mode(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
+    client = app.test_client()
+    client.set_cookie(
+        "trading_algos_dashboard_experiment_form",
+        '{"run_mode": "engine_chain", "alertgens_json": "[]", "decmaker_key": "alg1", "decmaker_param_json": "{}", "speed_factor": "30"}',
+    )
+
+    response = client.get("/experiments/new")
+
+    assert response.status_code == 200
+    assert (
+        b'<option value="engine_chain" selected>Engine chain (many alertgens + one decmaker)</option>'
+        in response.data
+    )
+    assert b'data-run-mode-section="engine_chain"' in response.data
 
 
 def test_bulk_experiment_page_renders(monkeypatch):
