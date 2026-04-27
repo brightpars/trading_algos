@@ -59,9 +59,11 @@ def test_data_server_client_exposes_all_registered_methods(monkeypatch) -> None:
             recorded["get_price"] = (symbol, ts)
             return 10.5
 
-        def get_history_price(self, symbol: str, ts: str) -> float:
-            recorded["get_history_price"] = (symbol, ts)
-            return 10.0
+        def get_history_price(
+            self, symbol: str, ts1: str, ts2: str
+        ) -> list[dict[str, Any]]:
+            recorded["get_history_price"] = (symbol, ts1, ts2)
+            return [{"symbol": symbol, "start": ts1, "end": ts2}]
 
         def get_data(self, symbol: str, ts: str) -> dict[str, Any]:
             recorded["get_data"] = (symbol, ts)
@@ -84,7 +86,17 @@ def test_data_server_client_exposes_all_registered_methods(monkeypatch) -> None:
     assert client.ping() == "pong"
     assert recorded["timeout_seconds"] == 2.0
     assert client.get_price("AAPL", ts) == 10.5
-    assert client.get_history_price("AAPL", ts) == 10.0
+    assert client.get_history_price(
+        "AAPL",
+        ts,
+        datetime.fromisoformat("2024-01-01T09:32:00"),
+    ) == [
+        {
+            "symbol": "AAPL",
+            "start": "2024-01-01 09:30:00",
+            "end": "2024-01-01 09:32:00",
+        }
+    ]
     assert client.get_data("AAPL", ts) == {
         "symbol": "AAPL",
         "ts": "2024-01-01 09:30:00",
@@ -99,7 +111,11 @@ def test_data_server_client_exposes_all_registered_methods(monkeypatch) -> None:
         }
     ]
     assert recorded["get_price"] == ("AAPL", "2024-01-01 09:30:00")
-    assert recorded["get_history_price"] == ("AAPL", "2024-01-01 09:30:00")
+    assert recorded["get_history_price"] == (
+        "AAPL",
+        "2024-01-01 09:30:00",
+        "2024-01-01 09:32:00",
+    )
     assert recorded["get_data"] == ("AAPL", "2024-01-01 09:30:00")
     assert recorded["get_candles"] == (
         "AAPL",

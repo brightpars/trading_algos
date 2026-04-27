@@ -37,7 +37,7 @@ class MongoCounterRepository:
     def get_next_counter_value(self, counter_name: str, seed_value: int) -> int:
         self._collection.update_one(
             {"_id": counter_name},
-            {"$set": {"seq": int(seed_value)}, "$inc": {"seq": 1}},
+            [{"$set": {"seq": {"$add": [{"$ifNull": ["$seq", int(seed_value)]}, 1]}}}],
             upsert=True,
         )
         refreshed = self._collection.find_one({"_id": counter_name}) or {}

@@ -77,12 +77,13 @@ class DataServerClient:
             self._serialize_remote_datetime(ts),
         )
 
-    def get_history_price(self, symbol: str, ts: object) -> Any:
+    def get_history_price(self, symbol: str, ts1: object, ts2: object) -> Any:
         return _proxy_call(
             self._proxy,
             "get_history_price",
             symbol,
-            self._serialize_remote_datetime(ts),
+            self._serialize_remote_datetime(ts1),
+            self._serialize_remote_datetime(ts2),
         )
 
     def get_data(self, symbol: str, ts: object) -> Any:
