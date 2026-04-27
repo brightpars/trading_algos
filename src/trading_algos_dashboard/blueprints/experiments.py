@@ -15,6 +15,7 @@ from flask import (
     request,
     url_for,
 )
+from trading_algos.configuration.validation import validate_configuration_payload
 from trading_algos_dashboard.extensions import (
     clear_form_state,
     load_form_state,
@@ -455,6 +456,8 @@ def _list_configuration_presets() -> list[dict[str, str]]:
         if isinstance(updated_at, datetime):
             updated_at_label = updated_at.strftime("%Y-%m-%d %H:%M UTC")
             updated_at_sort_key = updated_at.isoformat()
+        structure_lines = _build_configuration_structure_lines(payload_dict)
+        preflight = _build_configuration_preflight(payload_dict)
         nodes = payload_dict.get("nodes")
         node_count = len(nodes) if isinstance(nodes, list) else 0
         algorithm_count = 0
@@ -480,6 +483,12 @@ def _list_configuration_presets() -> list[dict[str, str]]:
                 "algorithm_count": str(algorithm_count),
                 "group_count": str(group_count),
                 "configuration_json": json.dumps(payload_dict, indent=2),
+                "structure_lines": "\n".join(structure_lines),
+                "preflight_valid": "true" if preflight["is_valid"] else "false",
+                "preflight_errors": "\n".join(_preflight_messages(preflight, "errors")),
+                "preflight_warnings": "\n".join(
+                    _preflight_messages(preflight, "warnings")
+                ),
                 "updated_at_label": updated_at_label,
                 "updated_at_sort_key": updated_at_sort_key,
             }
@@ -496,6 +505,73 @@ def _recent_configuration_presets(
         reverse=True,
     )
     return sorted_presets[:3]
+
+
+def _build_configuration_structure_lines(payload: dict[str, object]) -> list[str]:
+    nodes = payload.get("nodes") or []
+    if not isinstance(nodes, list):
+        return []
+    nodes_by_id = {
+        str(node.get("node_id")): node for node in nodes if isinstance(node, dict)
+    }
+
+    def render(node_id: str, depth: int) -> list[str]:
+        node = nodes_by_id.get(node_id)
+        if node is None:
+            return []
+        prefix = "  " * depth + "- "
+        node_type = str(node.get("node_type", "unknown"))
+        if node_type == "algorithm":
+            alg_key = str(node.get("alg_key", ""))
+            node_name = str(node.get("name") or alg_key or node_id)
+            return [f"{prefix}{node_name} ({alg_key})"]
+        node_name = str(node.get("name") or node_type.upper())
+        children = node.get("children") or []
+        lines = [f"{prefix}{node_name} [{node_type.upper()}]"]
+        if isinstance(children, list):
+            for child_id in children:
+                lines.extend(render(str(child_id), depth + 1))
+        return lines
+
+    root_node_id = payload.get("root_node_id")
+    if not isinstance(root_node_id, str) or not root_node_id:
+        return []
+    return render(root_node_id, 0)
+
+
+def _build_configuration_preflight(payload: dict[str, object]) -> dict[str, object]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    try:
+        normalized = validate_configuration_payload(payload)
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        errors.append(str(exc))
+        return {
+            "is_valid": False,
+            "errors": errors,
+            "warnings": warnings,
+        }
+
+    if len(normalized.nodes) >= 10:
+        warnings.append(
+            "Large configuration; review structure carefully before queueing."
+        )
+
+    return {
+        "is_valid": True,
+        "errors": errors,
+        "warnings": warnings,
+    }
+
+
+def _preflight_messages(
+    preflight: dict[str, object],
+    key: str,
+) -> list[str]:
+    value = preflight.get(key)
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
 
 
 def _load_algorithm_preset(alg_key: str | None) -> dict[str, str] | None:
@@ -668,6 +744,172 @@ def _render_bulk_experiment(
     )
 
 
+def _collect_submitted_experiment_form_data() -> dict[str, str]:
+    configuration_source = request.form.get("configuration_source", "").strip()
+    if not configuration_source:
+        configuration_source = (
+            "quick_builder"
+            if request.form.get("quick_builder_alg_key", "").strip()
+            else "configuration_json"
+        )
+
+    submitted_form_data = {
+        "run_mode": request.form.get("run_mode", "configuration"),
+        "configuration_source": configuration_source,
+        "selected_draft_id": request.form.get("selected_draft_id", ""),
+        "quick_builder_alg_key": request.form.get("quick_builder_alg_key", ""),
+        "quick_builder_buy_enabled": request.form.get(
+            "quick_builder_buy_enabled", "true"
+        ),
+        "quick_builder_sell_enabled": request.form.get(
+            "quick_builder_sell_enabled", "true"
+        ),
+        "symbol": request.form.get("symbol", ""),
+        "start_date": request.form.get("start_date", ""),
+        "start_time": request.form.get("start_time", ""),
+        "end_date": request.form.get("end_date", ""),
+        "end_time": request.form.get("end_time", ""),
+        "alertgens_json": request.form.get("alertgens_json", "[]"),
+        "decmaker_key": request.form.get("decmaker_key", "alg1"),
+        "decmaker_param_json": request.form.get("decmaker_param_json", "{}"),
+        "speed_factor": request.form.get("speed_factor", "60"),
+        "notes": request.form.get("notes", ""),
+        "configuration_json": request.form.get("configuration_json", ""),
+        "max_concurrent_experiments": str(
+            current_app.config.get("EXPERIMENT_MAX_CONCURRENT_RUNS", 1)
+        ),
+    }
+    for key, value in request.form.items():
+        if key.startswith("quick_param__"):
+            submitted_form_data[key] = value
+    return submitted_form_data
+
+
+def _quick_builder_configuration_payload_from_request() -> dict[str, object]:
+    submitted_form_data = _collect_submitted_experiment_form_data()
+    quick_builder_algorithms = _build_quick_builder_algorithms(
+        current_app.extensions[
+            "algorithm_catalog_service"
+        ].list_algorithm_implementations()
+    )
+    return _build_quick_builder_configuration_payload(
+        quick_builder_algorithms,
+        submitted_form_data,
+    )
+
+
+def _configuration_template_payload(template_key: str) -> dict[str, object]:
+    if template_key == "single_algorithm":
+        return build_single_algorithm_configuration_payload(
+            alg_key="OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+            alg_param={"window": 2},
+        )
+
+    if template_key == "and_strategy":
+        return {
+            "config_key": "template-and-strategy",
+            "version": "1",
+            "name": "Template AND strategy",
+            "root_node_id": "group1",
+            "nodes": [
+                {
+                    "node_id": "group1",
+                    "node_type": "and",
+                    "name": "AND group",
+                    "children": ["alg1", "alg2"],
+                },
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                },
+                {
+                    "node_id": "alg2",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+                    "alg_param": {"period": 5},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                },
+            ],
+            "runtime_overrides": {},
+            "compatibility_metadata": {},
+        }
+
+    if template_key == "or_strategy":
+        return {
+            "config_key": "template-or-strategy",
+            "version": "1",
+            "name": "Template OR strategy",
+            "root_node_id": "group1",
+            "nodes": [
+                {
+                    "node_id": "group1",
+                    "node_type": "or",
+                    "name": "OR group",
+                    "children": ["alg1", "alg2"],
+                },
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                },
+                {
+                    "node_id": "alg2",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+                    "alg_param": {"period": 5},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                },
+            ],
+            "runtime_overrides": {},
+            "compatibility_metadata": {},
+        }
+
+    if template_key == "breakout_example":
+        return {
+            "config_key": "template-breakout-example",
+            "version": "1",
+            "name": "Template breakout example",
+            "root_node_id": "group1",
+            "nodes": [
+                {
+                    "node_id": "group1",
+                    "node_type": "and",
+                    "name": "Breakout confirmation",
+                    "children": ["alg1", "alg2"],
+                },
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                },
+                {
+                    "node_id": "alg2",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+                    "alg_param": {"period": 5},
+                    "buy_enabled": True,
+                    "sell_enabled": False,
+                },
+            ],
+            "runtime_overrides": {},
+            "compatibility_metadata": {},
+        }
+
+    raise ValueError(f"Unsupported configuration template: {template_key}")
+
+
 @bp.get("")
 def history():
     service = current_app.extensions["experiment_service"]
@@ -706,6 +948,53 @@ def new_experiment():
 @bp.get("/bulk")
 def bulk_experiment():
     return _render_bulk_experiment()
+
+
+@bp.post("/quick-builder/save-draft")
+def save_quick_builder_as_draft():
+    try:
+        configuration_payload = _quick_builder_configuration_payload_from_request()
+        draft_id = current_app.extensions["configuration_builder_service"].create_draft(
+            configuration_payload
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return _render_new_experiment(
+            status_code=400,
+            form_data=_collect_submitted_experiment_form_data(),
+        )
+    flash("Quick-builder configuration saved as draft.", "success")
+    return redirect(url_for("configurations.detail_configuration", draft_id=draft_id))
+
+
+@bp.post("/quick-builder/open-in-builder")
+def open_quick_builder_in_builder():
+    try:
+        configuration_payload = _quick_builder_configuration_payload_from_request()
+        draft_id = current_app.extensions["configuration_builder_service"].create_draft(
+            configuration_payload
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return _render_new_experiment(
+            status_code=400,
+            form_data=_collect_submitted_experiment_form_data(),
+        )
+    flash("Quick-builder configuration opened in the full builder.", "success")
+    return redirect(url_for("configurations.edit_configuration", draft_id=draft_id))
+
+
+@bp.post("/configuration-templates/<template_key>/open-in-builder")
+def open_configuration_template_in_builder(template_key: str):
+    try:
+        draft_id = current_app.extensions["configuration_builder_service"].create_draft(
+            _configuration_template_payload(template_key)
+        )
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return _render_new_experiment(status_code=400)
+    flash("Configuration template opened in the full builder.", "success")
+    return redirect(url_for("configurations.edit_configuration", draft_id=draft_id))
 
 
 @bp.post("/<experiment_id>/cancel")
@@ -747,43 +1036,7 @@ def delete_experiment(experiment_id: str):
 
 @bp.post("")
 def create_experiment():
-    configuration_source = request.form.get("configuration_source", "").strip()
-    if not configuration_source:
-        configuration_source = (
-            "quick_builder"
-            if request.form.get("quick_builder_alg_key", "").strip()
-            else "configuration_json"
-        )
-
-    submitted_form_data = {
-        "run_mode": request.form.get("run_mode", "configuration"),
-        "configuration_source": configuration_source,
-        "selected_draft_id": request.form.get("selected_draft_id", ""),
-        "quick_builder_alg_key": request.form.get("quick_builder_alg_key", ""),
-        "quick_builder_buy_enabled": request.form.get(
-            "quick_builder_buy_enabled", "true"
-        ),
-        "quick_builder_sell_enabled": request.form.get(
-            "quick_builder_sell_enabled", "true"
-        ),
-        "symbol": request.form.get("symbol", ""),
-        "start_date": request.form.get("start_date", ""),
-        "start_time": request.form.get("start_time", ""),
-        "end_date": request.form.get("end_date", ""),
-        "end_time": request.form.get("end_time", ""),
-        "alertgens_json": request.form.get("alertgens_json", "[]"),
-        "decmaker_key": request.form.get("decmaker_key", "alg1"),
-        "decmaker_param_json": request.form.get("decmaker_param_json", "{}"),
-        "speed_factor": request.form.get("speed_factor", "60"),
-        "notes": request.form.get("notes", ""),
-        "configuration_json": request.form.get("configuration_json", ""),
-        "max_concurrent_experiments": str(
-            current_app.config.get("EXPERIMENT_MAX_CONCURRENT_RUNS", 1)
-        ),
-    }
-    for key, value in request.form.items():
-        if key.startswith("quick_param__"):
-            submitted_form_data[key] = value
+    submitted_form_data = _collect_submitted_experiment_form_data()
 
     service = current_app.extensions["experiment_service"]
     quick_builder_algorithms = _build_quick_builder_algorithms(

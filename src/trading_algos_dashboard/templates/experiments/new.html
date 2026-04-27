@@ -143,6 +143,27 @@
     </select>
     <div class="form-text mb-3">Use the quick builder for a single algorithm run, pick a saved configuration draft for graph-based setups, or switch to advanced JSON for manual payloads.</div>
 
+    <div class="builder-card mb-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h3 class="h6 mb-0">Starter templates</h3>
+        <span class="text-muted small">Open a ready-made configuration in the full builder</span>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <form method="post" action="{{ url_for('experiments.open_configuration_template_in_builder', template_key='single_algorithm') }}">
+          <button class="btn btn-outline-secondary btn-sm" type="submit">Single algorithm</button>
+        </form>
+        <form method="post" action="{{ url_for('experiments.open_configuration_template_in_builder', template_key='and_strategy') }}">
+          <button class="btn btn-outline-secondary btn-sm" type="submit">AND strategy</button>
+        </form>
+        <form method="post" action="{{ url_for('experiments.open_configuration_template_in_builder', template_key='or_strategy') }}">
+          <button class="btn btn-outline-secondary btn-sm" type="submit">OR strategy</button>
+        </form>
+        <form method="post" action="{{ url_for('experiments.open_configuration_template_in_builder', template_key='breakout_example') }}">
+          <button class="btn btn-outline-secondary btn-sm" type="submit">Breakout example</button>
+        </form>
+      </div>
+    </div>
+
     <div data-configuration-source-section="quick_builder">
       <div class="row g-3">
         <div class="col-md-6">
@@ -231,6 +252,24 @@
         >{{ form_data.configuration_json }}</textarea>
         <div class="form-text">This preview is generated automatically from the quick-builder inputs and is read-only.</div>
       </div>
+      <div class="mt-3 d-flex gap-2 flex-wrap">
+        <button
+          class="btn btn-outline-success"
+          type="submit"
+          formaction="{{ url_for('experiments.save_quick_builder_as_draft') }}"
+          formmethod="post"
+        >
+          Save as draft
+        </button>
+        <button
+          class="btn btn-outline-primary"
+          type="submit"
+          formaction="{{ url_for('experiments.open_quick_builder_in_builder') }}"
+          formmethod="post"
+        >
+          Open in builder
+        </button>
+      </div>
     </div>
 
     <div data-configuration-source-section="saved_configuration">
@@ -261,6 +300,12 @@
       <div class="row g-3">
         <div class="col-md-8">
           <label class="form-label">Saved configuration</label>
+          <input
+            class="form-control mb-2"
+            id="saved-configuration-search"
+            type="search"
+            placeholder="Search saved configurations by name or key"
+          >
           <select class="form-select" name="selected_draft_id" id="saved-configuration-select">
             <option value="">Select a saved configuration</option>
             {% for preset in configuration_presets %}
@@ -275,6 +320,11 @@
               data-config-status="{{ preset.status }}"
               data-config-updated-at="{{ preset.updated_at_label }}"
               data-config-json='{{ preset.configuration_json|tojson }}'
+              data-config-structure-lines='{{ preset.structure_lines|tojson }}'
+              data-config-preflight-valid="{{ preset.preflight_valid }}"
+              data-config-preflight-errors='{{ preset.preflight_errors|tojson }}'
+              data-config-preflight-warnings='{{ preset.preflight_warnings|tojson }}'
+              data-search-text="{{ (preset.name ~ ' ' ~ (preset.config_key or preset.draft_id))|lower }}"
               {% if form_data.selected_draft_id == preset.draft_id %}selected{% endif %}
             >{{ preset.name }} ({{ preset.config_key or preset.draft_id }})</option>
             {% endfor %}
@@ -313,6 +363,16 @@
                 <label class="form-label">Configuration preview</label>
                 <textarea class="form-control font-monospace" id="saved-configuration-preview" rows="12" readonly>{% if selected_configuration %}{{ selected_configuration.configuration_json }}{% endif %}</textarea>
               </div>
+              <div class="mt-3">
+                <label class="form-label">Structure preview</label>
+                <pre class="bg-light p-3 rounded small mb-0" id="saved-configuration-structure-preview"></pre>
+              </div>
+              <div class="mt-3">
+                <label class="form-label">Preflight check</label>
+                <div class="alert alert-success py-2 mb-2 d-none" id="saved-configuration-preflight-success">Configuration looks valid and ready to queue.</div>
+                <div class="alert alert-danger py-2 mb-2 d-none" id="saved-configuration-preflight-errors"></div>
+                <div class="alert alert-warning py-2 mb-0 d-none" id="saved-configuration-preflight-warnings"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -345,6 +405,7 @@
     const experimentForm = document.getElementById("new-experiment-form");
     const validationAlert = document.getElementById("new-experiment-validation-alert");
     const savedConfigurationSelect = document.getElementById("saved-configuration-select");
+    const savedConfigurationSearch = document.getElementById("saved-configuration-search");
     const savedConfigurationSummaryCard = document.getElementById("saved-configuration-summary-card");
     const savedConfigurationSummaryName = document.getElementById("saved-configuration-summary-name");
     const savedConfigurationSummaryKey = document.getElementById("saved-configuration-summary-key");
@@ -358,6 +419,10 @@
     const savedConfigurationEditLink = document.getElementById("saved-configuration-edit-link");
     const savedConfigurationRunLink = document.getElementById("saved-configuration-run-link");
     const savedConfigurationPreview = document.getElementById("saved-configuration-preview");
+    const savedConfigurationStructurePreview = document.getElementById("saved-configuration-structure-preview");
+    const savedConfigurationPreflightSuccess = document.getElementById("saved-configuration-preflight-success");
+    const savedConfigurationPreflightErrors = document.getElementById("saved-configuration-preflight-errors");
+    const savedConfigurationPreflightWarnings = document.getElementById("saved-configuration-preflight-warnings");
     if (!(runModeSelect instanceof HTMLSelectElement)) {
       return;
     }
@@ -616,6 +681,10 @@
       const configStatus = selectedOption.dataset.configStatus || "";
       const configUpdatedAt = selectedOption.dataset.configUpdatedAt || "";
       const configJson = selectedOption.dataset.configJson || "";
+      const configStructureLines = selectedOption.dataset.configStructureLines || "";
+      const preflightValid = selectedOption.dataset.configPreflightValid === "true";
+      const preflightErrors = selectedOption.dataset.configPreflightErrors || "";
+      const preflightWarnings = selectedOption.dataset.configPreflightWarnings || "";
       if (savedConfigurationSummaryName instanceof HTMLElement) {
         savedConfigurationSummaryName.textContent = configName;
       }
@@ -652,6 +721,44 @@
       if (savedConfigurationPreview instanceof HTMLTextAreaElement) {
         savedConfigurationPreview.value = configJson;
       }
+      if (savedConfigurationStructurePreview instanceof HTMLElement) {
+        savedConfigurationStructurePreview.textContent = configStructureLines || "No structure preview available.";
+      }
+      if (savedConfigurationPreflightSuccess instanceof HTMLElement) {
+        savedConfigurationPreflightSuccess.classList.toggle("d-none", !preflightValid);
+      }
+      if (savedConfigurationPreflightErrors instanceof HTMLElement) {
+        const hasErrors = preflightErrors.trim() !== "";
+        savedConfigurationPreflightErrors.classList.toggle("d-none", !hasErrors);
+        savedConfigurationPreflightErrors.innerHTML = hasErrors
+          ? preflightErrors.split("\n").filter(Boolean).map((message) => `<div>${message}</div>`).join("")
+          : "";
+      }
+      if (savedConfigurationPreflightWarnings instanceof HTMLElement) {
+        const hasWarnings = preflightWarnings.trim() !== "";
+        savedConfigurationPreflightWarnings.classList.toggle("d-none", !hasWarnings);
+        savedConfigurationPreflightWarnings.innerHTML = hasWarnings
+          ? preflightWarnings.split("\n").filter(Boolean).map((message) => `<div>${message}</div>`).join("")
+          : "";
+      }
+    };
+
+    const filterSavedConfigurations = () => {
+      if (!(savedConfigurationSelect instanceof HTMLSelectElement) || !(savedConfigurationSearch instanceof HTMLInputElement)) {
+        return;
+      }
+      const query = savedConfigurationSearch.value.trim().toLowerCase();
+      Array.from(savedConfigurationSelect.options).forEach((option, index) => {
+        if (!(option instanceof HTMLOptionElement)) {
+          return;
+        }
+        if (index === 0) {
+          option.hidden = false;
+          return;
+        }
+        const searchText = option.dataset.searchText || option.textContent?.toLowerCase() || "";
+        option.hidden = query !== "" && !searchText.includes(query);
+      });
     };
 
     document.querySelectorAll('.recent-configuration-preset').forEach((button) => {
@@ -687,6 +794,9 @@
         updateSavedConfigurationSummary();
         showValidationAlert([]);
       });
+    }
+    if (savedConfigurationSearch instanceof HTMLInputElement) {
+      savedConfigurationSearch.addEventListener("input", filterSavedConfigurations);
     }
     if (quickBuilderAlgorithmSelect instanceof HTMLSelectElement) {
       quickBuilderAlgorithmSelect.addEventListener("change", () => {
@@ -724,6 +834,7 @@
     syncConfigurationSourceSections();
     syncQuickBuilderAlgorithmSections();
     syncInteractiveFieldState();
+    filterSavedConfigurations();
     updateSavedConfigurationSummary();
     updateQuickBuilderPreview();
   })();

@@ -215,7 +215,12 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b'data-configuration-source-section="quick_builder"' in response.data
     assert b'data-configuration-source-section="saved_configuration"' in response.data
     assert b'data-configuration-source-section="configuration_json"' in response.data
-    assert b"Recent configurations" in response.data or b"Select a saved configuration" in response.data
+    assert (
+        b"Recent configurations" in response.data
+        or b"Select a saved configuration" in response.data
+    )
+    assert b"Starter templates" in response.data
+    assert b"Search saved configurations by name or key" in response.data
     assert b'id="quick-builder-configuration-preview"' in response.data
     assert b"readonly" in response.data
     assert b"data-default-param=" in response.data
@@ -223,7 +228,10 @@ def test_new_experiment_page_renders(monkeypatch):
         b'<option value="configuration" selected>Configuration</option>'
         in response.data
     )
-    assert b"Single algorithm" not in response.data
+    assert (
+        b"/experiments/configuration-templates/single_algorithm/open-in-builder"
+        in response.data
+    )
     assert b'name="algorithms_json"' not in response.data
 
 
@@ -563,8 +571,6 @@ def test_create_experiment_accepts_saved_configuration_selection(monkeypatch, tm
     assert experiments[0]["input_snapshot"]["nodes"][0]["alg_param"] == {"window": 4}
 
 
-
-
 def test_new_experiment_page_shows_recent_saved_configuration_presets(
     monkeypatch,
 ):
@@ -618,6 +624,8 @@ def test_new_experiment_page_shows_recent_saved_configuration_presets(
     assert first_draft_id.encode() in response.data
     assert second_draft_id.encode() in response.data
     assert b"recent-configuration-preset" in response.data
+
+
 def test_new_experiment_page_prefills_selected_algorithm_from_query(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
@@ -687,6 +695,86 @@ def test_create_experiment_accepts_quick_builder_configuration(monkeypatch, tmp_
     assert experiments[0]["input_snapshot"]["nodes"][0]["alg_param"] == {"period": 7}
     assert experiments[0]["input_snapshot"]["nodes"][0]["buy_enabled"] is True
     assert experiments[0]["input_snapshot"]["nodes"][0]["sell_enabled"] is False
+
+
+def test_quick_builder_can_save_configuration_as_draft(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
+
+    response = app.test_client().post(
+        "/experiments/quick-builder/save-draft",
+        data={
+            "run_mode": "configuration",
+            "configuration_source": "quick_builder",
+            "quick_builder_alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "quick_param__period": "9",
+            "quick_builder_buy_enabled": "true",
+            "quick_builder_sell_enabled": "true",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    drafts = app.extensions["configuration_builder_service"].list_drafts()
+    assert len(drafts) == 1
+    assert (
+        drafts[0]["config_key"]
+        == "single-OLD-boundary-breakout-NEW-breakout-donchian-channel"
+    )
+    assert drafts[0]["payload"]["nodes"][0]["alg_param"] == {"period": 9}
+
+
+def test_quick_builder_can_open_generated_configuration_in_builder(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
+
+    response = app.test_client().post(
+        "/experiments/quick-builder/open-in-builder",
+        data={
+            "run_mode": "configuration",
+            "configuration_source": "quick_builder",
+            "quick_builder_alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+            "quick_param__period": "11",
+            "quick_builder_buy_enabled": "true",
+            "quick_builder_sell_enabled": "false",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert "/configurations/cfgdraft_" in location
+    assert location.endswith("/edit")
+    drafts = app.extensions["configuration_builder_service"].list_drafts()
+    assert len(drafts) == 1
+    assert drafts[0]["payload"]["nodes"][0]["alg_param"] == {"period": 11}
+    assert drafts[0]["payload"]["nodes"][0]["sell_enabled"] is False
+
+
+def test_configuration_template_can_open_in_builder(monkeypatch):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
+
+    response = app.test_client().post(
+        "/experiments/configuration-templates/and_strategy/open-in-builder",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    location = response.headers["Location"]
+    assert "/configurations/cfgdraft_" in location
+    assert location.endswith("/edit")
+    drafts = app.extensions["configuration_builder_service"].list_drafts()
+    assert len(drafts) == 1
+    assert drafts[0]["payload"]["config_key"] == "template-and-strategy"
+    assert drafts[0]["payload"]["root_node_id"] == "group1"
+    assert len(drafts[0]["payload"]["nodes"]) == 3
 
 
 def test_experiment_history_allows_deleting_one_experiment(monkeypatch):
