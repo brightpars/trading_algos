@@ -7,6 +7,7 @@ from typing import Any
 
 import mongoengine  # type: ignore[import-untyped]
 from pymongo import MongoClient
+from pymongo import ReturnDocument
 from pymongo.database import Database
 from trading_servers import CentralServer
 from trading_servers import DataServer
@@ -28,20 +29,36 @@ class MongoCounterRepository:
     def __init__(self, *, mongo_uri: str, mongo_db_name: str) -> None:
         self._client: MongoClient[Any] = MongoClient(mongo_uri)
         self._db: Database[Any] = self._client[mongo_db_name]
-        self._collection = self._db["dashboard_service_runtime_counters"]
+        self._counter_collection = self._db["counters"]
+        self._counter_specs: dict[str, tuple[str, str]] = {
+            "alert_id": ("alerts", "alertID"),
+            "asset_id": ("assets", "assetID"),
+            "operation_id": ("operations", "operationID"),
+            "execution_id": ("executions", "executionID"),
+        }
 
     def get_counter_seed_value(self, counter_name: str) -> int:
-        document = self._collection.find_one({"_id": counter_name}) or {}
-        return int(document.get("seq", 0))
+        collection_name, field_name = self._counter_specs[counter_name]
+        latest = self._db[collection_name].find_one(
+            sort=[(field_name, -1)],
+            projection={field_name: True},
+        )
+        if latest is None:
+            return 0
+        return int(latest.get(field_name, 0))
 
     def get_next_counter_value(self, counter_name: str, seed_value: int) -> int:
-        self._collection.update_one(
+        result = self._counter_collection.find_one_and_update(
             {"_id": counter_name},
             [{"$set": {"seq": {"$add": [{"$ifNull": ["$seq", int(seed_value)]}, 1]}}}],
             upsert=True,
+            return_document=ReturnDocument.AFTER,
         )
-        refreshed = self._collection.find_one({"_id": counter_name}) or {}
-        return int(refreshed.get("seq", seed_value + 1))
+        if result is None or "seq" not in result:
+            raise RuntimeError(
+                f"counter update returned no sequence for counter={counter_name}"
+            )
+        return int(result["seq"])
 
 
 def _build_config() -> ServiceRuntimeConfig:
