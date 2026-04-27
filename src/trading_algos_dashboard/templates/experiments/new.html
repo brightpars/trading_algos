@@ -138,9 +138,10 @@
     <label class="form-label">Configuration setup</label>
     <select class="form-select mb-3" name="configuration_source" id="configuration-source-select">
       <option value="quick_builder" {% if form_data.configuration_source == 'quick_builder' %}selected{% endif %}>Quick builder (single algorithm)</option>
+      <option value="saved_configuration" {% if form_data.configuration_source == 'saved_configuration' %}selected{% endif %}>Saved configuration</option>
       <option value="configuration_json" {% if form_data.configuration_source == 'configuration_json' %}selected{% endif %}>Advanced JSON</option>
     </select>
-    <div class="form-text mb-3">Use the quick builder for a single algorithm run, or switch to advanced JSON for manual configuration payloads.</div>
+    <div class="form-text mb-3">Use the quick builder for a single algorithm run, pick a saved configuration draft for graph-based setups, or switch to advanced JSON for manual payloads.</div>
 
     <div data-configuration-source-section="quick_builder">
       <div class="row g-3">
@@ -232,6 +233,92 @@
       </div>
     </div>
 
+    <div data-configuration-source-section="saved_configuration">
+      {% if recent_configuration_presets %}
+      <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h3 class="h6 mb-0">Recent configurations</h3>
+          <span class="text-muted small">Click one to select it</span>
+        </div>
+        <div class="row g-3">
+          {% for preset in recent_configuration_presets %}
+          <div class="col-md-4">
+            <button
+              class="btn btn-outline-secondary text-start w-100 h-100 recent-configuration-preset"
+              type="button"
+              data-draft-id="{{ preset.draft_id }}"
+            >
+              <div class="fw-semibold">{{ preset.name }}</div>
+              <div class="small text-muted">{{ preset.config_key or preset.draft_id }}</div>
+              <div class="small text-muted">Updated {{ preset.updated_at_label or 'unknown' }}</div>
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="row g-3">
+        <div class="col-md-8">
+          <label class="form-label">Saved configuration</label>
+          <select class="form-select" name="selected_draft_id" id="saved-configuration-select">
+            <option value="">Select a saved configuration</option>
+            {% for preset in configuration_presets %}
+            <option
+              value="{{ preset.draft_id }}"
+              data-config-key="{{ preset.config_key }}"
+              data-config-name="{{ preset.name }}"
+              data-config-version="{{ preset.version }}"
+              data-config-node-count="{{ preset.node_count }}"
+              data-config-algorithm-count="{{ preset.algorithm_count }}"
+              data-config-group-count="{{ preset.group_count }}"
+              data-config-status="{{ preset.status }}"
+              data-config-updated-at="{{ preset.updated_at_label }}"
+              data-config-json='{{ preset.configuration_json|tojson }}'
+              {% if form_data.selected_draft_id == preset.draft_id %}selected{% endif %}
+            >{{ preset.name }} ({{ preset.config_key or preset.draft_id }})</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Choose an existing configuration draft created in the configuration builder.</div>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <div class="d-grid gap-2 w-100">
+            <a class="btn btn-outline-secondary" href="{{ url_for('configurations.list_configurations') }}">Browse configurations</a>
+            <a class="btn btn-success" href="{{ url_for('configurations.new_configuration') }}">Create new configuration</a>
+          </div>
+        </div>
+        <div class="col-12">
+          <div class="card {% if not form_data.selected_draft_id %}d-none{% endif %}" id="saved-configuration-summary-card">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                  <h3 class="h6 mb-2" id="saved-configuration-summary-name">{{ selected_configuration.name if selected_configuration else '' }}</h3>
+                  <div class="small text-muted d-flex flex-wrap gap-2">
+                    <span id="saved-configuration-summary-key">{% if selected_configuration and selected_configuration.config_key %}key: {{ selected_configuration.config_key }}{% endif %}</span>
+                    <span id="saved-configuration-summary-version">{% if selected_configuration and selected_configuration.version %}version: {{ selected_configuration.version }}{% endif %}</span>
+                    <span id="saved-configuration-summary-node-count"></span>
+                    <span id="saved-configuration-summary-algorithm-count"></span>
+                    <span id="saved-configuration-summary-group-count"></span>
+                    <span id="saved-configuration-summary-status"></span>
+                    <span id="saved-configuration-summary-updated-at"></span>
+                  </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <a class="btn btn-outline-secondary btn-sm" id="saved-configuration-open-link" href="{% if selected_configuration and selected_configuration.draft_id %}{{ url_for('configurations.detail_configuration', draft_id=selected_configuration.draft_id) }}{% else %}{{ url_for('configurations.list_configurations') }}{% endif %}">Open</a>
+                  <a class="btn btn-outline-primary btn-sm" id="saved-configuration-edit-link" href="{% if selected_configuration and selected_configuration.draft_id %}{{ url_for('configurations.edit_configuration', draft_id=selected_configuration.draft_id) }}{% else %}{{ url_for('configurations.list_configurations') }}{% endif %}">Edit</a>
+                  <a class="btn btn-outline-success btn-sm" id="saved-configuration-run-link" href="{% if selected_configuration and selected_configuration.draft_id %}{{ url_for('experiments.new_experiment', draft_id=selected_configuration.draft_id) }}{% else %}{{ url_for('experiments.new_experiment') }}{% endif %}">Run direct</a>
+                </div>
+              </div>
+              <div>
+                <label class="form-label">Configuration preview</label>
+                <textarea class="form-control font-monospace" id="saved-configuration-preview" rows="12" readonly>{% if selected_configuration %}{{ selected_configuration.configuration_json }}{% endif %}</textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div data-configuration-source-section="configuration_json">
       <label class="form-label">Configuration JSON</label>
       <details {% if selected_configuration or form_data.configuration_json %}open{% endif %}>
@@ -257,6 +344,20 @@
     const quickBuilderAlgorithmSelect = document.getElementById("quick-builder-alg-key");
     const experimentForm = document.getElementById("new-experiment-form");
     const validationAlert = document.getElementById("new-experiment-validation-alert");
+    const savedConfigurationSelect = document.getElementById("saved-configuration-select");
+    const savedConfigurationSummaryCard = document.getElementById("saved-configuration-summary-card");
+    const savedConfigurationSummaryName = document.getElementById("saved-configuration-summary-name");
+    const savedConfigurationSummaryKey = document.getElementById("saved-configuration-summary-key");
+    const savedConfigurationSummaryVersion = document.getElementById("saved-configuration-summary-version");
+    const savedConfigurationSummaryNodeCount = document.getElementById("saved-configuration-summary-node-count");
+    const savedConfigurationSummaryAlgorithmCount = document.getElementById("saved-configuration-summary-algorithm-count");
+    const savedConfigurationSummaryGroupCount = document.getElementById("saved-configuration-summary-group-count");
+    const savedConfigurationSummaryStatus = document.getElementById("saved-configuration-summary-status");
+    const savedConfigurationSummaryUpdatedAt = document.getElementById("saved-configuration-summary-updated-at");
+    const savedConfigurationOpenLink = document.getElementById("saved-configuration-open-link");
+    const savedConfigurationEditLink = document.getElementById("saved-configuration-edit-link");
+    const savedConfigurationRunLink = document.getElementById("saved-configuration-run-link");
+    const savedConfigurationPreview = document.getElementById("saved-configuration-preview");
     if (!(runModeSelect instanceof HTMLSelectElement)) {
       return;
     }
@@ -493,11 +594,97 @@
       quickBuilderPreview.value = JSON.stringify(payload, null, 2);
     };
 
+    const updateSavedConfigurationSummary = () => {
+      if (!(savedConfigurationSelect instanceof HTMLSelectElement)) {
+        return;
+      }
+      const selectedOption = savedConfigurationSelect.selectedOptions[0];
+      const hasSelection = selectedOption instanceof HTMLOptionElement && selectedOption.value !== "";
+      if (savedConfigurationSummaryCard instanceof HTMLElement) {
+        savedConfigurationSummaryCard.classList.toggle("d-none", !hasSelection);
+      }
+      if (!hasSelection) {
+        return;
+      }
+      const draftId = selectedOption.value;
+      const configName = selectedOption.dataset.configName || draftId;
+      const configKey = selectedOption.dataset.configKey || "";
+      const configVersion = selectedOption.dataset.configVersion || "";
+      const configNodeCount = selectedOption.dataset.configNodeCount || "";
+      const configAlgorithmCount = selectedOption.dataset.configAlgorithmCount || "";
+      const configGroupCount = selectedOption.dataset.configGroupCount || "";
+      const configStatus = selectedOption.dataset.configStatus || "";
+      const configUpdatedAt = selectedOption.dataset.configUpdatedAt || "";
+      const configJson = selectedOption.dataset.configJson || "";
+      if (savedConfigurationSummaryName instanceof HTMLElement) {
+        savedConfigurationSummaryName.textContent = configName;
+      }
+      if (savedConfigurationSummaryKey instanceof HTMLElement) {
+        savedConfigurationSummaryKey.textContent = configKey ? `key: ${configKey}` : "";
+      }
+      if (savedConfigurationSummaryVersion instanceof HTMLElement) {
+        savedConfigurationSummaryVersion.textContent = configVersion ? `version: ${configVersion}` : "";
+      }
+      if (savedConfigurationSummaryNodeCount instanceof HTMLElement) {
+        savedConfigurationSummaryNodeCount.textContent = configNodeCount ? `nodes: ${configNodeCount}` : "";
+      }
+      if (savedConfigurationSummaryAlgorithmCount instanceof HTMLElement) {
+        savedConfigurationSummaryAlgorithmCount.textContent = configAlgorithmCount ? `algorithms: ${configAlgorithmCount}` : "";
+      }
+      if (savedConfigurationSummaryGroupCount instanceof HTMLElement) {
+        savedConfigurationSummaryGroupCount.textContent = configGroupCount ? `groups: ${configGroupCount}` : "";
+      }
+      if (savedConfigurationSummaryStatus instanceof HTMLElement) {
+        savedConfigurationSummaryStatus.textContent = configStatus ? `status: ${configStatus}` : "";
+      }
+      if (savedConfigurationSummaryUpdatedAt instanceof HTMLElement) {
+        savedConfigurationSummaryUpdatedAt.textContent = configUpdatedAt ? `updated: ${configUpdatedAt}` : "";
+      }
+      if (savedConfigurationOpenLink instanceof HTMLAnchorElement) {
+        savedConfigurationOpenLink.href = `/configurations/${encodeURIComponent(draftId)}`;
+      }
+      if (savedConfigurationEditLink instanceof HTMLAnchorElement) {
+        savedConfigurationEditLink.href = `/configurations/${encodeURIComponent(draftId)}/edit`;
+      }
+      if (savedConfigurationRunLink instanceof HTMLAnchorElement) {
+        savedConfigurationRunLink.href = `/experiments/new?draft_id=${encodeURIComponent(draftId)}`;
+      }
+      if (savedConfigurationPreview instanceof HTMLTextAreaElement) {
+        savedConfigurationPreview.value = configJson;
+      }
+    };
+
+    document.querySelectorAll('.recent-configuration-preset').forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+      button.addEventListener('click', () => {
+        if (!(savedConfigurationSelect instanceof HTMLSelectElement)) {
+          return;
+        }
+        savedConfigurationSelect.value = button.dataset.draftId || '';
+        if (configurationSourceSelect instanceof HTMLSelectElement) {
+          configurationSourceSelect.value = 'saved_configuration';
+          syncConfigurationSourceSections();
+        }
+        updateSavedConfigurationSummary();
+        syncInteractiveFieldState();
+        showValidationAlert([]);
+      });
+    });
+
     runModeSelect.addEventListener("change", syncRunModeSections);
     if (configurationSourceSelect instanceof HTMLSelectElement) {
       configurationSourceSelect.addEventListener("change", () => {
         syncConfigurationSourceSections();
         syncInteractiveFieldState();
+        updateSavedConfigurationSummary();
+        showValidationAlert([]);
+      });
+    }
+    if (savedConfigurationSelect instanceof HTMLSelectElement) {
+      savedConfigurationSelect.addEventListener("change", () => {
+        updateSavedConfigurationSummary();
         showValidationAlert([]);
       });
     }
@@ -537,6 +724,7 @@
     syncConfigurationSourceSections();
     syncQuickBuilderAlgorithmSections();
     syncInteractiveFieldState();
+    updateSavedConfigurationSummary();
     updateQuickBuilderPreview();
   })();
 </script>

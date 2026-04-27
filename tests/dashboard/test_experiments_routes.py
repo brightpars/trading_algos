@@ -209,9 +209,13 @@ def test_new_experiment_page_renders(monkeypatch):
     assert b'data-run-mode-section="configuration"' in response.data
     assert b'name="configuration_source"' in response.data
     assert b"Quick builder (single algorithm)" in response.data
+    assert b"Saved configuration" in response.data
     assert b'name="quick_builder_alg_key"' in response.data
+    assert b'name="selected_draft_id"' in response.data
     assert b'data-configuration-source-section="quick_builder"' in response.data
+    assert b'data-configuration-source-section="saved_configuration"' in response.data
     assert b'data-configuration-source-section="configuration_json"' in response.data
+    assert b"Recent configurations" in response.data or b"Select a saved configuration" in response.data
     assert b'id="quick-builder-configuration-preview"' in response.data
     assert b"readonly" in response.data
     assert b"data-default-param=" in response.data
@@ -491,12 +495,129 @@ def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypa
     assert b"Selected configuration" in response.data
     assert b"Combo Breakout" in response.data
     assert draft_id.encode() in response.data
+    assert b'value="saved_configuration" selected' in response.data
+    assert f'value="{draft_id}"'.encode() in response.data
+    assert b"saved-configuration-summary-card" in response.data
+    assert b"saved-configuration-preview" in response.data
     assert (
         b"OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation"
         in response.data
     )
 
 
+def test_create_experiment_accepts_saved_configuration_selection(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(
+        DashboardConfig(
+            "x",
+            "mongodb://example",
+            "db",
+            str(tmp_path / "reports"),
+        )
+    )
+    app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
+    draft_id = app.extensions["configuration_builder_service"].create_draft(
+        {
+            "config_key": "phase2_combo",
+            "version": "1",
+            "name": "Phase 2 Combo",
+            "root_node_id": "alg1",
+            "nodes": [
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 4},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                }
+            ],
+            "compatibility_metadata": {},
+        }
+    )
+
+    response = app.test_client().post(
+        "/experiments",
+        data={
+            "run_mode": "configuration",
+            "configuration_source": "saved_configuration",
+            "selected_draft_id": draft_id,
+            "symbol": "AAPL",
+            "start_date": "2024-01-01",
+            "start_time": "09:30",
+            "end_date": "2024-01-31",
+            "end_time": "16:00",
+            "notes": "saved configuration run",
+        },
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    experiments = app.extensions["experiment_repository"].list_experiments()
+    assert len(experiments) == 1
+    assert experiments[0]["input_kind"] == "configuration"
+    assert experiments[0]["input_snapshot"]["config_key"] == "phase2_combo"
+    assert experiments[0]["input_snapshot"]["name"] == "Phase 2 Combo"
+    assert experiments[0]["input_snapshot"]["nodes"][0]["alg_param"] == {"window": 4}
+
+
+
+
+def test_new_experiment_page_shows_recent_saved_configuration_presets(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()
+    )
+    app = create_app(DashboardConfig("x", "mongodb://example", "db", "reports"))
+    first_draft_id = app.extensions["configuration_builder_service"].create_draft(
+        {
+            "config_key": "recent_a",
+            "version": "1",
+            "name": "Recent A",
+            "root_node_id": "alg1",
+            "nodes": [
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_close_high_channel_breakout_NEW_channel_breakout_with_confirmation",
+                    "alg_param": {"window": 2},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                }
+            ],
+            "compatibility_metadata": {},
+        }
+    )
+    second_draft_id = app.extensions["configuration_builder_service"].create_draft(
+        {
+            "config_key": "recent_b",
+            "version": "1",
+            "name": "Recent B",
+            "root_node_id": "alg1",
+            "nodes": [
+                {
+                    "node_id": "alg1",
+                    "node_type": "algorithm",
+                    "alg_key": "OLD_boundary_breakout_NEW_breakout_donchian_channel",
+                    "alg_param": {"period": 5},
+                    "buy_enabled": True,
+                    "sell_enabled": True,
+                }
+            ],
+            "compatibility_metadata": {},
+        }
+    )
+
+    response = app.test_client().get("/experiments/new")
+
+    assert response.status_code == 200
+    assert b"Recent configurations" in response.data
+    assert first_draft_id.encode() in response.data
+    assert second_draft_id.encode() in response.data
+    assert b"recent-configuration-preset" in response.data
 def test_new_experiment_page_prefills_selected_algorithm_from_query(monkeypatch):
     monkeypatch.setattr(
         "trading_algos_dashboard.app.MongoClient", lambda *_a, **_k: _Client()

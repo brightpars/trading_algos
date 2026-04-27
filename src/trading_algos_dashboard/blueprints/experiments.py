@@ -57,6 +57,7 @@ def _experiment_form_defaults(catalog: list[dict[str, object]]) -> dict[str, str
     return {
         "run_mode": "configuration",
         "configuration_source": "quick_builder",
+        "selected_draft_id": "",
         "quick_builder_alg_key": str(catalog[0]["key"]) if catalog else "",
         "quick_builder_buy_enabled": "true",
         "quick_builder_sell_enabled": "true",
@@ -440,6 +441,63 @@ def _load_configuration_preset(draft_id: str | None) -> dict[str, str] | None:
     }
 
 
+def _list_configuration_presets() -> list[dict[str, str]]:
+    drafts = current_app.extensions["configuration_builder_service"].list_drafts()
+    presets: list[dict[str, str]] = []
+    for draft in drafts:
+        if not isinstance(draft, dict):
+            continue
+        payload = draft.get("payload")
+        payload_dict = payload if isinstance(payload, dict) else {}
+        updated_at = draft.get("updated_at")
+        updated_at_label = ""
+        updated_at_sort_key = ""
+        if isinstance(updated_at, datetime):
+            updated_at_label = updated_at.strftime("%Y-%m-%d %H:%M UTC")
+            updated_at_sort_key = updated_at.isoformat()
+        nodes = payload_dict.get("nodes")
+        node_count = len(nodes) if isinstance(nodes, list) else 0
+        algorithm_count = 0
+        group_count = 0
+        if isinstance(nodes, list):
+            for node in nodes:
+                if not isinstance(node, dict):
+                    continue
+                node_type = str(node.get("node_type", ""))
+                if node_type == "algorithm":
+                    algorithm_count += 1
+                elif node_type in {"and", "or", "pipeline"}:
+                    group_count += 1
+        presets.append(
+            {
+                "draft_id": str(draft.get("draft_id", "")),
+                "config_key": str(draft.get("config_key", "")),
+                "name": str(draft.get("name", "")) or "Unnamed configuration",
+                "version": str(payload_dict.get("version", "")),
+                "status": str(draft.get("status", "draft")),
+                "root_node_id": str(payload_dict.get("root_node_id", "")),
+                "node_count": str(node_count),
+                "algorithm_count": str(algorithm_count),
+                "group_count": str(group_count),
+                "configuration_json": json.dumps(payload_dict, indent=2),
+                "updated_at_label": updated_at_label,
+                "updated_at_sort_key": updated_at_sort_key,
+            }
+        )
+    return sorted(presets, key=lambda item: (item["name"], item["draft_id"]))
+
+
+def _recent_configuration_presets(
+    presets: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    sorted_presets = sorted(
+        presets,
+        key=lambda item: (item["updated_at_sort_key"], item["draft_id"]),
+        reverse=True,
+    )
+    return sorted_presets[:3]
+
+
 def _load_algorithm_preset(alg_key: str | None) -> dict[str, str] | None:
     if not alg_key:
         return None
@@ -467,6 +525,8 @@ def _render_new_experiment(
         "algorithm_catalog_service"
     ].list_algorithm_implementations()
     quick_builder_algorithms = _build_quick_builder_algorithms(catalog)
+    configuration_presets = _list_configuration_presets()
+    recent_configuration_presets = _recent_configuration_presets(configuration_presets)
     decmakers = current_app.extensions[
         "algorithm_catalog_service"
     ].list_decmaker_implementations()
@@ -482,7 +542,8 @@ def _render_new_experiment(
     selected_algorithm = _load_algorithm_preset(request.args.get("alg_key"))
     if selected_configuration is not None:
         effective_form_data["run_mode"] = "configuration"
-        effective_form_data["configuration_source"] = "configuration_json"
+        effective_form_data["configuration_source"] = "saved_configuration"
+        effective_form_data["selected_draft_id"] = selected_configuration["draft_id"]
         effective_form_data["configuration_json"] = selected_configuration[
             "configuration_json"
         ]
@@ -505,6 +566,18 @@ def _render_new_experiment(
                 )
     if form_data is not None:
         effective_form_data.update(form_data)
+
+    if (
+        effective_form_data.get("configuration_source") == "saved_configuration"
+        and not selected_configuration
+    ):
+        selected_configuration = _load_configuration_preset(
+            effective_form_data.get("selected_draft_id")
+        )
+        if selected_configuration is not None:
+            effective_form_data["configuration_json"] = selected_configuration[
+                "configuration_json"
+            ]
 
     _merge_quick_builder_defaults(quick_builder_algorithms, effective_form_data)
 
@@ -540,6 +613,8 @@ def _render_new_experiment(
             "experiments/new.html",
             algorithms=catalog,
             quick_builder_algorithms=quick_builder_algorithms,
+            configuration_presets=configuration_presets,
+            recent_configuration_presets=recent_configuration_presets,
             decmakers=decmakers,
             recent_experiments=_recent_experiment_presets(),
             selected_configuration=selected_configuration,
@@ -683,6 +758,7 @@ def create_experiment():
     submitted_form_data = {
         "run_mode": request.form.get("run_mode", "configuration"),
         "configuration_source": configuration_source,
+        "selected_draft_id": request.form.get("selected_draft_id", ""),
         "quick_builder_alg_key": request.form.get("quick_builder_alg_key", ""),
         "quick_builder_buy_enabled": request.form.get(
             "quick_builder_buy_enabled", "true"
@@ -723,6 +799,15 @@ def create_experiment():
                 configuration_payload = _build_quick_builder_configuration_payload(
                     quick_builder_algorithms,
                     submitted_form_data,
+                )
+            elif submitted_form_data["configuration_source"] == "saved_configuration":
+                selected_configuration = _load_configuration_preset(
+                    submitted_form_data["selected_draft_id"]
+                )
+                if selected_configuration is None:
+                    raise ValueError("A saved configuration must be selected.")
+                configuration_payload = json.loads(
+                    selected_configuration["configuration_json"]
                 )
             else:
                 configuration_payload = json.loads(
