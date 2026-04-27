@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
-import sys
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import mongoengine  # type: ignore[import-untyped]
@@ -12,7 +10,6 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from trading_servers import CentralServer
 from trading_servers import DataServer
-from trading_servers.engines_control import Server as EnginesControlServer
 from trading_servers import FakeDateTimeServer
 from trading_servers.xmlrpc_server import Base_XML_RPC_Server
 
@@ -86,69 +83,6 @@ def _connect_data_runtime_storage() -> None:
     )
 
 
-def _smarttrade_repo_root() -> Path:
-    return Path(__file__).resolve().parents[3] / "smarttrade"
-
-
-def _ensure_smarttrade_import_paths() -> None:
-    src_root = str(Path(__file__).resolve().parents[1])
-    smarttrade_root = str(_smarttrade_repo_root())
-    for path in [src_root, smarttrade_root]:
-        if path not in sys.path:
-            sys.path.insert(0, path)
-
-
-def _configure_engines_control_runtime() -> None:
-    _ensure_smarttrade_import_paths()
-
-    from config.service import get_config_service  # type: ignore[import-not-found]
-    from engines.alertgen.alertgen_algs import AlertGenAlgs  # type: ignore[import-not-found]
-    from engines.decmaker.decmaker_algs import DecMakerAlgs  # type: ignore[import-not-found]
-    from trading_servers.engines_control_runtime import (  # type: ignore[import-not-found]
-        EnginesControlRuntimeDependencies,
-        configure_engines_control_runtime,
-    )
-    from utils_shared.helpers import (  # type: ignore[import-not-found]
-        validate_alertgen_engine_payload,
-        validate_decmaker_engine_payload,
-    )
-    from utils_shared.helpers_basic import custom_sleep  # type: ignore[import-not-found]
-    from utils_shared.logging import log_debug, log_error  # type: ignore[import-not-found]
-    from utils_shared.online_services import (  # type: ignore[import-not-found]
-        get_server_state_by_proxy,
-    )
-    from utils_shared.objects_factory.broker_proxy import (  # type: ignore[import-not-found]
-        get_or_create_broker_proxy,
-    )
-    from utils_shared.objects_factory.central_proxy import (  # type: ignore[import-not-found]
-        get_or_create_central_proxy,
-    )
-    from utils_shared.objects_factory.data_proxy import (  # type: ignore[import-not-found]
-        get_or_create_data_proxy,
-    )
-    from utils_shared.objects_factory.date_time_proxy import (  # type: ignore[import-not-found]
-        get_or_create_fake_datetime_proxy,
-    )
-
-    configure_engines_control_runtime(
-        EnginesControlRuntimeDependencies(
-            decmaker_class=DecMakerAlgs,
-            alertgen_class=AlertGenAlgs,
-            get_config_service=get_config_service,
-            get_server_state_by_proxy=get_server_state_by_proxy,
-            custom_sleep=custom_sleep,
-            log_debug=log_debug,
-            log_error=log_error,
-            get_central_proxy=get_or_create_central_proxy,
-            get_fake_datetime_proxy=get_or_create_fake_datetime_proxy,
-            get_data_proxy=get_or_create_data_proxy,
-            get_broker_proxy=get_or_create_broker_proxy,
-            validate_alertgen_engine_payload=validate_alertgen_engine_payload,
-            validate_decmaker_engine_payload=validate_decmaker_engine_payload,
-        )
-    )
-
-
 def _build_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
     if config.name == "central":
         mongo_uri, mongo_db_name = _mongo_runtime_settings()
@@ -174,15 +108,6 @@ def _build_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
         )
     if config.name == "fake_datetime":
         return FakeDateTimeServer(
-            user_id=config.user_id,
-            ip=config.host,
-            port=config.port,
-            sever_name=config.name,
-            log_requests_to_terminal=False,
-        )
-    if config.name == "engines_control":
-        _configure_engines_control_runtime()
-        return EnginesControlServer(
             user_id=config.user_id,
             ip=config.host,
             port=config.port,

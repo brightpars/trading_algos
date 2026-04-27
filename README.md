@@ -9,12 +9,12 @@ This repository contains reusable trading-oriented algorithm libraries, with `al
 Runtime engine envelopes and application wiring such as:
 
 - alertgen/decmaker engine payload defaults,
-- smarttrade-specific execution configuration,
-- smarttrade-backed dashboard/runtime integration,
+- external application-specific execution configuration,
+- external application-backed dashboard/runtime integration,
 
 belong in the consuming application layer, not in this library package.
 
-There is still a `src/trading_algos_dashboard` package in this repository today, but it is intentionally treated as smarttrade-coupled application code and is a candidate to move into the smarttrade project.
+There is still a `src/trading_algos_dashboard` package in this repository today, but it should remain self-contained inside this repository and must not depend on a sibling application source tree.
 
 ## Alertgen direction
 

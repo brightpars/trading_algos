@@ -61,11 +61,11 @@ SERVICE_DEFINITIONS: tuple[dict[str, Any], ...] = (
         "label": "Engines control",
         "default_ip": "127.0.0.1",
         "default_port": 7102,
-        "controllable": True,
+        "controllable": False,
         "start_command_env": "TRADING_ALGOS_DASHBOARD_ENGINES_CONTROL_START_CMD",
         "workdir_env": "TRADING_ALGOS_DASHBOARD_ENGINES_CONTROL_WORKDIR",
         "host_env": "TRADING_ALGOS_DASHBOARD_ENGINES_CONTROL_HOST",
-        "default_start_command": "./.venv/bin/python -m trading_algos_dashboard.service_runtime engines_control",
+        "default_start_command": "",
     },
 )
 

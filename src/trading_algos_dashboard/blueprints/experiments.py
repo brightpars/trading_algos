@@ -249,7 +249,9 @@ def _merge_engine_chain_defaults(
     for position, index in enumerate(indices, start=1):
         form_key = f"engine_alertgen_{index}_alg_key"
         parsed_alertgen = (
-            parsed_alertgens[position - 1] if position <= len(parsed_alertgens) else None
+            parsed_alertgens[position - 1]
+            if position <= len(parsed_alertgens)
+            else None
         )
         if form_data.get(form_key, "").strip() == "" and isinstance(
             parsed_alertgen, dict
@@ -483,9 +485,7 @@ def _engine_alertgen_rows_for_view(
             else {}
         )
         default_param = (
-            dict(default_param_value)
-            if isinstance(default_param_value, dict)
-            else {}
+            dict(default_param_value) if isinstance(default_param_value, dict) else {}
         )
         param_values = {
             key: form_data.get(

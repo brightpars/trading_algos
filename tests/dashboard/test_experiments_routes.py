@@ -611,7 +611,9 @@ def test_create_experiment_accepts_engine_chain_guided_builder_with_four_alertge
     experiments = app.extensions["experiment_repository"].list_experiments()
     assert len(experiments) == 1
     assert len(experiments[0]["input_snapshot"]["alertgens"]) == 4
-    assert experiments[0]["input_snapshot"]["alertgens"][3]["alg_param"] == {"period": 8}
+    assert experiments[0]["input_snapshot"]["alertgens"][3]["alg_param"] == {
+        "period": 8
+    }
 
 
 def test_new_experiment_page_prefills_selected_configuration_from_draft(monkeypatch):
