@@ -81,8 +81,6 @@ def _build_app(monkeypatch):
             "mongodb://example",
             "db",
             "reports",
-            "/tmp/smarttrade",
-            1,
         )
     )
 

@@ -236,8 +236,6 @@ def test_bulk_experiment_creates_one_queued_experiment_per_runnable_algorithm(
             "mongodb://example",
             "db",
             str(tmp_path / "reports"),
-            "/tmp/smarttrade",
-            1,
         )
     )
     app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
@@ -280,8 +278,6 @@ def test_bulk_experiment_creates_one_queued_experiment_per_symbol(
             "mongodb://example",
             "db",
             str(tmp_path / "reports"),
-            "/tmp/smarttrade",
-            1,
         )
     )
     app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
@@ -357,8 +353,6 @@ def test_create_experiment_does_not_update_runtime_concurrency_setting(
             "mongodb://example",
             "db",
             str(tmp_path / "reports"),
-            "/tmp/smarttrade",
-            1,
             experiment_max_concurrent_runs=2,
         )
     )
@@ -1023,8 +1017,6 @@ def test_create_experiment_accepts_valid_configuration_payload(monkeypatch, tmp_
             "mongodb://example",
             "db",
             str(tmp_path / "reports"),
-            "/tmp/smarttrade",
-            1,
         )
     )
 
@@ -1145,8 +1137,6 @@ def test_create_experiment_redirects_to_queued_detail_page_when_dispatch_is_idle
             "mongodb://example",
             "db",
             str(tmp_path / "reports"),
-            "/tmp/smarttrade",
-            1,
         )
     )
     app.extensions["experiment_service"].dispatch_available_experiments = lambda: []
@@ -1589,8 +1579,6 @@ def test_cancel_experiment_marks_cancelled_immediately(monkeypatch, tmp_path):
             "mongodb://example",
             "db",
             str(tmp_path / "reports"),
-            "/tmp/smarttrade",
-            1,
         )
     )
 
@@ -1676,8 +1664,6 @@ def test_create_experiment_returns_400_when_data_fetch_fault_occurs(
             "mongodb://example",
             "db",
             str(tmp_path / "reports"),
-            "/tmp/smarttrade",
-            1,
         )
     )
 
@@ -1739,8 +1725,6 @@ def test_create_experiment_returns_400_when_no_market_data_is_available(
             "mongodb://example",
             "db",
             str(tmp_path / "reports"),
-            "/tmp/smarttrade",
-            1,
         )
     )
 
@@ -1783,11 +1767,12 @@ def test_fetch_candles_skips_missing_timestamps_when_other_data_exists():
 
     class _Proxy:
         def get_data(self, _symbol, ts):
-            if ts.minute == 31:
+            ts_obj = datetime.fromisoformat(ts)
+            if ts_obj.minute == 31:
                 raise Fault(1, "missing candle")
             return {
                 "_id": "mongo-id",
-                "ts": ts.isoformat(sep=" "),
+                "ts": ts_obj.isoformat(sep=" "),
                 "Open": 10,
                 "High": 11,
                 "Low": 9,

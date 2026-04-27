@@ -107,7 +107,6 @@ class MarketDataSourceService:
     def __init__(
         self,
         *,
-        smarttrade_path: str | None = None,
         user_id: int | None = None,
         endpoint_resolver: Callable[[], tuple[str, int] | None] | None = None,
         market_data_cache: LayeredMarketDataCache | None = None,
@@ -443,7 +442,6 @@ class LegacyMarketDataSourceService(MarketDataSourceService):
     def __init__(
         self,
         *,
-        smarttrade_path: str | None = None,
         user_id: int | None = None,
         endpoint_resolver: Callable[[], tuple[str, int] | None] | None = None,
         market_data_cache: LayeredMarketDataCache | None = None,
@@ -451,7 +449,6 @@ class LegacyMarketDataSourceService(MarketDataSourceService):
         proxy_factory: Callable[..., MarketDataProxy] | None = None,
     ):
         super().__init__(
-            smarttrade_path=smarttrade_path,
             user_id=user_id,
             endpoint_resolver=endpoint_resolver,
             market_data_cache=market_data_cache,

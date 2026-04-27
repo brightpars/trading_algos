@@ -103,8 +103,6 @@ def _build_app(monkeypatch):
             "mongodb://example",
             "db",
             "reports",
-            "/tmp/smarttrade",
-            1,
             experiment_max_concurrent_runs=2,
         )
     )

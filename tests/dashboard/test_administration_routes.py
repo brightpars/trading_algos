@@ -102,7 +102,6 @@ def _build_app(monkeypatch):
             "mongodb://example",
             "db",
             "reports",
-            "/tmp/smarttrade",
             1,
         )
     )
@@ -1683,8 +1682,6 @@ def test_app_startup_rebuild_preserves_existing_rejected_review_state(monkeypatc
             "mongodb://example",
             "db",
             "reports",
-            "/tmp/smarttrade",
-            1,
         )
     )
 
@@ -1741,8 +1738,6 @@ def test_app_startup_rebuild_preserves_regular_catalog_fields(monkeypatch):
             "mongodb://example",
             "db",
             "reports",
-            "/tmp/smarttrade",
-            1,
         )
     )
 
