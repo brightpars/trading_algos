@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
-from xmlrpc.client import ServerProxy
+
+from trading_algos_dashboard.services.server_rpc_clients import (
+    EnginesControlServerClient,
+    FakeDateTimeServerClient,
+)
 
 
 @dataclass(frozen=True)
@@ -32,12 +36,13 @@ class EngineRunService:
 
     def run_chain(self, request: EngineRunRequest) -> dict[str, Any]:
         self._ensure_required_services_running()
+        fake_datetime_client = self._fake_datetime_client()
         self._initialize_fake_datetime(
+            client=fake_datetime_client,
             start_dt=request.start_dt,
             speed_factor=request.speed_factor,
         )
-        endpoint = self._engines_control_endpoint()
-        proxy = ServerProxy(endpoint, allow_none=True)
+        client = self._engines_control_client()
         payload = {
             "symbol": request.symbol,
             "start": request.start_dt.astimezone(timezone.utc).isoformat(),
@@ -48,7 +53,7 @@ class EngineRunService:
             "decmaker": request.decmaker,
             "report_base_path": request.report_dir,
         }
-        result = proxy.run_engine_chain(payload)
+        result = client.run_engine_chain(payload)
         if not isinstance(result, dict):
             raise RuntimeError(
                 "Engines control returned an invalid engine-chain payload"
@@ -56,11 +61,7 @@ class EngineRunService:
         return result
 
     def stop_chain(self) -> None:
-        endpoint = self._engines_control_endpoint()
-        proxy = ServerProxy(endpoint, allow_none=True)
-        stop_chain = getattr(proxy, "stop_engine_chain", None)
-        if callable(stop_chain):
-            stop_chain()
+        self._engines_control_client().stop_engine_chain()
 
     def _ensure_required_services_running(self) -> None:
         for server_name in ("central", "data", "fake_datetime", "engines_control"):
@@ -79,17 +80,24 @@ class EngineRunService:
     def _initialize_fake_datetime(
         self,
         *,
+        client: FakeDateTimeServerClient,
         start_dt: datetime,
         speed_factor: int,
     ) -> None:
-        endpoint = self._fake_datetime_endpoint()
-        proxy = ServerProxy(endpoint, allow_none=True)
-        proxy.init(
+        client.init(
             start_dt.strftime("%Y-%m-%d"),
             start_dt.strftime("%H:%M:%S"),
             int(speed_factor),
         )
-        proxy.start_clock()
+        client.start_clock()
+
+    def _fake_datetime_client(self) -> FakeDateTimeServerClient:
+        host, port = self.fake_datetime_endpoint_resolver()
+        return FakeDateTimeServerClient(host=host, port=int(port))
+
+    def _engines_control_client(self) -> EnginesControlServerClient:
+        host, port = self.engines_control_endpoint_resolver()
+        return EnginesControlServerClient(host=host, port=int(port))
 
     def _fake_datetime_endpoint(self) -> str:
         host, port = self.fake_datetime_endpoint_resolver()

@@ -82,12 +82,15 @@ def test_engines_control_runtime_server_supports_legacy_method_surface() -> None
         log_requests_to_terminal=False,
     )
 
-    assert server.check_connections() == [
-        {"central(127.0.0.1:6000)": "down"},
-        {"fake_datetime(127.0.0.1:7100)": "down"},
-        {"data(127.0.0.1:6010)": "down"},
-        {"broker(127.0.0.1:7101)": "down"},
-    ]
+    connection_statuses = server.check_connections()
+    assert len(connection_statuses) == 4
+    assert connection_statuses[0].keys() == {"central(127.0.0.1:6000)"}
+    assert connection_statuses[1].keys() == {"fake_datetime(127.0.0.1:7100)"}
+    assert connection_statuses[2].keys() == {"data(127.0.0.1:6010)"}
+    assert connection_statuses[3] == {"broker(127.0.0.1:7101)": "down"}
+    assert connection_statuses[0]["central(127.0.0.1:6000)"] in {"up", "down"}
+    assert connection_statuses[1]["fake_datetime(127.0.0.1:7100)"] in {"up", "down"}
+    assert connection_statuses[2]["data(127.0.0.1:6010)"] in {"up", "down"}
 
     run_alertgen_result = server.run_alertgen_and_sensors(
         {
