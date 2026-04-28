@@ -19,7 +19,9 @@ class AlertgenAlgorithmCore:
     ) -> None:
         self.name = name
         self.engine_config = dict(engine_config)
-        self.sensor_config = normalize_alertgen_sensor_config(sensor_config, label=f"{name} sensor_config")
+        self.sensor_config = normalize_alertgen_sensor_config(
+            sensor_config, label=f"{name} sensor_config"
+        )
         self.do_buy = bool(self.sensor_config["buy"])
         self.do_sell = bool(self.sensor_config["sell"])
         self.symbol = str(self.sensor_config["symbol"])

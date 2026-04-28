@@ -70,9 +70,15 @@ def test_decmaker_algorithm_core_delegates_processing(monkeypatch) -> None:
     algorithm.process_alerts_list.assert_called_once_with([{"alertID": 1}])
 
 
-def test_alertgen_algorithm_core_normalizes_and_delegates(monkeypatch, tmp_path) -> None:
+def test_alertgen_algorithm_core_normalizes_and_delegates(
+    monkeypatch, tmp_path
+) -> None:
     algorithm = SimpleNamespace(
-        latest_data_modifiable={"buy_SIGNAL": True, "sell_SIGNAL": False, "trend_confidence": 0.8},
+        latest_data_modifiable={
+            "buy_SIGNAL": True,
+            "sell_SIGNAL": False,
+            "trend_confidence": 0.8,
+        },
         process=Mock(),
         interactive_report_payloads=Mock(return_value=[({"chart": 1}, "chart")]),
         alg_specific_report=Mock(return_value=[("figure.png", "figure")]),

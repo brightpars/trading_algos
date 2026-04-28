@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import os
-import socket
 from time import perf_counter
 from typing import Any
-from xmlrpc.client import ServerProxy
+from typing import Callable
 
 from trading_servers.xmlrpc_server import Base_XML_RPC_Server
 
 from trading_algos.decmaker.factory import create_decmaker_algorithm
+from trading_algos_dashboard.engines_control_health import build_connection_statuses
+from trading_algos_dashboard.engines_control_health import default_connection_targets
+from trading_algos_dashboard.engines_control_health import service_state
 from trading_algos_dashboard.services.algorithm_runner_service import (
     run_alert_algorithm,
 )
@@ -82,56 +83,60 @@ def _empty_runtime_state() -> _RuntimeState:
     )
 
 
-class EnginesControlRuntimeServer(Base_XML_RPC_Server):
+@dataclass(frozen=True)
+class DashboardEnginesControlRuntimeDependencies:
+    alert_algorithm_runner: Callable[..., dict[str, Any]]
+    decmaker_algorithm_factory: Callable[..., Any]
+    connection_targets_provider: Callable[[], list[tuple[str, str, int]]]
+    connection_state_resolver: Callable[[str, int], str]
+
+
+_runtime_dependencies: DashboardEnginesControlRuntimeDependencies | None = None
+
+
+def _default_runtime_dependencies() -> DashboardEnginesControlRuntimeDependencies:
+    return DashboardEnginesControlRuntimeDependencies(
+        alert_algorithm_runner=run_alert_algorithm,
+        decmaker_algorithm_factory=create_decmaker_algorithm,
+        connection_targets_provider=default_connection_targets,
+        connection_state_resolver=service_state,
+    )
+
+
+def configure_dashboard_engines_control_runtime(
+    dependencies: DashboardEnginesControlRuntimeDependencies,
+) -> None:
+    global _runtime_dependencies
+    _runtime_dependencies = dependencies
+
+
+def get_dashboard_engines_control_runtime() -> (
+    DashboardEnginesControlRuntimeDependencies
+):
+    if _runtime_dependencies is None:
+        return _default_runtime_dependencies()
+    return _runtime_dependencies
+
+
+class EnginesControlRuntimeService:
     def __init__(
         self,
         *,
-        user_id: int,
-        ip: str,
-        port: int,
-        sever_name: str,
-        log_requests_to_terminal: bool,
+        server_name: str,
+        dependencies: DashboardEnginesControlRuntimeDependencies,
     ) -> None:
-        super().__init__(
-            user_id=user_id,
-            ip=ip,
-            port=port,
-            server_name=sever_name,
-            log_requests_to_terminal=log_requests_to_terminal,
-        )
+        self._server_name = server_name
+        self._dependencies = dependencies
         self._stop_requested = False
         self._state = _empty_runtime_state()
-
-    def register_all_functions(self) -> None:
-        self.server.register_function(
-            self.run_alertgen_and_sensors_rpc, "run_alertgen_and_sensors"
-        )
-        self.server.register_function(self.get_all_alertgen_info)
-        self.server.register_function(self.stop_all_alertgen_instances)
-        self.server.register_function(
-            self.start_decision_maker_rpc, "start_decision_maker"
-        )
-        self.server.register_function(self.get_decision_maker_info)
-        self.server.register_function(self.stop_decision_maker_instance)
-        self.server.register_function(self.is_decision_maker_stop_complete)
-        self.server.register_function(self.get_decision_maker_stop_report)
-        self.server.register_function(self.get_all_engines_reports)
-        self.server.register_function(self.check_connections)
-        self.server.register_function(self.run_all_engines)
-        self.server.register_function(self.pause_all_engines)
-        self.server.register_function(self.is_alertgen_stop_complete)
-        self.server.register_function(self.get_alertgen_stop_reports)
-        self.server.register_function(self.run_engine_chain_rpc, "run_engine_chain")
-        self.server.register_function(self.stop_engine_chain)
 
     def stop_engine_chain(self) -> int:
         self._stop_requested = True
         return 0
 
     def run_engine_chain(self, payload: dict[str, Any]) -> dict[str, Any]:
-        self.reject_if_shutting_down()
         self._stop_requested = False
-        result = run_engine_chain_payload(payload)
+        result = run_engine_chain_payload(payload, dependencies=self._dependencies)
         self._state.alertgen_reports = [
             dict(item)
             for item in list(
@@ -142,11 +147,11 @@ class EnginesControlRuntimeServer(Base_XML_RPC_Server):
             if isinstance(item, dict)
         ]
         self._state.alertgen_infos = _alertgen_infos_from_results(
-            self.server_name,
+            self._server_name,
             self._state.alertgen_reports,
         )
         self._state.decision_maker_info = _build_decision_maker_info(
-            self.server_name,
+            self._server_name,
             dict(payload.get("decmaker") or {}),
         )
         self._state.decision_maker_report = {
@@ -161,18 +166,7 @@ class EnginesControlRuntimeServer(Base_XML_RPC_Server):
         self._state.decision_maker_stop_report = {}
         return result
 
-    def run_engine_chain_rpc(self, payload: Any) -> dict[str, Any]:
-        if not isinstance(payload, dict):
-            raise ValueError("Engine chain payload must be a dict")
-        return self.run_engine_chain(payload)
-
-    def run_alertgen_and_sensors_rpc(self, payload: Any) -> int | str:
-        if not isinstance(payload, dict):
-            raise ValueError("Alertgen payload must be a dict")
-        return self.run_alertgen_and_sensors(payload)
-
     def run_alertgen_and_sensors(self, payload: dict[str, Any]) -> int | str:
-        self.reject_if_shutting_down()
         if self._state.alertgens_running:
             return "already_run_is_called"
         execution_id = str(payload.get("execution_id", "runtime"))
@@ -201,7 +195,7 @@ class EnginesControlRuntimeServer(Base_XML_RPC_Server):
                 sensor_name = str(sensor.get("name") or f"sensor_{sensor_index}")
                 infos.append(
                     {
-                        "server": self.server_name,
+                        "server": self._server_name,
                         "name": f"{item.get('name', 'alertgen')}:{sensor_name}",
                         "type": str(engine_config.get("type", "alertgen")),
                         "config": {
@@ -236,13 +230,7 @@ class EnginesControlRuntimeServer(Base_XML_RPC_Server):
         self._state.alertgen_stop_complete = True
         return list(reports)
 
-    def start_decision_maker_rpc(self, payload: Any) -> int | str:
-        if not isinstance(payload, dict):
-            raise ValueError("Decision maker payload must be a dict")
-        return self.start_decision_maker(payload)
-
     def start_decision_maker(self, payload: dict[str, Any]) -> int | str:
-        self.reject_if_shutting_down()
         if self._state.decision_maker_running:
             return "already_decision_maker_is_up"
         config = payload.get("config")
@@ -258,7 +246,7 @@ class EnginesControlRuntimeServer(Base_XML_RPC_Server):
         if not isinstance(engine_config, dict):
             raise ValueError("engine_config must be a dict")
         self._state.decision_maker_info = {
-            "server": self.server_name,
+            "server": self._server_name,
             "name": str(config.get("name", "decision_maker")),
             "type": str(engine_config.get("type", "dec1")),
             "config": {"engine_config": dict(engine_config)},
@@ -306,10 +294,10 @@ class EnginesControlRuntimeServer(Base_XML_RPC_Server):
         }
 
     def check_connections(self) -> list[dict[str, str]]:
-        return [
-            {f"{name}({host}:{port})": _service_state(host, port)}
-            for name, host, port in _connection_targets()
-        ]
+        return build_connection_statuses(
+            self._dependencies.connection_targets_provider(),
+            state_resolver=self._dependencies.connection_state_resolver,
+        )
 
     def run_all_engines(self) -> int:
         self._state.alertgens_running = bool(self._state.alertgen_infos) or bool(
@@ -333,7 +321,123 @@ class EnginesControlRuntimeServer(Base_XML_RPC_Server):
         return [dict(item) for item in reports]
 
 
-def run_engine_chain_payload(payload: dict[str, Any]) -> dict[str, Any]:
+class EnginesControlRuntimeServer(Base_XML_RPC_Server):
+    def __init__(
+        self,
+        *,
+        user_id: int,
+        ip: str,
+        port: int,
+        sever_name: str,
+        log_requests_to_terminal: bool,
+    ) -> None:
+        super().__init__(
+            user_id=user_id,
+            ip=ip,
+            port=port,
+            server_name=sever_name,
+            log_requests_to_terminal=log_requests_to_terminal,
+        )
+        self._runtime = EnginesControlRuntimeService(
+            server_name=self.server_name,
+            dependencies=get_dashboard_engines_control_runtime(),
+        )
+
+    def register_all_functions(self) -> None:
+        self.server.register_function(
+            self.run_alertgen_and_sensors_rpc, "run_alertgen_and_sensors"
+        )
+        self.server.register_function(self.get_all_alertgen_info)
+        self.server.register_function(self.stop_all_alertgen_instances)
+        self.server.register_function(
+            self.start_decision_maker_rpc, "start_decision_maker"
+        )
+        self.server.register_function(self.get_decision_maker_info)
+        self.server.register_function(self.stop_decision_maker_instance)
+        self.server.register_function(self.is_decision_maker_stop_complete)
+        self.server.register_function(self.get_decision_maker_stop_report)
+        self.server.register_function(self.get_all_engines_reports)
+        self.server.register_function(self.check_connections)
+        self.server.register_function(self.run_all_engines)
+        self.server.register_function(self.pause_all_engines)
+        self.server.register_function(self.is_alertgen_stop_complete)
+        self.server.register_function(self.get_alertgen_stop_reports)
+        self.server.register_function(self.run_engine_chain_rpc, "run_engine_chain")
+        self.server.register_function(self.stop_engine_chain)
+
+    def stop_engine_chain(self) -> int:
+        return self._runtime.stop_engine_chain()
+
+    def run_engine_chain(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.reject_if_shutting_down()
+        return self._runtime.run_engine_chain(payload)
+
+    def run_engine_chain_rpc(self, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ValueError("Engine chain payload must be a dict")
+        return self.run_engine_chain(payload)
+
+    def run_alertgen_and_sensors_rpc(self, payload: Any) -> int | str:
+        if not isinstance(payload, dict):
+            raise ValueError("Alertgen payload must be a dict")
+        return self.run_alertgen_and_sensors(payload)
+
+    def run_alertgen_and_sensors(self, payload: dict[str, Any]) -> int | str:
+        self.reject_if_shutting_down()
+        return self._runtime.run_alertgen_and_sensors(payload)
+
+    def get_all_alertgen_info(self) -> list[dict[str, Any]]:
+        return self._runtime.get_all_alertgen_info()
+
+    def stop_all_alertgen_instances(self) -> list[dict[str, Any]]:
+        return self._runtime.stop_all_alertgen_instances()
+
+    def start_decision_maker_rpc(self, payload: Any) -> int | str:
+        if not isinstance(payload, dict):
+            raise ValueError("Decision maker payload must be a dict")
+        return self.start_decision_maker(payload)
+
+    def start_decision_maker(self, payload: dict[str, Any]) -> int | str:
+        self.reject_if_shutting_down()
+        return self._runtime.start_decision_maker(payload)
+
+    def get_decision_maker_info(self) -> dict[str, Any]:
+        return self._runtime.get_decision_maker_info()
+
+    def stop_decision_maker_instance(self) -> dict[str, Any]:
+        return self._runtime.stop_decision_maker_instance()
+
+    def is_decision_maker_stop_complete(self) -> bool:
+        return self._runtime.is_decision_maker_stop_complete()
+
+    def get_decision_maker_stop_report(self) -> dict[str, Any] | None:
+        return self._runtime.get_decision_maker_stop_report()
+
+    def get_all_engines_reports(self) -> dict[str, Any]:
+        return self._runtime.get_all_engines_reports()
+
+    def check_connections(self) -> list[dict[str, str]]:
+        return self._runtime.check_connections()
+
+    def run_all_engines(self) -> int:
+        return self._runtime.run_all_engines()
+
+    def pause_all_engines(self) -> int:
+        return self._runtime.pause_all_engines()
+
+    def is_alertgen_stop_complete(self) -> bool:
+        return self._runtime.is_alertgen_stop_complete()
+
+    def get_alertgen_stop_reports(self) -> list[dict[str, Any]] | None:
+        return self._runtime.get_alertgen_stop_reports()
+
+
+def run_engine_chain_payload(
+    payload: dict[str, Any],
+    *,
+    dependencies: DashboardEnginesControlRuntimeDependencies | None = None,
+) -> dict[str, Any]:
+    runtime_dependencies = dependencies or get_dashboard_engines_control_runtime()
     started_at = _utc_now()
     started_at_perf = perf_counter()
     symbol = str(payload["symbol"])
@@ -343,7 +447,7 @@ def run_engine_chain_payload(payload: dict[str, Any]) -> dict[str, Any]:
     decmaker_payload = dict(payload["decmaker"])
 
     alertgen_results = [
-        run_alert_algorithm(
+        runtime_dependencies.alert_algorithm_runner(
             sensor_config=dict(alertgen_payload),
             report_base_path=report_base_path,
             candles=candles,
@@ -355,6 +459,7 @@ def run_engine_chain_payload(payload: dict[str, Any]) -> dict[str, Any]:
         symbol=symbol,
         alertgen_results=alertgen_results,
         decmaker_payload=decmaker_payload,
+        decmaker_algorithm_factory=runtime_dependencies.decmaker_algorithm_factory,
     )
     signal_summary = _build_signal_summary(alertgen_results)
     finished_at = _utc_now()
@@ -433,6 +538,7 @@ def _combine_latest_decision(
     symbol: str,
     alertgen_results: list[dict[str, Any]],
     decmaker_payload: dict[str, Any],
+    decmaker_algorithm_factory: Callable[..., Any],
 ) -> dict[str, Any]:
     alerts = _build_decmaker_alerts(symbol=symbol, alertgen_results=alertgen_results)
     container = _DecisionMakerContainer(
@@ -449,7 +555,7 @@ def _combine_latest_decision(
             None,
         ),
     )
-    decision_maker = create_decmaker_algorithm(
+    decision_maker = decmaker_algorithm_factory(
         container_obj=container,
         engine_config=dict(decmaker_payload.get("decmaker_param") or {}),
     )
@@ -575,59 +681,3 @@ def _build_decision_maker_info(
         "type": str(decmaker_payload.get("decmaker_key", "dec1") or "dec1"),
         "config": {"engine_config": dict(decmaker_payload.get("decmaker_param") or {})},
     }
-
-
-def _connection_targets() -> list[tuple[str, str, int]]:
-    return [
-        (
-            "central",
-            os.environ.get("TRADING_ALGOS_DASHBOARD_CENTRAL_HOST", "127.0.0.1").strip()
-            or "127.0.0.1",
-            int(os.environ.get("TRADING_ALGOS_DASHBOARD_CENTRAL_PORT", "6000")),
-        ),
-        (
-            "fake_datetime",
-            os.environ.get(
-                "TRADING_ALGOS_DASHBOARD_FAKE_DATETIME_HOST", "127.0.0.1"
-            ).strip()
-            or "127.0.0.1",
-            int(os.environ.get("TRADING_ALGOS_DASHBOARD_FAKE_DATETIME_PORT", "7100")),
-        ),
-        (
-            "data",
-            os.environ.get("TRADING_ALGOS_DASHBOARD_DATA_HOST", "127.0.0.1").strip()
-            or "127.0.0.1",
-            int(os.environ.get("TRADING_ALGOS_DASHBOARD_DATA_PORT", "6010")),
-        ),
-        (
-            "broker",
-            os.environ.get("TRADING_ALGOS_DASHBOARD_BROKER_HOST", "127.0.0.1").strip()
-            or "127.0.0.1",
-            int(os.environ.get("TRADING_ALGOS_DASHBOARD_BROKER_PORT", "7101")),
-        ),
-    ]
-
-
-def _service_state(host: str, port: int) -> str:
-    if _xmlrpc_ping(host, port):
-        return "up"
-    if _tcp_port_open(host, port):
-        return "up"
-    return "down"
-
-
-def _xmlrpc_ping(host: str, port: int) -> bool:
-    try:
-        proxy = ServerProxy(f"http://{host}:{port}", allow_none=True)
-        result = proxy.ping()
-        return result == "pong"
-    except Exception:
-        return False
-
-
-def _tcp_port_open(host: str, port: int) -> bool:
-    try:
-        with socket.create_connection((host, port), timeout=0.25):
-            return True
-    except OSError:
-        return False

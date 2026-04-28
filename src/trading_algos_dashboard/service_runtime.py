@@ -4,17 +4,25 @@ import argparse
 import os
 from dataclasses import dataclass
 from typing import Any
+from typing import Callable
 
 import mongoengine  # type: ignore[import-untyped]
 from pymongo import MongoClient
 from pymongo import ReturnDocument
 from pymongo.database import Database
-from trading_servers import CentralServer
-from trading_servers import DataServer
-from trading_servers import FakeDateTimeServer
 from trading_servers.xmlrpc_server import Base_XML_RPC_Server
 
-from trading_algos_dashboard.engines_control_runtime import EnginesControlRuntimeServer
+from trading_algos_dashboard.trading_servers_integration import (
+    TradingServerRuntimeRequest,
+)
+from trading_algos_dashboard.trading_servers_integration import build_central_server
+from trading_algos_dashboard.trading_servers_integration import build_data_server
+from trading_algos_dashboard.trading_servers_integration import (
+    build_engines_control_server,
+)
+from trading_algos_dashboard.trading_servers_integration import (
+    build_fake_datetime_server,
+)
 
 
 @dataclass(frozen=True)
@@ -102,46 +110,55 @@ def _connect_data_runtime_storage() -> None:
     )
 
 
+def _runtime_request(config: ServiceRuntimeConfig) -> TradingServerRuntimeRequest:
+    return TradingServerRuntimeRequest(
+        name=config.name,
+        host=config.host,
+        port=config.port,
+        user_id=config.user_id,
+    )
+
+
+def _build_central_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
+    mongo_uri, mongo_db_name = _mongo_runtime_settings()
+    return build_central_server(
+        _runtime_request(config),
+        counter_repository=MongoCounterRepository(
+            mongo_uri=mongo_uri,
+            mongo_db_name=mongo_db_name,
+        ),
+    )
+
+
+def _build_data_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
+    _connect_data_runtime_storage()
+    return build_data_server(_runtime_request(config))
+
+
+def _build_fake_datetime_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
+    return build_fake_datetime_server(_runtime_request(config))
+
+
+def _build_engines_control_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
+    return build_engines_control_server(_runtime_request(config))
+
+
+ServerBuilder = Callable[[ServiceRuntimeConfig], Base_XML_RPC_Server]
+
+
+_SERVER_BUILDERS: dict[str, ServerBuilder] = {
+    "central": _build_central_server,
+    "data": _build_data_server,
+    "fake_datetime": _build_fake_datetime_server,
+    "engines_control": _build_engines_control_server,
+}
+
+
 def _build_server(config: ServiceRuntimeConfig) -> Base_XML_RPC_Server:
-    if config.name == "central":
-        mongo_uri, mongo_db_name = _mongo_runtime_settings()
-        return CentralServer(
-            user_id=config.user_id,
-            ip=config.host,
-            port=config.port,
-            sever_name=config.name,
-            log_requests_to_terminal=False,
-            counter_repository=MongoCounterRepository(
-                mongo_uri=mongo_uri,
-                mongo_db_name=mongo_db_name,
-            ),
-        )
-    if config.name == "data":
-        _connect_data_runtime_storage()
-        return DataServer(
-            user_id=config.user_id,
-            ip=config.host,
-            port=config.port,
-            sever_name=config.name,
-            log_requests_to_terminal=False,
-        )
-    if config.name == "fake_datetime":
-        return FakeDateTimeServer(
-            user_id=config.user_id,
-            ip=config.host,
-            port=config.port,
-            sever_name=config.name,
-            log_requests_to_terminal=False,
-        )
-    if config.name == "engines_control":
-        return EnginesControlRuntimeServer(
-            user_id=config.user_id,
-            ip=config.host,
-            port=config.port,
-            sever_name=config.name,
-            log_requests_to_terminal=False,
-        )
-    raise ValueError(f"Unsupported service runtime: {config.name}")
+    builder = _SERVER_BUILDERS.get(config.name)
+    if builder is None:
+        raise ValueError(f"Unsupported service runtime: {config.name}")
+    return builder(config)
 
 
 def main() -> None:

@@ -41,7 +41,9 @@ def validate_decmaker_engine_payload(
     return normalized
 
 
-def _validate_required_keys(payload: dict[str, Any], required_keys: list[str], label: str) -> None:
+def _validate_required_keys(
+    payload: dict[str, Any], required_keys: list[str], label: str
+) -> None:
     missing_keys = [key for key in required_keys if key not in payload]
     if missing_keys:
         raise ValueError(f"{label} is missing required keys: {', '.join(missing_keys)}")
